@@ -23,13 +23,13 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 
 | Field | Value |
 |---|---|
-| Stage | Foundation phase complete (T001–T005) — ready for Phase 1 (public shell) |
+| Stage | Foundation (T001–T005) + public shell/landing (T010/T011) complete |
 | Current focus | Web platform MVP |
 | Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16 |
-| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives + shadcn/ui base UI system, committed to git |
+| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives + shadcn/ui base UI system + public site, committed to git |
 | Build | `VERIFIED` — `npm run build` succeeds (Next.js 16.3.5, Turbopack) |
 | Tests | `UNVERIFIED` — no test runner configured yet |
-| Next action | T010 — public layout |
+| Next action | T013 — authentication — `BLOCKED` on auth provider decision (B2). T012 (Pricing, P1) skipped for now |
 
 Core loop being built:
 
@@ -81,14 +81,17 @@ Browser → Next.js App → Backend API → PostgreSQL / AI Provider / Storage
 
 ---
 
-## 4. UI State — `UNVERIFIED`
+## 4. UI State
 
-- **Design system:** Glass Capsule (`AGENTS.md` §7) is mandatory and **newly adopted**. Any UI built
-  before 2026-09-16 predates it and must be re-checked against §7.11.
-- **Design tokens:** not confirmed to exist → T003.
-- **Capsule primitives:** not confirmed to exist → T004.
-- **Known migration risk:** earlier guidance specified rounded cards and a purple accent. Any existing
-  screen following that guidance is now non-conformant and requires rework, not preservation.
+- **Design system:** Glass Capsule (`AGENTS.md` §7) — `VERIFIED` implemented (tokens T003, primitives
+  T004, base UI T005).
+- **Design tokens:** `VERIFIED` — see §3 Architecture State.
+- **Capsule primitives:** `VERIFIED` — see §3 Architecture State.
+- **Public site:** `VERIFIED` — `SiteHeader`/`SiteFooter` (`components/layout/`), landing page
+  (`app/(public)/page.tsx`) covering role benefits and the core loop, and `/login`/`/signup` placeholder
+  pages explicitly labeled unavailable pending T013. Verified visually at ~390px and desktop widths.
+- **Known migration risk:** earlier guidance specified rounded cards and a purple accent — resolved;
+  no such UI exists in the repository.
 
 ---
 

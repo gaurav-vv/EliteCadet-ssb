@@ -37,14 +37,10 @@ P2  Post-MVP
 
 ### Current state of the roadmap
 
-T001–T005 are complete: the repository exists (Next.js/TypeScript/Tailwind scaffold via
-`create-next-app`), the Glass Capsule design token layer (`app/globals.css`) is implemented,
-`CapsulePrimary`/`CapsuleSecondary`/`CapsuleSmall` (`components/ui/capsule.tsx`) are built and
-visually verified, and the base UI system (shadcn/ui — button, input, select, dialog, tabs, badge,
-table, alert, label, textarea, separator, skeleton — plus custom `EmptyState`/`ErrorState`/
-`LoadingState`) is installed, reconciled to the navy design tokens, and visually verified. See
-`status.md` for the verified architecture snapshot. All remaining tasks are `[ ]` or `[~]` and have
-not been verified as implemented.
+T001–T005 (Foundation) and T010/T011 (public layout + landing page) are complete — see `status.md`
+for the verified architecture snapshot. T012 (Pricing) was skipped for now as P1; T013/T014 remain
+`[~]` BLOCKED on the auth provider decision. All remaining tasks are `[ ]` or `[~]` and have not been
+verified as implemented.
 
 ---
 
@@ -150,12 +146,12 @@ button, badge or empty state.
 
 # Phase 1 — Public Shell & Access
 
-## T010 — Public layout — P0 — `[ ]`
+## T010 — Public layout — P0 — `[x]`
 **Depends on:** T004, T005.
 **Requirements:** header, footer, primary CTA, responsive layout, correct metadata scaffolding.
 **Acceptance:** layout holds at 320px–1920px with no horizontal overflow; nav is keyboard operable.
 
-## T011 — Landing page — P0 — `[ ]`
+## T011 — Landing page — P0 — `[x]`
 **Why:** First contact with the product; drives signup.
 **Depends on:** T010. **Spec:** `specs.md` §5.1.
 **Requirements:** value proposition, student/mentor/academy benefits, AI-assisted preparation,
