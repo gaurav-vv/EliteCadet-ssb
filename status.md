@@ -23,13 +23,13 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 
 | Field | Value |
 |---|---|
-| Stage | Scaffold + design tokens complete (T001–T003); no components yet |
+| Stage | Scaffold + design tokens + capsule primitives complete (T001–T004) |
 | Current focus | Web platform MVP |
 | Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16 |
-| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens, committed to git |
+| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives, committed to git |
 | Build | `VERIFIED` — `npm run build` succeeds (Next.js 16.3.5, Turbopack) |
 | Tests | `UNVERIFIED` — no test runner configured yet |
-| Next action | T004 — capsule primitive components |
+| Next action | T005 — base UI system |
 
 Core loop being built:
 
@@ -59,7 +59,7 @@ Onboard → Practice → AI Feedback → Improve → Practice Again
 | Installed versions | `VERIFIED` — Next.js 16.3.5, React 19.2.8, TypeScript 5.9.3, Tailwind CSS 4.3.3, ESLint 9.x, eslint-config-next 16.3.5 |
 | Routing | `VERIFIED` — App Router default (`/`, `/_not-found`); no product routes yet |
 | Design tokens | `VERIFIED` — `app/globals.css`: navy scale, bg/text, semantic status colors, glass opacity/blur/border, two shadow levels, capsule radii, motion duration/easing + reduced-motion override; spacing intentionally reuses Tailwind's default scale (no second system) |
-| Capsule primitive components | `UNVERIFIED` — not built (T004) |
+| Capsule primitive components | `VERIFIED` — `components/ui/capsule.tsx`: `CapsulePrimary`/`CapsuleSecondary`/`CapsuleSmall`, all 8 states, keyboard focus, responsive at 320/768px (see Decisions Register for a cascade-layer bug found and fixed) |
 | API client layer | `UNVERIFIED` — not built |
 | Authentication | `UNVERIFIED` + `BLOCKED` (provider undecided) |
 | Authorization / academy isolation | `UNVERIFIED` |
@@ -163,6 +163,8 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-16 | Media-player / watch-room / playback-sync requirements excluded | Belong to a different project; no such feature exists here |
 | 2026-09-16 | Frontend-defined types serve as the interim API contract | Unblocks UI work without scattering backend assumptions |
 | 2026-09-16 | Project scaffolded with `create-next-app` (App Router, TS strict, Tailwind, ESLint), package name `ssb-academy` | Standard, supported tooling for the mandated stack (`AGENTS.md` §3); confirmed with user that "from scratch" meant no pre-existing code, not hand-authoring config |
+| 2026-09-16 | Capsule icons are passed as string names (`icon="mission"`) resolved against a registry in `components/ui/capsule.tsx`, never as a component reference or JSX element prop | Next.js 16 / React 19 cannot serialize a Lucide icon (forwardRef component) across the Server→Client Component boundary as a custom prop; confirmed by reproducing both failure modes during T004. All capsule call sites (mostly Server Components) must use this pattern |
+| 2026-09-16 | `.glass-surface`/`.glass-surface--*` state modifiers (selected/success/error/focus-visible) are written as plain CSS in `app/globals.css`, never as Tailwind utility classes on a component | `.glass-surface` sets `background`/`border`/`box-shadow` outside any Tailwind `@layer`, so those unlayered declarations always beat layered Tailwind utilities for the same properties regardless of class order — found via visual QA in T004 (selected/success/error/focus states were invisible until fixed). Any new glass-surface-based component must add state styling next to `.glass-surface` in CSS, not via `border-*`/`bg-*`/`shadow-*`/`ring-*` utility classes |
 
 ---
 

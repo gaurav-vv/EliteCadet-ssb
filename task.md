@@ -37,10 +37,12 @@ P2  Post-MVP
 
 ### Current state of the roadmap
 
-T001–T003 are complete: the repository exists (Next.js/TypeScript/Tailwind scaffold via
-`create-next-app`) and the Glass Capsule design token layer (`app/globals.css`) is implemented and
-visually verified. See `status.md` for the verified architecture snapshot. All remaining tasks are
-`[ ]` or `[~]` and have not been verified as implemented.
+T001–T004 are complete: the repository exists (Next.js/TypeScript/Tailwind scaffold via
+`create-next-app`), the Glass Capsule design token layer (`app/globals.css`) is implemented, and
+`CapsulePrimary`/`CapsuleSecondary`/`CapsuleSmall` (`components/ui/capsule.tsx`) are built and
+visually verified at 320/768px, via keyboard, and across all eight states. See `status.md` for the
+verified architecture snapshot. All remaining tasks are `[ ]` or `[~]` and have not been verified as
+implemented.
 
 ---
 
@@ -107,7 +109,7 @@ editing any component.
 
 ---
 
-## T004 — Capsule primitive components — P0 — `[ ]`
+## T004 — Capsule primitive components — P0 — `[x]`
 
 **Why:** The whole UI is built from three capsule levels. They must exist once, not per page.
 

@@ -122,10 +122,38 @@ body {
   border-radius: var(--capsule-radius-sm);
 }
 
+/*
+ * State modifiers live here, not as Tailwind utilities on the component:
+ * .glass-surface sets background/border/box-shadow as unlayered CSS, which
+ * always wins over Tailwind's layered utility classes for the same
+ * properties. Add new capsule visual states next to these, not as
+ * conditional Tailwind classes in components/ui/capsule.tsx.
+ */
+.glass-surface--selected {
+  background: color-mix(in srgb, var(--brand-navy-100) 65%, var(--bg-base));
+  border: 2px solid var(--brand-navy-500);
+  box-shadow: var(--shadow-hover);
+}
+
+.glass-surface--success {
+  border-color: var(--status-success);
+}
+
+.glass-surface--error {
+  border-color: var(--status-danger);
+}
+
 @media (hover: hover) {
   .glass-surface:hover {
     box-shadow: var(--shadow-hover);
   }
+}
+
+.glass-surface:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--bg-base),
+    0 0 0 4px var(--brand-navy-500);
 }
 
 @media (prefers-reduced-motion: reduce) {

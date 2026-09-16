@@ -282,7 +282,21 @@ A screen is not complete until all twelve are "yes":
 7. Navy branding consistent · 8. Spacing & typography consistent · 9. Icons consistent ·
 10. Interactions smooth · 11. Works mobile → desktop · 12. Premium without visual noise
 
-### 7.12 North star
+### 7.12 Implementation constraints (learned in T004 — binding)
+
+- **Icon props cross component boundaries as names, not references.** A Lucide icon component
+  cannot be serialized from a Server Component into a `"use client"` component as a prop — passing
+  the component reference or a rendered `<Icon />` element both fail at runtime. Any capsule/button/etc.
+  that takes an icon must accept a string key resolved against an internal icon registry inside the
+  client component's own file (see `capsuleIcons` in `components/ui/capsule.tsx` for the pattern).
+- **`.glass-surface` state styling lives in CSS, never as Tailwind utilities on the component.**
+  `.glass-surface` sets `background`/`border`/`box-shadow` as plain (unlayered) CSS in
+  `app/globals.css`, which always overrides Tailwind's own layered utility classes for those same
+  properties — a `border-*`/`bg-*`/`shadow-*`/`ring-*` utility applied conditionally in a component
+  will silently do nothing. Add new visual states (selected, error, focus, etc.) as
+  `.glass-surface--*` rules next to `.glass-surface` itself.
+
+### 7.13 North star
 
 > Apple-like simplicity + glass capsule interaction + strong navy branding + progressive navigation
 > + generous whitespace + extremely consistent components.
