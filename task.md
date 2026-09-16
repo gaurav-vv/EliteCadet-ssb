@@ -37,9 +37,10 @@ P2  Post-MVP
 
 ### Current state of the roadmap
 
-T001 and T002 are complete: the repository now exists (Next.js/TypeScript/Tailwind scaffold via
-`create-next-app`, committed to git). See `status.md` for the verified architecture snapshot. All
-remaining tasks are `[ ]` or `[~]` and have not been verified as implemented.
+T001–T003 are complete: the repository exists (Next.js/TypeScript/Tailwind scaffold via
+`create-next-app`) and the Glass Capsule design token layer (`app/globals.css`) is implemented and
+visually verified. See `status.md` for the verified architecture snapshot. All remaining tasks are
+`[ ]` or `[~]` and have not been verified as implemented.
 
 ---
 
@@ -85,7 +86,7 @@ commands.
 
 ---
 
-## T003 — Design token layer (Glass Capsule) — P0 — `[ ]`
+## T003 — Design token layer (Glass Capsule) — P0 — `[x]`
 
 **Why:** The design system in `AGENTS.md` §7 is mandatory and token-driven. Building screens before
 tokens guarantees scattered literals and an inconsistent UI.

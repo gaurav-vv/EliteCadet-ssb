@@ -1,26 +1,140 @@
 @import "tailwindcss";
 
+/*
+ * Design token layer — Glass Capsule design system (AGENTS.md §7.10).
+ * Every capsule/glass/motion value used anywhere in the app must come from
+ * here. A raw hex, radius, blur or duration literal in a component is a
+ * review failure. Spacing uses Tailwind's built-in scale — see the note
+ * below rather than a second, competing spacing system.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Navy brand scale — primary actions, headings, selected states, nav, icons (§7.5) */
+  --brand-navy-900: #0b1b3a;
+  --brand-navy-700: #14284f;
+  --brand-navy-500: #2b4a82;
+  --brand-navy-300: #7c93c2;
+  --brand-navy-100: #e4eaf5;
+  --brand-navy-50: #f4f7fc;
+  --brand-navy: var(--brand-navy-700);
+  --brand-navy-fg: #ffffff;
+
+  /* Background */
+  --bg-base: #ffffff;
+  --bg-ambient: #f6f8fc;
+
+  /* Text */
+  --text-primary: #16213e;
+  --text-muted: #5b6478;
+
+  /* Semantic status — restrained, always paired with text/icon (§13) */
+  --status-success: #1f8a4c;
+  --status-success-bg: #e8f6ee;
+  --status-warning: #a15c00;
+  --status-warning-bg: #fbf1e0;
+  --status-danger: #c0293b;
+  --status-danger-bg: #fbeaec;
+  --status-info: #1d6fb8;
+  --status-info-bg: #e9f3fc;
+
+  /* Glass effect (§7.4) */
+  --glass-opacity: 0.6;
+  --glass-blur: 16px;
+  --border-opacity: 0.1;
+
+  /* Shadows — exactly two levels (§7.10) */
+  --shadow-soft: 0 1px 2px rgb(11 27 58 / 4%), 0 4px 12px rgb(11 27 58 / 6%);
+  --shadow-hover: 0 2px 4px rgb(11 27 58 / 6%), 0 10px 24px rgb(11 27 58 / 10%);
+
+  /* Capsule radii — three-level hierarchy shares these two radii (§7.3) */
+  --capsule-radius: 28px;
+  --capsule-radius-sm: 16px;
+
+  /* Motion (§7.7) */
+  --motion-duration: 180ms;
+  --motion-duration-slow: 260ms;
+  --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/*
+ * Spacing tokens: Tailwind's default spacing scale (p-1, gap-4, space-y-6, …)
+ * IS the spacing token system for this project. AGENTS.md §5 requires reusing
+ * an existing token system rather than adding a second one — do not introduce
+ * a parallel --space-* scale or arbitrary px/rem values in components.
+ */
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-brand-navy-900: var(--brand-navy-900);
+  --color-brand-navy-700: var(--brand-navy-700);
+  --color-brand-navy-500: var(--brand-navy-500);
+  --color-brand-navy-300: var(--brand-navy-300);
+  --color-brand-navy-100: var(--brand-navy-100);
+  --color-brand-navy-50: var(--brand-navy-50);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-fg: var(--brand-navy-fg);
+
+  --color-bg-base: var(--bg-base);
+  --color-bg-ambient: var(--bg-ambient);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+
+  --color-success: var(--status-success);
+  --color-success-bg: var(--status-success-bg);
+  --color-warning: var(--status-warning);
+  --color-warning-bg: var(--status-warning-bg);
+  --color-danger: var(--status-danger);
+  --color-danger-bg: var(--status-danger-bg);
+  --color-info: var(--status-info);
+  --color-info-bg: var(--status-info-bg);
+
+  --radius-capsule: var(--capsule-radius);
+  --radius-capsule-sm: var(--capsule-radius-sm);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+ * Glass surface — the shared base for every capsule (T004 builds the
+ * CapsulePrimary/Secondary/Small components on top of this class rather
+ * than re-declaring blur/opacity/border literals per component).
+ */
+.glass-surface {
+  background: color-mix(in srgb, var(--bg-base) calc(var(--glass-opacity) * 100%), transparent);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid rgb(11 27 58 / var(--border-opacity));
+  box-shadow: var(--shadow-soft);
+  border-radius: var(--capsule-radius);
+  transition:
+    transform var(--motion-duration) var(--motion-easing),
+    box-shadow var(--motion-duration) var(--motion-easing),
+    background var(--motion-duration) var(--motion-easing),
+    border-color var(--motion-duration) var(--motion-easing);
+}
+
+.glass-surface--sm {
+  border-radius: var(--capsule-radius-sm);
+}
+
+@media (hover: hover) {
+  .glass-surface:hover {
+    box-shadow: var(--shadow-hover);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

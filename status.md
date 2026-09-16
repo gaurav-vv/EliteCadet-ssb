@@ -23,13 +23,13 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 
 | Field | Value |
 |---|---|
-| Stage | Scaffold complete (T001, T002); no feature/design-system code yet |
+| Stage | Scaffold + design tokens complete (T001–T003); no components yet |
 | Current focus | Web platform MVP |
 | Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16 |
-| Codebase | `VERIFIED` — Next.js scaffold exists, committed to git |
+| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens, committed to git |
 | Build | `VERIFIED` — `npm run build` succeeds (Next.js 16.3.5, Turbopack) |
 | Tests | `UNVERIFIED` — no test runner configured yet |
-| Next action | T003 — design token layer (Glass Capsule) |
+| Next action | T004 — capsule primitive components |
 
 Core loop being built:
 
@@ -58,7 +58,8 @@ Onboard → Practice → AI Feedback → Improve → Practice Again
 | Project structure | `VERIFIED` — App Router scaffold (`app/`, `public/`), no `src/` dir, matches `AGENTS.md` §5 target (subdirectories not yet created) |
 | Installed versions | `VERIFIED` — Next.js 16.3.5, React 19.2.8, TypeScript 5.9.3, Tailwind CSS 4.3.3, ESLint 9.x, eslint-config-next 16.3.5 |
 | Routing | `VERIFIED` — App Router default (`/`, `/_not-found`); no product routes yet |
-| Component library / tokens | `UNVERIFIED` — not built (T003, T004) |
+| Design tokens | `VERIFIED` — `app/globals.css`: navy scale, bg/text, semantic status colors, glass opacity/blur/border, two shadow levels, capsule radii, motion duration/easing + reduced-motion override; spacing intentionally reuses Tailwind's default scale (no second system) |
+| Capsule primitive components | `UNVERIFIED` — not built (T004) |
 | API client layer | `UNVERIFIED` — not built |
 | Authentication | `UNVERIFIED` + `BLOCKED` (provider undecided) |
 | Authorization / academy isolation | `UNVERIFIED` |
