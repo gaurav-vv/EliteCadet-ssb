@@ -8,14 +8,11 @@
 
 ## 0. Evidence Basis (read this first)
 
-This snapshot was produced from the four documentation files only. **No repository, source tree,
-`package.json`, or build was available for inspection.**
-
-Consequently:
-
-- Every statement about implementation is `UNVERIFIED`.
-- Nothing below claims a feature works.
-- Task **T001 (repository inspection)** must be run before any other statement here can be upgraded.
+T001 (repository inspection) has run. The repository now exists: a Next.js/TypeScript/Tailwind
+scaffold generated with `create-next-app`, installed, built and committed to git. Statements below
+about the scaffold are `VERIFIED` by direct inspection (`npm install`, `npm run lint`, `npm run build`
+all run clean). Everything under Phase 1 onward remains `UNVERIFIED` — no feature code has been
+written yet.
 
 Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `BROKEN` · `BLOCKED` ·
 `DEFERRED`.
@@ -26,13 +23,13 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 
 | Field | Value |
 |---|---|
-| Stage | Product definition complete; implementation not verified as started |
+| Stage | Scaffold complete (T001, T002); no feature/design-system code yet |
 | Current focus | Web platform MVP |
 | Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16 |
-| Codebase | `UNVERIFIED` — not inspected |
-| Build | `UNVERIFIED` — never run |
-| Tests | `UNVERIFIED` — no suite confirmed to exist |
-| Next action | T001 — repository inspection & reconciliation |
+| Codebase | `VERIFIED` — Next.js scaffold exists, committed to git |
+| Build | `VERIFIED` — `npm run build` succeeds (Next.js 16.3.5, Turbopack) |
+| Tests | `UNVERIFIED` — no test runner configured yet |
+| Next action | T003 — design token layer (Glass Capsule) |
 
 Core loop being built:
 
@@ -54,20 +51,25 @@ Onboard → Practice → AI Feedback → Improve → Practice Again
 
 ---
 
-## 3. Architecture State — `UNVERIFIED`
+## 3. Architecture State
 
 | Area | State |
 |---|---|
-| Project structure | `UNVERIFIED` |
-| Routing | `UNVERIFIED` |
-| Component library / tokens | `UNVERIFIED` |
-| API client layer | `UNVERIFIED` |
+| Project structure | `VERIFIED` — App Router scaffold (`app/`, `public/`), no `src/` dir, matches `AGENTS.md` §5 target (subdirectories not yet created) |
+| Installed versions | `VERIFIED` — Next.js 16.3.5, React 19.2.8, TypeScript 5.9.3, Tailwind CSS 4.3.3, ESLint 9.x, eslint-config-next 16.3.5 |
+| Routing | `VERIFIED` — App Router default (`/`, `/_not-found`); no product routes yet |
+| Component library / tokens | `UNVERIFIED` — not built (T003, T004) |
+| API client layer | `UNVERIFIED` — not built |
 | Authentication | `UNVERIFIED` + `BLOCKED` (provider undecided) |
 | Authorization / academy isolation | `UNVERIFIED` |
 | AI feedback integration | `UNVERIFIED` + `BLOCKED` (provider undecided) |
 | Backend / database | `UNVERIFIED` + `BLOCKED` (contract undecided) |
 | Storage | `UNVERIFIED` + `BLOCKED` |
-| Testing infrastructure | `UNVERIFIED` |
+| Testing infrastructure | `UNVERIFIED` — no test runner installed |
+| Lint | `VERIFIED` — `npm run lint` passes clean |
+| Build | `VERIFIED` — `npm run build` (Turbopack) succeeds, produces static `/` and `/_not-found` |
+| Git | `VERIFIED` — repository initialized, initial commit made |
+| Environment variables | `VERIFIED` — none required yet; none present |
 
 Intended architecture (target, not observed):
 
@@ -159,6 +161,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-16 | "Today's Mission" (MVP) split from the "5-Day SSB Mission" programme (P1) | Design brief and scope list conflicted on the word "Mission" |
 | 2026-09-16 | Media-player / watch-room / playback-sync requirements excluded | Belong to a different project; no such feature exists here |
 | 2026-09-16 | Frontend-defined types serve as the interim API contract | Unblocks UI work without scattering backend assumptions |
+| 2026-09-16 | Project scaffolded with `create-next-app` (App Router, TS strict, Tailwind, ESLint), package name `ssb-academy` | Standard, supported tooling for the mandated stack (`AGENTS.md` §3); confirmed with user that "from scratch" meant no pre-existing code, not hand-authoring config |
 
 ---
 

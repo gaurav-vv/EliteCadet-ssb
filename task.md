@@ -37,14 +37,15 @@ P2  Post-MVP
 
 ### Current state of the roadmap
 
-**No task below has been verified as implemented.** No repository has been inspected. Every task is
-`[ ]` or `[~]`. Once the repository exists, T001 reconciles this file against reality.
+T001 and T002 are complete: the repository now exists (Next.js/TypeScript/Tailwind scaffold via
+`create-next-app`, committed to git). See `status.md` for the verified architecture snapshot. All
+remaining tasks are `[ ]` or `[~]` and have not been verified as implemented.
 
 ---
 
 # Phase 0 — Foundation
 
-## T001 — Repository inspection & reconciliation — P0 — `[ ]`
+## T001 — Repository inspection & reconciliation — P0 — `[x]`
 
 **Why:** Every other task assumes a known starting point. This roadmap currently assumes nothing
 exists; that assumption must be replaced with fact.
@@ -68,7 +69,7 @@ result recorded.
 
 ---
 
-## T002 — Development standards — P0 — `[ ]`
+## T002 — Development standards — P0 — `[x]`
 
 **Why:** Conventions decided after code exists are conventions that get violated.
 
