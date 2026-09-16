@@ -17,7 +17,7 @@ import {
   Settings,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils/cn";
+import { cn } from "cn";
 
 // Named registry, not a component-reference prop: a Server Component can't
 // pass a component reference to this Client Component across the RSC

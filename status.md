@@ -23,13 +23,13 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 
 | Field | Value |
 |---|---|
-| Stage | Scaffold + design tokens + capsule primitives complete (T001–T004) |
+| Stage | Foundation phase complete (T001–T005) — ready for Phase 1 (public shell) |
 | Current focus | Web platform MVP |
 | Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16 |
-| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives, committed to git |
+| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives + shadcn/ui base UI system, committed to git |
 | Build | `VERIFIED` — `npm run build` succeeds (Next.js 16.3.5, Turbopack) |
 | Tests | `UNVERIFIED` — no test runner configured yet |
-| Next action | T005 — base UI system |
+| Next action | T010 — public layout |
 
 Core loop being built:
 
@@ -60,6 +60,7 @@ Onboard → Practice → AI Feedback → Improve → Practice Again
 | Routing | `VERIFIED` — App Router default (`/`, `/_not-found`); no product routes yet |
 | Design tokens | `VERIFIED` — `app/globals.css`: navy scale, bg/text, semantic status colors, glass opacity/blur/border, two shadow levels, capsule radii, motion duration/easing + reduced-motion override; spacing intentionally reuses Tailwind's default scale (no second system) |
 | Capsule primitive components | `VERIFIED` — `components/ui/capsule.tsx`: `CapsulePrimary`/`CapsuleSecondary`/`CapsuleSmall`, all 8 states, keyboard focus, responsive at 320/768px (see Decisions Register for a cascade-layer bug found and fixed) |
+| Base UI system | `VERIFIED` — shadcn/ui (Radix + Nova preset) installed: button, input, select, dialog, tabs, badge, table, alert, label, textarea, separator, skeleton; all remapped from shadcn's default neutral palette onto the navy design tokens (see Decisions Register). Custom `EmptyState`/`ErrorState`/`LoadingState` in `components/ui/` cover `AGENTS.md` §12. Typography scale uses Tailwind's default `text-*` scale (no second system, same precedent as spacing) |
 | API client layer | `UNVERIFIED` — not built |
 | Authentication | `UNVERIFIED` + `BLOCKED` (provider undecided) |
 | Authorization / academy isolation | `UNVERIFIED` |
@@ -165,6 +166,8 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-16 | Project scaffolded with `create-next-app` (App Router, TS strict, Tailwind, ESLint), package name `ssb-academy` | Standard, supported tooling for the mandated stack (`AGENTS.md` §3); confirmed with user that "from scratch" meant no pre-existing code, not hand-authoring config |
 | 2026-09-16 | Capsule icons are passed as string names (`icon="mission"`) resolved against a registry in `components/ui/capsule.tsx`, never as a component reference or JSX element prop | Next.js 16 / React 19 cannot serialize a Lucide icon (forwardRef component) across the Server→Client Component boundary as a custom prop; confirmed by reproducing both failure modes during T004. All capsule call sites (mostly Server Components) must use this pattern |
 | 2026-09-16 | `.glass-surface`/`.glass-surface--*` state modifiers (selected/success/error/focus-visible) are written as plain CSS in `app/globals.css`, never as Tailwind utility classes on a component | `.glass-surface` sets `background`/`border`/`box-shadow` outside any Tailwind `@layer`, so those unlayered declarations always beat layered Tailwind utilities for the same properties regardless of class order — found via visual QA in T004 (selected/success/error/focus states were invisible until fixed). Any new glass-surface-based component must add state styling next to `.glass-surface` in CSS, not via `border-*`/`bg-*`/`shadow-*`/`ring-*` utility classes |
+| 2026-09-16 | shadcn/ui installed with `-b radix -p nova` (Radix primitives, "Nova - Lucide/Geist" preset); its default neutral-gray tokens (`--primary`, `--border`, `--ring`, etc.) were remapped in `app/globals.css` to reference the existing navy/status tokens instead of being left as-is | shadcn init writes its own generic palette into `:root`, which would have silently produced black/gray buttons and inputs instead of the mandated navy branding (`AGENTS.md` §7.5) — a second, competing design system rather than one. `.dark`/chart/sidebar tokens were dropped as unused (no dark mode requirement; no chart or shadcn-sidebar component built yet) |
+| 2026-09-16 | Project standardized on the official `cn` npm package (`shadcn-ui/cn`) for className merging everywhere, not a hand-rolled `clsx`+`tailwind-merge` wrapper | Every file shadcn's CLI generates hardcodes `import { cn } from "cn"` regardless of the `utils` alias in `components.json` — fighting that on every future `shadcn add` would be constant, losing maintenance work. `lib/utils/cn.ts` and the `clsx`/`tailwind-merge` deps from T004 were removed; `components/ui/capsule.tsx` now imports from `"cn"` directly, matching every shadcn-generated component |
 
 ---
 

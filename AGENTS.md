@@ -139,6 +139,9 @@ styles/                 design tokens
   component count.
 - One icon family (Lucide). Never mix icon libraries.
 - Before creating a component, search for an existing one that already does it.
+- className merging uses the official `cn` package (`import { cn } from "cn"`) everywhere — this is
+  what every `shadcn add`-generated component already imports, not a project-local wrapper. `lib/utils/`
+  is for other future helpers (formatting, validation, ...), not a second `cn` implementation.
 
 ---
 

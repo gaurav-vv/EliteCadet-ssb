@@ -37,12 +37,14 @@ P2  Post-MVP
 
 ### Current state of the roadmap
 
-T001–T004 are complete: the repository exists (Next.js/TypeScript/Tailwind scaffold via
-`create-next-app`), the Glass Capsule design token layer (`app/globals.css`) is implemented, and
+T001–T005 are complete: the repository exists (Next.js/TypeScript/Tailwind scaffold via
+`create-next-app`), the Glass Capsule design token layer (`app/globals.css`) is implemented,
 `CapsulePrimary`/`CapsuleSecondary`/`CapsuleSmall` (`components/ui/capsule.tsx`) are built and
-visually verified at 320/768px, via keyboard, and across all eight states. See `status.md` for the
-verified architecture snapshot. All remaining tasks are `[ ]` or `[~]` and have not been verified as
-implemented.
+visually verified, and the base UI system (shadcn/ui — button, input, select, dialog, tabs, badge,
+table, alert, label, textarea, separator, skeleton — plus custom `EmptyState`/`ErrorState`/
+`LoadingState`) is installed, reconciled to the navy design tokens, and visually verified. See
+`status.md` for the verified architecture snapshot. All remaining tasks are `[ ]` or `[~]` and have
+not been verified as implemented.
 
 ---
 
@@ -130,7 +132,7 @@ reachable by keyboard; reduced-motion disables animation; contrast passes with t
 
 ---
 
-## T005 — Base UI system — P0 — `[ ]`
+## T005 — Base UI system — P0 — `[x]`
 
 **Why:** Non-capsule surfaces (forms, tables, dialogs) still need consistency.
 
