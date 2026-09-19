@@ -41,10 +41,10 @@ export function DemoDataControls({
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-4 px-6 py-6">
+    <div className="glass-regular flex flex-col gap-4 px-6 py-6">
       <div>
-        <h2 className="text-sm font-medium text-text-muted">Demo data</h2>
-        <p className="text-xs text-text-muted">{description}</p>
+        <h2 className="text-sm font-medium text-ink-secondary">Demo data</h2>
+        <p className="text-xs text-ink-secondary">{description}</p>
       </div>
       {message && (
         <Alert>

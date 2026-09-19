@@ -70,8 +70,8 @@ export function SessionsView({ sessions, mentees }: SessionsViewProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="glass-surface flex flex-col gap-4 px-6 py-6">
-        <h2 className="text-sm font-medium text-text-muted">Create a session</h2>
+      <div className="glass-regular flex flex-col gap-4 px-6 py-6">
+        <h2 className="text-sm font-medium text-ink-secondary">Create a session</h2>
         {status === "error" && errorMessage && (
           <Alert variant="destructive">
             <AlertDescription>{errorMessage}</AlertDescription>
@@ -115,18 +115,18 @@ export function SessionsView({ sessions, mentees }: SessionsViewProps) {
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-text-muted">All sessions</h2>
+        <h2 className="text-sm font-medium text-ink-secondary">All sessions</h2>
         {sessions.length === 0 ? (
           <EmptyState title="No sessions yet" description="Create one above." />
         ) : (
           <ul className="flex flex-col gap-2">
             {sessions.map((session) => (
-              <li key={session.id} className="glass-surface flex items-center justify-between gap-3 px-5 py-3">
+              <li key={session.id} className="glass-regular flex items-center justify-between gap-3 px-5 py-3">
                 <div>
-                  <p className="text-sm font-medium text-text-primary">
+                  <p className="text-sm font-medium text-ink">
                     {session.title} · {session.menteeName}
                   </p>
-                  <p className="text-xs text-text-muted">
+                  <p className="text-xs text-ink-secondary">
                     {formatDateTime(session.scheduledFor)} · {STATUS_LABEL[session.status]}
                   </p>
                 </div>

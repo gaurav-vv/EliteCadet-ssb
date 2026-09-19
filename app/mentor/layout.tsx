@@ -1,22 +1,29 @@
-import { MentorHeader } from "@/components/mentor/mentor-header";
-import { MentorNav } from "@/components/mentor/mentor-nav";
+import { AppShell } from "@/components/layout/app-shell";
+import type { SidebarNavItem } from "@/components/layout/sidebar";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
 import { markMentorActive } from "@/lib/mock/academy";
 
+const NAV_ITEMS: SidebarNavItem[] = [
+  { href: "/mentor", label: "Dashboard", icon: "dashboard" },
+  { href: "/mentor/mentees", label: "Mentees", icon: "mentees" },
+  { href: "/mentor/evaluations", label: "Evaluations", icon: "evaluations" },
+  { href: "/mentor/sessions", label: "Sessions", icon: "sessions" },
+  { href: "/mentor/profile", label: "Profile", icon: "profile" },
+];
+
 export default async function MentorLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = await getCurrentUserAndProfile();
-  const mentorName = profile?.fullName || "Mentor";
   if (user) markMentorActive(user.id);
 
   return (
-    <div className="flex min-h-full flex-col">
-      <MentorHeader mentorName={mentorName} />
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col md:flex-row md:gap-6 md:px-6 md:py-6">
-        <aside className="md:w-52 md:shrink-0">
-          <MentorNav />
-        </aside>
-        <main className="flex flex-1 flex-col px-4 py-4 md:px-0 md:py-0">{children}</main>
-      </div>
-    </div>
+    <AppShell
+      roleLabel="Mentor"
+      items={NAV_ITEMS}
+      searchPlaceholder="Search mentees…"
+      userName={profile?.fullName || "Mentor"}
+      profileHref="/mentor/profile"
+    >
+      {children}
+    </AppShell>
   );
 }

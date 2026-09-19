@@ -28,7 +28,7 @@ export function BudgetRunner({ items, totalSeconds, onDone }: BudgetRunnerProps)
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between text-sm text-text-muted">
+      <div className="flex items-center justify-between text-sm text-ink-secondary">
         <span>
           Item {index + 1} of {items.length}
         </span>
@@ -36,7 +36,7 @@ export function BudgetRunner({ items, totalSeconds, onDone }: BudgetRunnerProps)
           {minutes}:{seconds.toString().padStart(2, "0")} left
         </span>
       </div>
-      <div className="glass-surface px-6 py-6 text-text-primary">{item.prompt}</div>
+      <div className="glass-regular px-6 py-6 text-ink">{item.prompt}</div>
       <Textarea
         placeholder="Type your response…"
         value={responses[item.id] ?? ""}

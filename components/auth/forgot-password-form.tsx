@@ -31,9 +31,9 @@ export function ForgotPasswordForm() {
 
   if (status === "sent") {
     return (
-      <div className="glass-surface flex flex-col items-center gap-3 px-8 py-10 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">Check your email</h1>
-        <p className="text-sm text-text-muted">
+      <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10 text-center">
+        <h1 className="text-xl font-semibold text-ink">Check your email</h1>
+        <p className="text-sm text-ink-secondary">
           If an account exists for {email}, we&apos;ve sent a link to reset your password.
         </p>
         <Button asChild variant="outline" size="sm">
@@ -44,10 +44,10 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-10">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-10">
       <div className="flex flex-col gap-1 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">Reset your password</h1>
-        <p className="text-sm text-text-muted">Enter your email and we&apos;ll send you a reset link.</p>
+        <h1 className="text-xl font-semibold text-ink">Reset your password</h1>
+        <p className="text-sm text-ink-secondary">Enter your email and we&apos;ll send you a reset link.</p>
       </div>
 
       {status === "error" && errorMessage && (

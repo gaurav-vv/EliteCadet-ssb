@@ -7,107 +7,104 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design token layer — Glass Capsule design system (AGENTS.md §7.10).
- * Every capsule/glass/motion value used anywhere in the app must come from
- * here. A raw hex, radius, blur or duration literal in a component is a
- * review failure. Spacing uses Tailwind's built-in scale — see the note
- * below rather than a second, competing spacing system.
+ * Design token layer — Apple-Inspired Glass UI v3 (AGENTS.md §7).
+ * Every glass/colour/radius/shadow/motion value used anywhere in the app
+ * must come from here. A raw hex, radius, blur or duration literal in a
+ * component is a review failure. Spacing uses Tailwind's built-in scale.
+ *
+ * Note: our single brand colour is named --brand-accent (not bare
+ * --accent) specifically to avoid colliding with shadcn's own semantic
+ * --accent/--accent-foreground slot (a separate, subtle hover-highlight
+ * concept used internally by generated shadcn components).
  */
 :root {
-  /* Navy brand scale — primary actions, headings, selected states, nav, icons (§7.5) */
-  --brand-navy-900: #0b1b3a;
-  --brand-navy-700: #14284f;
-  --brand-navy-500: #2b4a82;
-  --brand-navy-300: #7c93c2;
-  --brand-navy-100: #e4eaf5;
-  --brand-navy-50: #f4f7fc;
-  --brand-navy: var(--brand-navy-700);
-  --brand-navy-fg: #ffffff;
+  /* Near-monochrome ink/surface system (§7.2) */
+  --ink: #1c1c1e;
+  --ink-secondary: #6e6e73;
+  --surface-base: #f5f5f7;
+  --hairline: rgba(0, 0, 0, 0.08);
 
-  /* Background */
-  --bg-base: #ffffff;
-  --bg-ambient: #f6f8fc;
+  /* The one saturated brand colour (§7.2) */
+  --brand-accent: #4a55e8;
+  --brand-accent-2: #6c63f2;
+  --brand-accent-fg: #ffffff;
 
-  /* Text */
-  --text-primary: #16213e;
-  --text-muted: #5b6478;
+  /* Semantic status — restrained, always paired with text/icon (§7.10) */
+  --status-success: #34c759;
+  --status-success-bg: rgba(52, 199, 89, 0.12);
+  --status-warning: #ff9f0a;
+  --status-warning-bg: rgba(255, 159, 10, 0.12);
+  --status-danger: #ff3b30;
+  --status-danger-bg: rgba(255, 59, 48, 0.12);
 
-  /* Semantic status — restrained, always paired with text/icon (§13) */
-  --status-success: #1f8a4c;
-  --status-success-bg: #e8f6ee;
-  --status-warning: #a15c00;
-  --status-warning-bg: #fbf1e0;
-  --status-danger: #c0293b;
-  --status-danger-bg: #fbeaec;
-  --status-info: #1d6fb8;
-  --status-info-bg: #e9f3fc;
+  /* Glass material tiers — never a fourth (§7.2) */
+  --glass-thin-bg: rgba(255, 255, 255, 0.55);
+  --glass-thin-border: rgba(255, 255, 255, 0.35);
+  --glass-thin-blur: 12px;
+  --glass-regular-bg: rgba(255, 255, 255, 0.65);
+  --glass-regular-border: rgba(255, 255, 255, 0.4);
+  --glass-regular-blur: 20px;
+  --glass-thick-bg: rgba(255, 255, 255, 0.75);
+  --glass-thick-border: rgba(255, 255, 255, 0.5);
+  --glass-thick-blur: 32px;
 
-  /* Glass effect (§7.4) */
-  --glass-opacity: 0.6;
-  --glass-blur: 16px;
-  --border-opacity: 0.1;
+  /* Radius scale — nothing outside this list (§7.2) */
+  --radius-control: 12px;
+  --radius-button: 14px;
+  --radius-card: 20px;
+  --radius-panel: 24px;
+  --radius-pill: 999px;
 
-  /* Shadows — exactly two levels (§7.10) */
-  --shadow-soft: 0 1px 2px rgb(11 27 58 / 4%), 0 4px 12px rgb(11 27 58 / 6%);
-  --shadow-hover: 0 2px 4px rgb(11 27 58 / 6%), 0 10px 24px rgb(11 27 58 / 10%);
+  /* Shadows — exactly this scale (§7.2) */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-glow-accent: 0 4px 16px rgba(74, 85, 232, 0.2);
 
-  /* Capsule radii — three-level hierarchy shares these two radii (§7.3) */
-  --capsule-radius: 28px;
-  --capsule-radius-sm: 16px;
-
-  /* Motion (§7.7) */
-  --motion-duration: 180ms;
-  --motion-duration-slow: 260ms;
+  /* Motion (§7.8, §7.11) */
+  --motion-duration: 200ms;
   --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
 
   /*
-   * shadcn/ui semantic tokens — remapped to the tokens above rather than
-   * shadcn's default neutral-gray palette, so generated components (Button,
-   * Input, Dialog, ...) pick up navy branding automatically (AGENTS.md §7.5)
-   * instead of needing per-component color overrides.
+   * shadcn/ui semantic tokens — remapped onto the tokens above so generated
+   * components (Button, Input, Dialog, ...) pick up the Glass UI system
+   * automatically instead of shadcn's default neutral-gray palette.
    */
-  --background: var(--bg-base);
-  --foreground: var(--text-primary);
-  --card: var(--bg-base);
-  --card-foreground: var(--text-primary);
-  --popover: var(--bg-base);
-  --popover-foreground: var(--text-primary);
-  --primary: var(--brand-navy);
-  --primary-foreground: var(--brand-navy-fg);
-  --secondary: var(--brand-navy-50);
-  --secondary-foreground: var(--brand-navy);
-  --muted: var(--bg-ambient);
-  --muted-foreground: var(--text-muted);
-  --accent: var(--brand-navy-50);
-  --accent-foreground: var(--brand-navy);
+  --background: var(--surface-base);
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+  --primary: var(--brand-accent);
+  --primary-foreground: var(--brand-accent-fg);
+  --secondary: color-mix(in srgb, var(--ink) 6%, transparent);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-base);
+  --muted-foreground: var(--ink-secondary);
+  --accent: rgba(74, 85, 232, 0.08);
+  --accent-foreground: var(--brand-accent);
   --destructive: var(--status-danger);
-  --border: color-mix(in srgb, var(--text-primary) 12%, transparent);
-  --input: color-mix(in srgb, var(--text-primary) 16%, transparent);
-  --ring: var(--brand-navy-500);
-  --radius: 0.625rem;
+  --border: var(--hairline);
+  --input: color-mix(in srgb, var(--ink) 14%, transparent);
+  --ring: var(--brand-accent);
+  --radius: 0.875rem;
 }
 
 /*
  * Spacing tokens: Tailwind's default spacing scale (p-1, gap-4, space-y-6, …)
- * IS the spacing token system for this project. AGENTS.md §5 requires reusing
- * an existing token system rather than adding a second one — do not introduce
- * a parallel --space-* scale or arbitrary px/rem values in components.
+ * IS the spacing token system for this project — do not introduce a
+ * parallel --space-* scale or arbitrary px/rem values in components.
  */
 
 @theme inline {
-  --color-brand-navy-900: var(--brand-navy-900);
-  --color-brand-navy-700: var(--brand-navy-700);
-  --color-brand-navy-500: var(--brand-navy-500);
-  --color-brand-navy-300: var(--brand-navy-300);
-  --color-brand-navy-100: var(--brand-navy-100);
-  --color-brand-navy-50: var(--brand-navy-50);
-  --color-brand-navy: var(--brand-navy);
-  --color-brand-navy-fg: var(--brand-navy-fg);
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-surface-base: var(--surface-base);
+  --color-hairline: var(--hairline);
 
-  --color-bg-base: var(--bg-base);
-  --color-bg-ambient: var(--bg-ambient);
-  --color-text-primary: var(--text-primary);
-  --color-text-muted: var(--text-muted);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-2: var(--brand-accent-2);
+  --color-brand-accent-fg: var(--brand-accent-fg);
 
   --color-success: var(--status-success);
   --color-success-bg: var(--status-success-bg);
@@ -115,11 +112,16 @@
   --color-warning-bg: var(--status-warning-bg);
   --color-danger: var(--status-danger);
   --color-danger-bg: var(--status-danger-bg);
-  --color-info: var(--status-info);
-  --color-info-bg: var(--status-info-bg);
 
-  --radius-capsule: var(--capsule-radius);
-  --radius-capsule-sm: var(--capsule-radius-sm);
+  --radius-control: var(--radius-control);
+  --radius-button: var(--radius-button);
+  --radius-card: var(--radius-card);
+  --radius-panel: var(--radius-panel);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-sm: var(--shadow-soft);
+  --shadow-md: var(--shadow-elevated);
+  --shadow-glow-accent: var(--shadow-glow-accent);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -152,17 +154,16 @@
 }
 
 /*
- * Glass surface — the shared base for every capsule (T004 builds the
- * CapsulePrimary/Secondary/Small components on top of this class rather
- * than re-declaring blur/opacity/border literals per component).
+ * Glass material tiers (§7.2) — the shared base for every panel/card/nav
+ * surface in the app. Stateful styling (selected, hover glow, etc.) lives
+ * here as plain CSS, never as conditional Tailwind utilities on a
+ * component: these classes set background/border/box-shadow outside any
+ * Tailwind @layer, which always wins over Tailwind's own layered utilities
+ * for the same properties (AGENTS.md §7.12).
  */
-.glass-surface {
-  background: color-mix(in srgb, var(--bg-base) calc(var(--glass-opacity) * 100%), transparent);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid rgb(11 27 58 / var(--border-opacity));
-  box-shadow: var(--shadow-soft);
-  border-radius: var(--capsule-radius);
+.glass-thin,
+.glass-regular,
+.glass-thick {
   transition:
     transform var(--motion-duration) var(--motion-easing),
     box-shadow var(--motion-duration) var(--motion-easing),
@@ -170,42 +171,118 @@
     border-color var(--motion-duration) var(--motion-easing);
 }
 
-.glass-surface--sm {
-  border-radius: var(--capsule-radius-sm);
+.glass-thin {
+  background: var(--glass-thin-bg);
+  backdrop-filter: blur(var(--glass-thin-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-thin-blur)) saturate(140%);
+  border: 1px solid var(--glass-thin-border);
+  box-shadow: var(--shadow-soft);
 }
 
-/*
- * State modifiers live here, not as Tailwind utilities on the component:
- * .glass-surface sets background/border/box-shadow as unlayered CSS, which
- * always wins over Tailwind's layered utility classes for the same
- * properties. Add new capsule visual states next to these, not as
- * conditional Tailwind classes in components/ui/capsule.tsx.
- */
-.glass-surface--selected {
-  background: color-mix(in srgb, var(--brand-navy-100) 65%, var(--bg-base));
-  border: 2px solid var(--brand-navy-500);
-  box-shadow: var(--shadow-hover);
+.glass-regular {
+  background: var(--glass-regular-bg);
+  backdrop-filter: blur(var(--glass-regular-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-regular-blur)) saturate(150%);
+  border: 1px solid var(--glass-regular-border);
+  box-shadow: var(--shadow-soft);
 }
 
-.glass-surface--success {
-  border-color: var(--status-success);
+.glass-thick {
+  background: var(--glass-thick-bg);
+  backdrop-filter: blur(var(--glass-thick-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-thick-blur)) saturate(160%);
+  border: 1px solid var(--glass-thick-border);
+  box-shadow: var(--shadow-soft);
 }
 
-.glass-surface--error {
-  border-color: var(--status-danger);
+/* Card/row hover motion (§7.8) — opt-in via this class, not per-component */
+.glass-hover-lift {
+  cursor: pointer;
 }
-
 @media (hover: hover) {
-  .glass-surface:hover {
-    box-shadow: var(--shadow-hover);
+  .glass-hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-elevated);
+    border-color: color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+}
+.glass-hover-lift:active {
+  transform: translateY(0);
+  scale: 0.99;
+}
+
+/* Table/list row hover — tint only, no vertical translate (§7.5) */
+.row-hover-tint {
+  transition: background var(--motion-duration) var(--motion-easing);
+}
+@media (hover: hover) {
+  .row-hover-tint:hover {
+    background: var(--glass-thin-bg);
+  }
+}
+.row-hover-tint[data-selected="true"] {
+  background: rgba(74, 85, 232, 0.06);
+}
+
+/* Filter chip active state (§7.5) — accent-outlined, never filled */
+.filter-chip[data-active="true"] {
+  border-color: var(--brand-accent);
+  color: var(--brand-accent);
+}
+
+/* Sidebar / nav item states (§7.3) */
+.nav-item {
+  transition:
+    transform var(--motion-duration) var(--motion-easing),
+    background var(--motion-duration) var(--motion-easing),
+    color var(--motion-duration) var(--motion-easing);
+}
+.nav-item[data-active="true"] {
+  background: linear-gradient(135deg, var(--brand-accent), var(--brand-accent-2));
+  color: var(--brand-accent-fg);
+  box-shadow: var(--shadow-glow-accent);
+}
+@media (hover: hover) {
+  .nav-item[data-active="false"]:hover {
+    transform: translateY(-1px);
+    background: rgba(0, 0, 0, 0.04);
   }
 }
 
-.glass-surface:focus-visible {
+/* Ambient background wash (§2 / §7.1) — one persistent instance in the root
+   layout, never regenerated per route. */
+.ambient-wash {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 82% 0%,
+    rgba(74, 85, 232, 0.08),
+    rgba(45, 212, 191, 0.05) 40%,
+    transparent 70%
+  );
+  filter: blur(120px);
+  animation: ambient-drift 18s ease-in-out infinite;
+}
+
+@keyframes ambient-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-40px, 30px);
+  }
+}
+
+.glass-thin:focus-visible,
+.glass-regular:focus-visible,
+.glass-thick:focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px var(--bg-base),
-    0 0 0 4px var(--brand-navy-500);
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--brand-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -219,11 +296,10 @@
   }
 }
 /*
- * No .dark token block: this product has no dark theme (AGENTS.md §7.5 —
- * predominantly light background is a requirement, not a default). The
- * `dark:` variant below is kept only so Tailwind can compile any `dark:`
- * class shipped inside a generated shadcn component; it never activates
- * since nothing ever sets `class="dark"`.
+ * No .dark token block: this product has no dark theme. The `dark:`
+ * variant below is kept only so Tailwind can compile any `dark:` class
+ * shipped inside a generated shadcn component; it never activates since
+ * nothing ever sets `class="dark"`.
  */
 @layer base {
   * {

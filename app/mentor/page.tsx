@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CapsuleSecondary } from "@/components/ui/capsule";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { ListPanel, ListRow } from "@/components/ui/list-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -21,16 +23,13 @@ export default async function MentorDashboardPage() {
 
   return (
     <div className="flex flex-col gap-8 pb-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Welcome back, {data.mentorName.split(" ")[0]}</h1>
-        <p className="text-sm text-text-muted">Here&apos;s who needs your attention today.</p>
-      </div>
+      <PageHeader title={`Welcome back, ${data.mentorName.split(" ")[0]}`} subtitle="Here's who needs your attention today." />
 
       {data.totalMentees === 0 && (
         <Alert>
           <AlertDescription>
             You don&apos;t have any mentees yet. Visit{" "}
-            <Link href="/mentor/profile" className="underline">
+            <Link href="/mentor/profile" className="text-brand-accent underline">
               Profile
             </Link>{" "}
             to load sample demo data and preview what this dashboard looks like once populated.
@@ -39,94 +38,82 @@ export default async function MentorDashboardPage() {
       )}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Total mentees", value: data.totalMentees },
-          { label: "Sessions this week", value: data.sessionsThisWeek },
-          { label: "Pending evaluations", value: data.pendingEvaluations },
-          { label: "Average mentee score", value: data.averageMenteeScore ?? "—" },
-        ].map((stat) => (
-          <div key={stat.label} className="glass-surface flex flex-col gap-1 px-5 py-4">
-            <span className="text-xs font-medium tracking-wide text-text-muted uppercase">{stat.label}</span>
-            <span className="text-2xl font-semibold text-text-primary">{stat.value}</span>
-          </div>
-        ))}
+        <StatCard icon="mentees" label="Total mentees" value={data.totalMentees} />
+        <StatCard icon="sessions" label="Sessions this week" value={data.sessionsThisWeek} />
+        <StatCard icon="evaluations" label="Pending evaluations" value={data.pendingEvaluations} />
+        <StatCard icon="reports" label="Average mentee score" value={data.averageMenteeScore ?? "—"} />
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-text-muted">Students needing attention</h2>
+        <h2 className="text-[18px] font-semibold text-ink">Students needing attention</h2>
         {data.attentionMentees.length > 0 ? (
-          <ul className="flex flex-col gap-2">
+          <ListPanel>
             {data.attentionMentees.map((m) => (
-              <li key={m.menteeId}>
-                <CapsuleSecondary
-                  href={`/mentor/mentees/${m.menteeId}`}
-                  icon="mentees"
-                  label={m.fullName}
-                  description={m.reason}
-                />
-              </li>
+              <ListRow key={m.menteeId} href={`/mentor/mentees/${m.menteeId}`}>
+                <span className="text-sm text-ink">{m.fullName}</span>
+                <span className="text-xs text-ink-secondary">{m.reason}</span>
+              </ListRow>
             ))}
-          </ul>
+          </ListPanel>
         ) : (
           <EmptyState title="No attention signals" description="Every mentee has recent, on-track activity." />
         )}
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-text-muted">Today&apos;s schedule</h2>
+        <h2 className="text-[18px] font-semibold text-ink">Today&apos;s schedule</h2>
         {data.todaysSchedule.length > 0 ? (
-          <ul className="flex flex-col gap-2">
+          <ListPanel>
             {data.todaysSchedule.map((s) => (
-              <li key={s.title}>
-                <CapsuleSecondary icon="sessions" label={s.title} description={`With ${s.withName} · ${formatDate(s.scheduledFor)}`} />
-              </li>
+              <ListRow key={s.title}>
+                <span className="text-sm text-ink">{s.title}</span>
+                <span className="text-xs text-ink-secondary">
+                  With {s.withName} · {formatDate(s.scheduledFor)}
+                </span>
+              </ListRow>
             ))}
-          </ul>
+          </ListPanel>
         ) : (
           <EmptyState title="Nothing scheduled today" description="Create a session from the Sessions tab." />
         )}
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-text-muted">Mentee progress overview</h2>
+        <h2 className="text-[18px] font-semibold text-ink">Mentee progress overview</h2>
         {data.menteeProgressOverview.length > 0 ? (
-          <div className="flex flex-col gap-2">
+          <ListPanel>
             {data.menteeProgressOverview.map((row) => (
-              <Link
-                key={row.menteeId}
-                href={`/mentor/mentees/${row.menteeId}`}
-                className="glass-surface flex items-center justify-between px-5 py-3 no-underline"
-              >
-                <span className="text-sm text-text-primary">{row.fullName}</span>
-                <span className="flex items-center gap-2 text-sm text-text-muted">
+              <ListRow key={row.menteeId} href={`/mentor/mentees/${row.menteeId}`}>
+                <span className="text-sm text-ink">{row.fullName}</span>
+                <span className="flex items-center gap-2 text-sm text-ink-secondary">
                   {row.score ?? "—"}
                   <span aria-label={`trend ${row.trend}`}>
                     {row.trend === "up" ? "↑" : row.trend === "down" ? "↓" : "→"}
                   </span>
                 </span>
-              </Link>
+              </ListRow>
             ))}
-          </div>
+          </ListPanel>
         ) : (
           <EmptyState title="No mentee data yet" description="Progress appears once mentees start practicing." />
         )}
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-text-muted">Recent evaluations</h2>
+        <h2 className="text-[18px] font-semibold text-ink">Recent evaluations</h2>
         {data.recentEvaluations.length > 0 ? (
-          <ul className="flex flex-col gap-2">
+          <ListPanel>
             {data.recentEvaluations.map((e) => (
-              <li key={`${e.menteeName}-${e.createdAt}`} className="glass-surface flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-text-primary">
+              <ListRow key={`${e.menteeName}-${e.createdAt}`}>
+                <span className="text-sm text-ink">
                   {e.menteeName} · {e.activity}
                 </span>
-                <span className="text-xs text-text-muted">
+                <span className="text-xs text-ink-secondary">
                   {e.score} · {formatDate(e.createdAt)}
                 </span>
-              </li>
+              </ListRow>
             ))}
-          </ul>
+          </ListPanel>
         ) : (
           <EmptyState title="No evaluations yet" description="Submitted evaluations will show up here." />
         )}

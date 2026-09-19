@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-10 border-b border-border/60 bg-bg-base/80 backdrop-blur-md">
+    <header className="glass-thick sticky top-4 z-10 mx-4 rounded-panel sm:mx-6">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link
           href="/"
-          className="text-base font-semibold tracking-tight text-brand-navy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy-500"
+          className="text-base font-semibold tracking-tight text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent"
         >
           SSB Academy
         </Link>
@@ -15,7 +15,7 @@ export function SiteHeader() {
           <Button asChild variant="ghost">
             <Link href="/login">Login</Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="shadow-glow-accent">
             <Link href="/signup">Get Started</Link>
           </Button>
         </nav>

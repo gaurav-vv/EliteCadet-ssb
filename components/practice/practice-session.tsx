@@ -73,14 +73,14 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
     return (
       <div className="mx-auto flex max-w-xl flex-1 flex-col justify-center gap-6 py-10">
         <div>
-          <Link href="/student/practice/psychology" className="text-xs text-brand-navy hover:underline">
+          <Link href="/student/practice/psychology" className="text-xs text-brand-accent hover:underline">
             ← Psychology
           </Link>
-          <h1 className="mt-1 text-2xl font-semibold text-text-primary">{summary.title}</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-ink">{summary.title}</h1>
         </div>
-        <div className="glass-surface flex flex-col gap-3 px-6 py-6">
-          <p className="text-sm text-text-primary">{summary.description}</p>
-          <ul className="flex flex-col gap-1 text-sm text-text-muted">
+        <div className="glass-regular flex flex-col gap-3 px-6 py-6">
+          <p className="text-sm text-ink">{summary.description}</p>
+          <ul className="flex flex-col gap-1 text-sm text-ink-secondary">
             <li>{summary.itemCount} items</li>
             <li>{summary.durationLabel}</li>
             <li>Once started, the timer runs automatically — read the instructions fully before you begin.</li>
@@ -107,7 +107,7 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
   if (phase === "submitting") {
     return (
       <div className="mx-auto flex max-w-xl flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
-        <p className="text-sm text-text-muted">Submitting your responses…</p>
+        <p className="text-sm text-ink-secondary">Submitting your responses…</p>
       </div>
     );
   }
@@ -116,7 +116,7 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
     return (
       <div className="mx-auto flex max-w-xl flex-1 flex-col justify-center gap-4 py-10">
         <ErrorState message={errorMessage ?? undefined} onRetry={handleRetry} />
-        <p className="text-center text-xs text-text-muted">
+        <p className="text-center text-xs text-ink-secondary">
           Your responses are still here — retrying won&apos;t lose anything or create a duplicate submission.
         </p>
       </div>
@@ -125,9 +125,9 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
 
   return (
     <div className="mx-auto flex max-w-xl flex-1 flex-col items-center justify-center gap-4 py-10 text-center">
-      <div className="glass-surface flex flex-col items-center gap-3 px-8 py-10">
-        <h1 className="text-xl font-semibold text-text-primary">Submitted</h1>
-        <p className="text-sm text-text-muted">
+      <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10">
+        <h1 className="text-xl font-semibold text-ink">Submitted</h1>
+        <p className="text-sm text-ink-secondary">
           Your {summary.title.split(" —")[0]} responses were recorded. AI feedback isn&apos;t available yet
           (tracked as T034) — your mentor will be able to review this once mentor tools are built.
         </p>

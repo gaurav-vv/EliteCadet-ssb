@@ -31,9 +31,9 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-10">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-10">
       <div className="flex flex-col gap-1 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">Set a new password</h1>
+        <h1 className="text-xl font-semibold text-ink">Set a new password</h1>
       </div>
 
       {status === "error" && errorMessage && (

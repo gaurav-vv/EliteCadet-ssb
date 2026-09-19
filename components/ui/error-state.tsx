@@ -13,9 +13,9 @@ export function ErrorState({
   onRetry,
 }: ErrorStateProps) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-danger/30 bg-danger-bg px-6 py-10 text-center">
-      <AlertCircle aria-hidden="true" size={28} className="text-danger" />
-      <p className="text-sm text-text-primary">{message}</p>
+    <div className="glass-regular flex flex-col items-center gap-3 rounded-card border-danger/30 px-6 py-10 text-center">
+      <AlertCircle aria-hidden="true" size={24} className="text-danger" />
+      <p className="text-[14px] text-ink">{message}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>
           Try again

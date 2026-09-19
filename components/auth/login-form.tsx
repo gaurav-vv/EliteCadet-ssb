@@ -47,10 +47,10 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-10">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-10">
       <div className="flex flex-col gap-1 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">Welcome back</h1>
-        <p className="text-sm text-text-muted">Log in to continue your preparation.</p>
+        <h1 className="text-xl font-semibold text-ink">Welcome back</h1>
+        <p className="text-sm text-ink-secondary">Log in to continue your preparation.</p>
       </div>
 
       {reason && REASON_MESSAGES[reason] && (
@@ -81,7 +81,7 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
-            <Link href="/forgot-password" className="text-xs text-text-muted hover:text-brand-navy">
+            <Link href="/forgot-password" className="text-xs text-ink-secondary hover:text-brand-accent">
               Forgot password?
             </Link>
           </div>
@@ -100,9 +100,9 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-text-muted">
+      <p className="text-center text-sm text-ink-secondary">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="text-brand-navy hover:underline">
+        <Link href="/signup" className="text-brand-accent hover:underline">
           Sign up
         </Link>
       </p>

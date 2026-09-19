@@ -121,7 +121,7 @@ feature works.
 ```text
 app/                    routes (App Router)
 components/
-  ui/                   primitives (shadcn + capsule primitives)
+  ui/                   primitives (shadcn + Glass UI primitives — cards, nav, stat cards)
   layout/               shells, navigation, headers
   student/  mentor/  academy/
   practice/  evaluation/  charts/
@@ -155,156 +155,235 @@ styles/                 design tokens
 
 ---
 
-## 7. Design System — Glass Capsule Interface (MANDATORY)
+## 7. Design System — Apple-Inspired Glass UI v3 (MANDATORY)
 
-Project-wide requirement. Do not introduce unrelated UI patterns on individual pages without a strong
-functional reason recorded in `status.md`.
+Project-wide requirement, for every section of the app — public site, Student, Mentor, Academy Admin,
+and anything added later. Any new screen must be buildable entirely from the tokens and patterns
+below, without inventing new colours, radii, shadows or motion values.
 
-**This section supersedes all earlier visual guidance in these files**, specifically:
-- the previous "rounded cards / card-based dashboard" direction, and
-- the previous colour rule that treated **purple** as the primary brand accent.
+**This section supersedes all earlier visual guidance in these files, in full**, specifically the
+2026-09-16 "Glass Capsule Interface" system (capsule-shaped nav, navy brand colour, the
+`CapsulePrimary`/`CapsuleSecondary`/`CapsuleSmall` hierarchy). Decision recorded in `status.md`,
+2026-09-19. The full source design spec lives in `UI design.md` at the repo root — that file is
+descriptive reference material, not one of the four governing files in §0; this section is the
+binding, authoritative summary of it.
 
-### 7.1 Visual language
+### 7.1 Visual direction
 
-The interface must read as Apple-like, clean, premium, minimal, calm, spacious, distraction-free and
-consistent. Clarity and hierarchy beat density.
+The whole product reads as **one continuous surface**, not a dashboard with separate "app" pages
+bolted on. Whether the user is on the Dashboard, a Students table, a Batch detail view, or Settings,
+they see the same glass material, the same near-zero colour palette, the same radius/shadow/motion
+system. The interface feels: quiet, precise, spacious, almost monochrome, effortless, native (not
+"web glassy"), and consistent from screen to screen.
 
-Avoid: excessive cards, excessive borders, heavy shadows, loud gradients, oversaturated colour,
-cluttered dashboards, dense grids, decorative elements, competing visual containers.
+Biggest failure mode to avoid: giving a section its own accent colour or card style "because it's a
+different feature." Category is never colour-coded through UI chrome — only the three status colours
+(§7.2) may distinguish real states, applied as small tags/dots, never as whole-card or whole-icon
+accents.
 
-### 7.2 Capsule-first
-
-Major interactive options use rounded capsule surfaces, not rectangular cards. A capsule should feel
-like a **floating glass control**, not a card in a stack.
-
-Capsule traits: large radius · soft transparency · background blur · thin subtle border · very soft
-shadow · clean typography · consistent internal padding · clear icon · smooth transition.
-
-**Capsules are for navigation, actions, filters, categories, status and selection.** Paragraphs,
-instructions, long-form explanations, tables and forms are *not* wrapped in capsules. "Capsule-first"
-never means "put a capsule around every piece of text".
-
-### 7.3 Three-level hierarchy (strict)
-
-| Level | Used for | Traits |
-|---|---|---|
-| **Primary** | Major destinations — Mission, Practice, Progress | Larger, generous padding, larger icon, title + optional one-line description |
-| **Secondary** | Inside a section — Psychology, TAT, WAT, SRT, SDT, modules | Medium, consistent icon + label, clear interaction state |
-| **Small** | Filters, tags, status, difficulty, sort, quick actions | Compact, lightweight, scannable |
-
-No fourth level, and no capsule that sits visually between two levels.
-
-### 7.4 Glass effect
+### 7.2 Design tokens (centralised — no scattered literals)
 
 ```text
-Transparency + background blur + thin border + subtle shadow + large radius
+Glass materials (three tiers, never a fourth):
+  --glass-thin     blur(12px) saturate(140%)   bg rgba(255,255,255,0.55)  border rgba(255,255,255,0.35)
+  --glass-regular  blur(20px) saturate(150%)   bg rgba(255,255,255,0.65)  border rgba(255,255,255,0.40)
+  --glass-thick    blur(32px) saturate(160%)   bg rgba(255,255,255,0.75)  border rgba(255,255,255,0.50)
+  (glass-thin: chips/tags/tooltips/search/row-hover · glass-regular: cards/panels/tables/forms ·
+   glass-thick: sidebar/header/modals/drawers)
+
+Colour (one near-monochrome system, unchanged per section):
+  --ink            #1C1C1E   (primary text)
+  --ink-secondary  #6E6E73   (muted text)
+  --surface-base   #F5F5F7
+  --hairline       rgba(0,0,0,0.08)
+  --accent         #4A55E8   (indigo — the ONLY saturated colour in normal UI chrome)
+  --accent-2       #6C63F2   (gradient partner for --accent)
+  --status-success #34C759   --status-warning #FF9F0A   --status-danger #FF3B30
+
+Radius (one scale — nothing outside it):
+  --radius-control 12px   (chips, tags)
+  --radius-button  14px   (buttons)
+  --radius-card    20px   (content/stat/table-row cards)
+  --radius-panel   24px   (sidebar, header, modals, section containers)
+  --radius-pill    999px  (nav items, search bars, filter chips)
+
+Shadows (one scale):
+  --shadow-sm         0 1px 2px rgba(0,0,0,0.04), 0 1px 1px rgba(0,0,0,0.03)
+  --shadow-md         0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)
+  --shadow-glow-accent 0 4px 16px rgba(74,85,232,0.20)   (primary buttons + active nav ONLY)
+
+Motion:
+  --motion-duration 180–220ms   --motion-easing cubic-bezier(0.4, 0, 0.2, 1)
 ```
 
-Restrained. Blur and opacity must never push text or icon contrast below the requirements in §13.
-If the glass hurts legibility, reduce the glass — never the contrast rules.
+One-off values in components are a review failure. If a value is needed twice, it is a token.
 
-### 7.5 Background & branding
-
-- Predominantly clean white / very light background.
-- **Navy is the primary brand colour**: primary actions, important headings, selected states, brand
-  elements, key navigation, important icons.
-- Extremely subtle gradients and ambient colour variation only. No dramatic gradients.
-- Semantic colour stays restrained: green = success, amber = attention, red = critical,
-  blue = informational. Colour alone never carries meaning (§13).
-
-### 7.6 Progressive disclosure & navigation
-
-Do not expose every nested option at once.
+### 7.3 App shell (persists across every authenticated section)
 
 ```text
-Home
- ├── Mission
- ├── Practice
- │    └── Psychology
- │         ├── TAT
- │         ├── WAT
- │         ├── SRT
- │         └── SDT
- └── Progress
+┌──────────────────────────────────────────────────────────────┐
+│                    Top Header (glass-thick, 64px)              │
+├───────────────┬──────────────────────────────────────────────┤
+│   Sidebar     │              Content Region                    │
+│  (glass-thick)│   Page header (title + primary action)          │
+│   role nav    │   Filters / search (if list-based)               │
+│               │   Main content pattern (see §7.5)                │
+└───────────────┴──────────────────────────────────────────────┘
 ```
+
+Content region: max-width `1120px`, centred, side padding min `32px` (`48px` at ≥1440px), `8px` base
+grid, section gaps `32px`, card padding `24px`, internal gaps `12–16px` — identical across Student,
+Mentor and Academy.
+
+**Sidebar:** items are that role's nav (e.g. Student: Dashboard/Practice/Progress/Resources/Profile;
+Mentor: Dashboard/Mentees/Evaluations/Sessions/Profile; Academy:
+Dashboard/Students/Batches/Mentors/Reports/Settings). Same treatment for every item, no per-item
+colour coding. Inactive: transparent, icon+text in `--ink-secondary`. Active: `--accent → --accent-2`
+gradient fill, white text/icon, `--shadow-glow-accent` — the only place gradient fill appears besides
+a page's primary button. Hover (inactive): `translateY(-1px)`, background → `rgba(0,0,0,0.04)`, icon
+scale `1.05`, `160–200ms`.
+
+**Top header:** `glass-thick`, `64px`. Left: `glass-thin` search capsule, placeholder text scoped to
+the section ("Search students…", "Search mentors…"), same component everywhere. Right: notification
+button (`glass-thin`, circular, `6px` solid indigo dot, no glow/pulse), avatar, name + role label,
+chevron.
+
+**Mobile:** sidebar collapses into a floating bottom tab bar (`glass-thick`, `16px` margin). Single
+column content, `16–20px` padding.
+
+**Public site** (no authenticated shell): keep the same ink/glass/accent tokens and shared ambient
+background, but without the sidebar — same visual system, marketing layout.
+
+### 7.4 Page header pattern (every section uses this)
+
+Title (section name, large/bold, §7.7) → optional one-line subtitle → primary action right-aligned
+(`--accent` gradient button, the *one* colour action for that screen — omit entirely if the section
+has none, e.g. Settings) → secondary actions, if any, as `glass-regular` buttons beside it. No section
+gets a different header layout, size or colour treatment.
+
+### 7.5 Reusable content patterns (build every screen from these)
+
+- **Stat/KPI cards** — `glass-regular`, small line icon (`--ink-secondary`), uppercase label, large
+  bold value, optional status-coloured delta, optional muted sparkline. No per-section accent colours.
+- **List/table views** — container `glass-regular`; row hover = `glass-thin` tint, no border-colour
+  change; row selected = `rgba(74,85,232,0.06)` background, never a full accent fill; status shown via
+  small text tags/dots (three status colours only), never full-row colouring; sticky header row
+  (`--ink-secondary`, uppercase, `11px`); empty → Empty State pattern; row actions as icon buttons on
+  hover (`--ink-secondary`, danger red only on a destructive icon, on hover).
+- **Detail/profile views** — header block (avatar/initial glyph + name/title + status tag) in a
+  `glass-regular` panel; below, a 2–3 column grid of `glass-regular` info cards (same styling as stat
+  cards, holding text instead of numbers); activity/history as a vertical timeline, `--ink-secondary`
+  connector line, status dots only on events.
+- **Empty states** (one pattern, reused everywhere) — small line icon (`--ink-secondary`), one bold
+  primary line, one muted secondary line naming the resolving action, optional inline `--accent` text
+  link. Never a large illustration; never more than two lines of copy.
+- **Forms & modals** — modal container `glass-thick`, `--radius-panel`, centred, max-width
+  `480–560px`; inputs `glass-thin`, `--radius-control`, hairline border, `2px` accent focus ring
+  (same token everywhere); primary submit = accent gradient button; cancel/secondary = `glass-regular`
+  text button, no fill.
+- **Filters & search** — filter chips `glass-thin`, pill radius, `--ink-secondary` inactive,
+  accent-outlined (not filled) when active; search bar identical component to the header search,
+  scoped to the section's records.
+
+Nothing above introduces new visual rules per section — sections differ only in *which* patterns they
+combine (Dashboard: quick-action capsules + stat cards + attention panel + analytics; Students/
+Batches/Mentors: stat cards + filters + table/list + detail view; Reports: stat summary + chart panels
++ optional table; Settings: grouped form panels only, no stat cards, no tables, no primary action).
+
+### 7.6 Animated icons (global icon behaviour)
+
+Same motion rules regardless of where an icon appears (sidebar, table row, card, empty state): small,
+purposeful, never decorative. Max amplitude anywhere in the app: `2px` translate / `5%` scale / `10°`
+rotate. Notification bell: single `±4°` shake only on a genuinely new item, never a loop.
+
+### 7.7 Typography (one scale, all sections)
+
+Primary: SF Pro Display / SF Pro Text (fallback `-apple-system, "Inter", "Manrope", sans-serif`).
+
+| Role | Size | Weight | Colour |
+|---|---|---|---|
+| Page title | 28–32px | 700 | `--ink` |
+| Section/card title | 18–20px | 600 | `--ink` |
+| Card label (uppercase) | 11px | 600, `+0.04em` | `--ink-secondary` |
+| Stat/KPI value | 28–32px | 700 | `--ink` |
+| Body / description | 14–15px | 400–500 | `--ink-secondary` |
+| Table header | 11px | 600, uppercase | `--ink-secondary` |
+| Micro text (timestamps, meta) | 12–13px | 400 | `--ink-secondary` @70% |
+
+Only two font weights visible on any single screen at once.
+
+### 7.8 Card & row hover motion (one pattern, all sections)
 
 ```text
-Click Practice → Practice capsules → Click Psychology → TAT / WAT / SRT / SDT
+Rest:    translateY(0)      shadow: --shadow-sm
+Hover:   translateY(-2px)   shadow: --shadow-md   border opacity +10%
+Active:  translateY(0)      scale(0.99)
 ```
 
-The user must always know where they are, how they got there, what the options are, and how to go
-back. Nested navigation must never feel like a different application — same geometry, typography,
-icons, spacing, transitions and branding. Only the content hierarchy changes.
+`180–220ms`, `--motion-easing`. Table rows use a lighter version: background tint only, no vertical
+translate. `prefers-reduced-motion: reduce` freezes the shared ambient background on one frame,
+disables icon/card motion app-wide, and keeps only opacity/colour transitions.
 
-### 7.7 Motion
+### 7.9 Responsive behaviour (applies to every section)
 
-- Hover (pointer devices): slight lift `translateY(-1px … -3px)`, scale ≈ `1.01–1.02`, marginally
-  stronger shadow, smooth transition.
-- Press: slight scale-down, quick feedback, smooth recovery.
-- No bounce, no spring, no long or decorative transitions.
-- Motion communicates navigation, state change, selection, feedback or loading — nothing else.
-- `prefers-reduced-motion: reduce` must disable transform/opacity animation.
+- **≥1440px:** sidebar `260px`; stat cards 4-up; tables full width within the `1120px` content max;
+  two-column panels where a section calls for them.
+- **900–1439px:** sidebar narrows to `220px` or icon-only rail; stat cards 2×2; two-column panels
+  stack to one column if tight; tables gain horizontal scroll before columns are dropped.
+- **<900px:** sidebar → floating bottom tab bar; stat cards 1 column; tables become stacked record
+  cards (one `glass-regular` card per row, label/value pairs inside), not horizontal-scrolling tables;
+  filters collapse into a single "Filters" sheet trigger; search goes full width.
 
-### 7.8 Interaction states
+No horizontal page overflow at any breakpoint, in any section.
 
-Every interactive capsule implements `default · hover · pressed · selected · disabled · loading ·
-success · error`. Selected state uses subtle emphasis — slightly stronger border, slightly different
-background, navy accent, soft shadow, small state indicator — never an aggressive colour flip.
+### 7.10 Accessibility
 
-### 7.9 Responsive capsules
+Full keyboard navigation and logical tab order everywhere; visible focus ring `2px solid var(--accent)`
+with `2px` offset, identical token in forms/tables/nav/filters; every icon has an `aria-label`,
+including table row action icons; real `<button>`/`<a>`/`<table>` semantics, never `<div>`
+substitutes; text contrast ≥ 4.5:1 against glass at its lightest resting opacity (0.5 alpha), tested
+per material tier; touch targets ≥ `44px` including mobile card row actions; **status is never
+colour-only** — pair colour with an icon or text label (e.g. "At risk" text + dot, not a red row
+alone).
 
-Capsules must work on mobile, tablet, laptop, desktop and large displays. Do not shrink desktop
-capsules; adapt padding, font size, icon size, layout, column count and width. Primary capsules may
-go full-width or horizontally scrollable on small screens; small capsules may scroll horizontally
-rather than wrap into a messy grid.
+### 7.11 Motion principles
 
-### 7.10 Design tokens (centralised — no scattered literals)
+Use only: fade, small translate (≤2px), soft scale (≤5%), gentle gradient drift, subtle shadow/border
+change on hover/focus. Avoid everywhere: bouncing, decorative spinners, parallax, flashing, particles,
+hue-cycling backgrounds, elastic/overshoot easing, and route-transition animations that differ section
+to section — moving between sections must feel like the same app, not a scene change.
 
-Define once in the token layer and consume everywhere:
+### 7.12 Implementation constraints (still binding — verified true regardless of visual language)
 
-```text
---capsule-radius            --capsule-radius-sm
---glass-opacity             --glass-blur
---border-opacity            --shadow-soft / --shadow-hover
---brand-navy                --brand-navy-fg
---bg-base                   --bg-ambient
---text-primary              --text-muted
---space-1 … --space-n
---motion-duration           --motion-easing
-```
-
-One-off values in components are a review failure. If a value is needed twice, it is a token. If the
-repository already has a spacing/token system, reuse it rather than adding a second one.
-
-### 7.11 Screen acceptance test
-
-A screen is not complete until all twelve are "yes":
-
-1. Visually calm · 2. Primary action obvious · 3. Major options are appropriate capsules ·
-4. Unnecessary information hidden until needed · 5. Capsule hierarchy clear · 6. Glass effect subtle ·
-7. Navy branding consistent · 8. Spacing & typography consistent · 9. Icons consistent ·
-10. Interactions smooth · 11. Works mobile → desktop · 12. Premium without visual noise
-
-### 7.12 Implementation constraints (learned in T004 — binding)
-
-- **Icon props cross component boundaries as names, not references.** A Lucide icon component
-  cannot be serialized from a Server Component into a `"use client"` component as a prop — passing
-  the component reference or a rendered `<Icon />` element both fail at runtime. Any capsule/button/etc.
+- **Icon props cross component boundaries as names, not references.** A Lucide icon component cannot
+  be serialized from a Server Component into a `"use client"` component as a prop — passing the
+  component reference or a rendered `<Icon />` element both fail at runtime. Any nav item/button/card
   that takes an icon must accept a string key resolved against an internal icon registry inside the
-  client component's own file (see `capsuleIcons` in `components/ui/capsule.tsx` for the pattern).
-- **`.glass-surface` state styling lives in CSS, never as Tailwind utilities on the component.**
-  `.glass-surface` sets `background`/`border`/`box-shadow` as plain (unlayered) CSS in
-  `app/globals.css`, which always overrides Tailwind's own layered utility classes for those same
-  properties — a `border-*`/`bg-*`/`shadow-*`/`ring-*` utility applied conditionally in a component
-  will silently do nothing. Add new visual states (selected, error, focus, etc.) as
-  `.glass-surface--*` rules next to `.glass-surface` itself.
+  client component's own file.
+- **Stateful glass surface styling lives in CSS, never as Tailwind utilities on the component.** A
+  shared `.glass-surface`-style base class that sets `background`/`border`/`box-shadow` as plain
+  (unlayered) CSS in `app/globals.css` always overrides Tailwind's own layered utility classes for
+  those same properties — a `border-*`/`bg-*`/`shadow-*`/`ring-*` utility applied conditionally in a
+  component will silently do nothing. Add new visual states (selected, error, focus, etc.) as
+  modifier classes next to the base class itself, not as component-level Tailwind conditionals.
 
-### 7.13 North star
+### 7.13 Screen acceptance test
 
-> Apple-like simplicity + glass capsule interaction + strong navy branding + progressive navigation
-> + generous whitespace + extremely consistent components.
+A screen is not complete until all are "yes": 1. Reads as the same app as every other section ·
+2. Primary action obvious and singular · 3. No section-specific accent colour · 4. Correct glass tier
+used for each surface · 5. Radius/shadow/motion all from the token scale · 6. Status shown via colour
++ icon/text, never colour alone · 7. Typography scale followed, ≤2 weights per screen · 8. Works
+mobile → large desktop with no horizontal overflow · 9. Empty states use the one shared pattern ·
+10. Reduced-motion respected.
+
+### 7.14 North star
+
+> One system, many sections. Dashboard, Students, Batches, Mentors, Reports, Settings — and Student
+> and Mentor's own sections — are all expressions of the same material, colour, type, radius, shadow
+> and motion tokens. Never section-specific variants of them.
 >
-> "There is very little on the screen, but everything I need is immediately understandable."
+> The result should feel like a single Apple-designed app with several sections — like System Settings
+> or Health — not a collection of differently themed dashboards stitched together.
 
 This principle outranks adding more visual elements.
 
@@ -410,7 +489,7 @@ icon accessibility · sensible screen-reader structure · adequate touch targets
 ## 14. Responsive
 
 Desktop · laptop · tablet · mobile browser. Reflow content; do not scale a desktop layout down.
-Pay particular attention to navigation, capsules, tables, charts, forms, dialogs and schedules.
+Pay particular attention to the sidebar/nav, stat cards, tables, charts, forms, dialogs and schedules.
 
 ---
 

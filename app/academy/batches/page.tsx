@@ -13,8 +13,8 @@ export default async function BatchesPage() {
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Batches</h1>
-        <p className="text-sm text-text-muted">{batches.length} batches in your academy.</p>
+        <h1 className="text-[28px] font-bold text-ink">Batches</h1>
+        <p className="text-sm text-ink-secondary">{batches.length} batches in your academy.</p>
       </div>
 
       <CreateBatchForm />
@@ -27,10 +27,10 @@ export default async function BatchesPage() {
             <li key={batch.id}>
               <Link
                 href={`/academy/batches/${batch.id}`}
-                className="glass-surface flex items-center justify-between px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01]"
+                className="glass-regular flex items-center justify-between px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01]"
               >
-                <span className="text-sm font-medium text-text-primary">{batch.name}</span>
-                <span className="text-xs text-text-muted">
+                <span className="text-sm font-medium text-ink">{batch.name}</span>
+                <span className="text-xs text-ink-secondary">
                   {batch.studentIds.length} students · Mentor: {getMentorName(batch.mentorId)}
                 </span>
               </Link>

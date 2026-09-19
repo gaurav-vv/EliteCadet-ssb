@@ -40,7 +40,7 @@ export function StudentActions({ studentId, status, batchId, batches }: StudentA
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-end sm:justify-between">
+    <div className="glass-regular flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="batch">Batch</Label>
         <Select value={batchId ?? "none"} onValueChange={changeBatch}>

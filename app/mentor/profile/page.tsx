@@ -12,8 +12,8 @@ export default async function MentorProfilePage() {
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Profile</h1>
-        <p className="text-sm text-text-muted">Update how you appear to your mentees.</p>
+        <h1 className="text-[28px] font-bold text-ink">Profile</h1>
+        <p className="text-sm text-ink-secondary">Update how you appear to your mentees.</p>
       </div>
       <MentorProfileForm realFullName={profile?.fullName ?? ""} />
       <DemoDataControls

@@ -19,10 +19,10 @@ export function ResetLocalData() {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-4 px-6 py-6">
+    <div className="glass-regular flex flex-col gap-4 px-6 py-6">
       <div>
-        <h2 className="text-sm font-medium text-text-muted">Demo data</h2>
-        <p className="text-xs text-text-muted">
+        <h2 className="text-sm font-medium text-ink-secondary">Demo data</h2>
+        <p className="text-xs text-ink-secondary">
           Your onboarding answers and profile are stored in this browser only (status.md, 2026-09-18).
           Clearing them resets you to a brand-new student.
         </p>

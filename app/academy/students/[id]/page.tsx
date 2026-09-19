@@ -37,23 +37,23 @@ export default async function StudentDetailPage({
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div>
-        <Link href="/academy/students" className="text-xs text-brand-navy hover:underline">
+        <Link href="/academy/students" className="text-xs text-brand-accent hover:underline">
           ← Students
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-text-primary">{student.fullName}</h1>
-        <p className="text-sm text-text-muted">
+        <h1 className="mt-1 text-[28px] font-bold text-ink">{student.fullName}</h1>
+        <p className="text-sm text-ink-secondary">
           {getBatchName(student.batchId)} · {getMentorName(student.mentorId)} · Last active {formatDate(student.lastActivityAt)}
         </p>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        <div className="glass-surface flex flex-col gap-1 px-5 py-4">
-          <span className="text-xs font-medium tracking-wide text-text-muted uppercase">Readiness</span>
-          <span className="text-2xl font-semibold text-text-primary">{student.readiness ?? "—"}</span>
+        <div className="glass-regular flex flex-col gap-1 px-5 py-4">
+          <span className="text-[11px] font-semibold tracking-[0.04em] text-ink-secondary uppercase">Readiness</span>
+          <span className="text-[28px] font-bold text-ink">{student.readiness ?? "—"}</span>
         </div>
-        <div className="glass-surface flex flex-col gap-1 px-5 py-4">
-          <span className="text-xs font-medium tracking-wide text-text-muted uppercase">Status</span>
-          <span className="text-sm text-text-primary">{student.status === "active" ? "Active" : "Inactive"}</span>
+        <div className="glass-regular flex flex-col gap-1 px-5 py-4">
+          <span className="text-[11px] font-semibold tracking-[0.04em] text-ink-secondary uppercase">Status</span>
+          <span className="text-sm text-ink">{student.status === "active" ? "Active" : "Inactive"}</span>
         </div>
       </section>
 

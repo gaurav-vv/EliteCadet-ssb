@@ -35,8 +35,8 @@ export function InviteMentorForm() {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-4 px-6 py-6">
-      <h2 className="text-sm font-medium text-text-muted">Invite a mentor</h2>
+    <div className="glass-regular flex flex-col gap-4 px-6 py-6">
+      <h2 className="text-sm font-medium text-ink-secondary">Invite a mentor</h2>
       {status === "error" && errorMessage && (
         <Alert variant="destructive">
           <AlertDescription>{errorMessage}</AlertDescription>

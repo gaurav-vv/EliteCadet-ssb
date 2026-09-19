@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CapsuleSmall } from "@/components/ui/capsule";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   Select,
   SelectContent,
@@ -137,9 +137,9 @@ export function OnboardingForm({ defaultFullName = "" }: OnboardingFormProps) {
 
   if (alreadyComplete) {
     return (
-      <div className="glass-surface flex flex-col items-center gap-3 px-8 py-10 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">You&apos;re already set up</h1>
-        <p className="text-sm text-text-muted">Onboarding is already complete for this account.</p>
+      <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10 text-center">
+        <h1 className="text-xl font-semibold text-ink">You&apos;re already set up</h1>
+        <p className="text-sm text-ink-secondary">Onboarding is already complete for this account.</p>
         <Button asChild size="sm">
           <Link href="/student">Go to dashboard</Link>
         </Button>
@@ -149,9 +149,9 @@ export function OnboardingForm({ defaultFullName = "" }: OnboardingFormProps) {
 
   if (status === "success") {
     return (
-      <div className="glass-surface flex flex-col items-center gap-3 px-8 py-10 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">You&apos;re all set, {draft.fullName.split(" ")[0]}</h1>
-        <p className="text-sm text-text-muted">Your preparation profile is ready.</p>
+      <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10 text-center">
+        <h1 className="text-xl font-semibold text-ink">You&apos;re all set, {draft.fullName.split(" ")[0]}</h1>
+        <p className="text-sm text-ink-secondary">Your preparation profile is ready.</p>
         <Button asChild size="sm">
           <Link href="/student">Go to dashboard</Link>
         </Button>
@@ -160,10 +160,10 @@ export function OnboardingForm({ defaultFullName = "" }: OnboardingFormProps) {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-10">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-10">
       <div className="flex flex-col gap-1 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">Tell us about your preparation</h1>
-        <p className="text-sm text-text-muted">
+        <h1 className="text-xl font-semibold text-ink">Tell us about your preparation</h1>
+        <p className="text-sm text-ink-secondary">
           This personalizes your dashboard, missions and recommendations.
         </p>
       </div>
@@ -211,13 +211,11 @@ export function OnboardingForm({ defaultFullName = "" }: OnboardingFormProps) {
           <Label>Preparation stage</Label>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Preparation stage">
             {STAGE_OPTIONS.map((option) => (
-              <CapsuleSmall
+              <FilterChip
                 key={option.value}
                 label={option.label}
                 selected={draft.preparationStage === option.value}
                 onClick={() => updateDraft({ preparationStage: option.value })}
-                role="radio"
-                aria-checked={draft.preparationStage === option.value}
               />
             ))}
           </div>

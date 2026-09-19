@@ -45,33 +45,33 @@ export default async function BatchDetailPage({
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div>
-        <Link href="/academy/batches" className="text-xs text-brand-navy hover:underline">
+        <Link href="/academy/batches" className="text-xs text-brand-accent hover:underline">
           ← Batches
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-text-primary">{batch.name}</h1>
-        <p className="text-sm text-text-muted">
+        <h1 className="mt-1 text-[28px] font-bold text-ink">{batch.name}</h1>
+        <p className="text-sm text-ink-secondary">
           {members.length} students · Average readiness: {averageReadiness ?? "—"}
         </p>
       </div>
 
-      <div className="glass-surface flex flex-col gap-4 px-6 py-6">
+      <div className="glass-regular flex flex-col gap-4 px-6 py-6">
         <BatchMentorAssign batchId={batch.id} mentorId={batch.mentorId} mentors={mentors} />
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-text-muted">Members</h2>
+        <h2 className="text-[18px] font-semibold text-ink">Members</h2>
         <AddExistingStudentToBatch batchId={batch.id} unassignedStudents={unassigned.map(({ id: sid, fullName }) => ({ id: sid, fullName }))} />
         {members.length === 0 ? (
           <EmptyState title="No students in this batch yet" description="Add one above." />
         ) : (
           <ul className="flex flex-col gap-2">
             {members.map((student) => (
-              <li key={student.id} className="glass-surface flex items-center justify-between px-5 py-3">
-                <Link href={`/academy/students/${student.id}`} className="text-sm text-text-primary hover:underline">
+              <li key={student.id} className="glass-regular flex items-center justify-between px-5 py-3">
+                <Link href={`/academy/students/${student.id}`} className="text-sm text-ink hover:underline">
                   {student.fullName}
                 </Link>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-text-muted">{student.readiness ?? "—"}</span>
+                  <span className="text-sm text-ink-secondary">{student.readiness ?? "—"}</span>
                   <RemoveStudentButton batchId={batch.id} studentId={student.id} />
                 </div>
               </li>

@@ -2,7 +2,7 @@
 
 **Type:** Current project state. Reporting only — never a source of requirements.
 **Question this file answers:** *If I open this project today, what is the exact state?*
-**Last updated:** 2026-09-19
+**Last updated:** 2026-09-19 (design system rebuild)
 
 ---
 
@@ -87,6 +87,45 @@ Browser → Next.js App → Backend API → PostgreSQL / AI Provider / Storage
 ---
 
 ## 4. UI State
+
+> **2026-09-19 — design system replaced.** Everything below this notice describing "Glass Capsule"
+> (navy brand colour, `CapsulePrimary`/`Secondary`/`Small`) is **superseded** and kept only as a
+> historical record of the T003–T005 build. The live design system is now **Apple-Inspired Glass UI
+> v3** (`AGENTS.md` §7, full spec in `UI design.md`) — see the Decisions Register entry below for
+> rationale and the summary immediately following this notice for current state.
+
+### 4.0 Current design system — Apple-Inspired Glass UI v3 — `VERIFIED`
+
+- **Tokens** (`app/globals.css`): ink/ink-secondary/surface-base/hairline, single brand-accent
+  (indigo) + brand-accent-2, three status colours, three glass material tiers (thin/regular/thick),
+  five-step radius scale, shadow-soft/elevated/glow-accent, motion duration/easing. `--brand-accent`
+  deliberately not named bare `--accent`, to avoid colliding with shadcn's own `--accent` semantic
+  slot (used internally for hover-highlight backgrounds).
+- **Shell** (`components/layout/`): `AppShell` composes `Sidebar` (glass-thick, pill nav items, active
+  = accent gradient + glow), `TopHeader` (glass-thick, search capsule + notifications + avatar menu),
+  `MobileTabBar` (floating glass-thick bottom bar, <900px). One shell, parameterized by role — used
+  identically by `app/student/layout.tsx`, `app/mentor/layout.tsx`, `app/academy/layout.tsx`.
+- **Shared content patterns** (`components/ui/`): `StatCard`, `PageHeader`, `ListPanel`/`ListRow`,
+  `EmptyState` (redesigned), `ErrorState`/`LoadingState` (redesigned), `StatusTag` (colour + text/dot,
+  never colour-only), `FilterChip`, `DetailHeader`, `nav-icons.tsx` (icon registry, replaces the old
+  `capsuleIcons`).
+- **Retired:** `components/ui/capsule.tsx` and the per-role `*-header.tsx`/`*-nav.tsx` components
+  (`components/{student,mentor,academy}/`) — deleted, replaced by the shared shell above.
+- **Ambient background:** one persistent `.ambient-wash` div in `app/layout.tsx` (root layout, never
+  remounted per route), indigo→cyan radial wash, `prefers-reduced-motion` freezes it via the existing
+  global reduced-motion rule.
+- **Migration scope:** every page under `app/`, every component under `components/{student,mentor,
+  academy,auth,shared,practice}/`, and the public site were swept for the old token names
+  (`glass-surface`, `text-text-primary/muted`, `brand-navy*`, `bg-bg-base/ambient`) and either
+  mechanically renamed or structurally rewritten (Capsule usages) onto the new system. Verified via
+  `npm run build` + `npm run lint` + `npx tsc --noEmit` (all clean) and rendered-HTML checks for `/`,
+  `/login`, `/signup`.
+- **Known remaining polish (not blocking):** dropdown menus (profile menu, select dropdowns) still use
+  shadcn's default solid `bg-popover` chrome rather than being explicitly restyled as `glass-thick`;
+  visually acceptable but not yet swept for full §7.13 screen-acceptance-test compliance page by page.
+  Track under a future T070-equivalent consistency pass.
+
+### 4.1 Historical (superseded 2026-09-19) — original Glass Capsule build record
 
 - **Design system:** Glass Capsule (`AGENTS.md` §7) — `VERIFIED` implemented (tokens T003, primitives
   T004, base UI T005).
@@ -226,6 +265,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-19 | No email confirmation required on signup (Supabase dashboard setting, not code) | User's explicit choice, to keep local testing fast; can be turned on later without any code change |
 | 2026-09-19 | Public signup offers **Student** and **Academy Admin** only. **Mentor accounts are invite-only** — an academy admin invites a mentor from `/academy/mentors`, which now creates a **real** Supabase account via `admin.inviteUserByEmail` (service-role key, server-side only) | Matches `specs.md` §8.5 exactly (mentors are invited, not self-signup). User explicitly asked for this to be real rather than mocked, unlike the rest of the academy domain — see Technical Debt for the mock/real bridge this required |
 | 2026-09-19 | Each role's Settings-equivalent page (Academy → Settings, Mentor → Profile, Student → Profile) gained "Load demo data" / "Clear demo data" controls | User's request: once real auth exists, every new account starts genuinely empty, losing the rich populated mock view built during T031/T040/T050. For Mentor/Academy this resets the shared in-memory mock arrays to their original snapshot (Server Actions in `lib/actions/{mentor,academy}.ts`, snapshotted at module load in `lib/mock/{mentor,academy}.ts`); for Student (no shared mutable mock state) it clears the relevant `localStorage` keys instead |
+| 2026-09-19 | Design system replaced app-wide: "Glass Capsule" (`AGENTS.md` §7, navy accent, `CapsulePrimary/Secondary/Small`) → **Apple-Inspired Glass UI v3** (indigo `--brand-accent`, three glass material tiers, sidebar+header app shell, stat cards/list-tables instead of capsule hierarchy). Full spec: `UI design.md` (repo root, descriptive reference, not a governing file). `AGENTS.md` §7 rewritten in full to be the binding summary | User provided a complete, detailed design doc and explicitly confirmed: (1) applies to the whole app, not just Academy Admin (even though the doc's own nav list — Dashboard/Students/Batches/Mentors/Reports/Settings — matches Academy's nav exactly), and (2) `AGENTS.md` should be updated to reflect it as the new mandatory system, the same way Glass Capsule itself superseded an earlier rounded-cards/purple direction |
 
 ---
 
@@ -239,6 +279,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-19 | ~~`/academy/*` had the same no-auth-guard gap~~ — **CLOSED 2026-09-19**. Per-academy data isolation is still not real: there is exactly one academy in the mock dataset (`lib/mock/academy.ts`), so a second real academy_admin account would see the same mock students/batches/mentors as the first. All mutations (add student, assign batch/mentor, invite mentor, update settings) are Server Actions. | Auth guard: done. Per-academy isolation: same backend migration as above (`AGENTS.md` §10) |
 | 2026-09-19 | Mentor invites are a hybrid: `inviteMentorAction` creates a **real** Supabase auth user (service-role `admin.inviteUserByEmail`, real email sent) so the person can actually log in as a mentor, but also pushes a matching row into the **mock** `lib/mock/academy.ts` `MENTORS` array purely so the existing mock-backed mentor list/dashboard/batch-assignment UI shows them immediately. `app/mentor/layout.tsx` flips that mock row from "invited" to "active" the first time the real mentor loads their own dashboard. This bridge is deliberate, not an oversight — documented in code comments in both files. | Same backend migration as the rows above; once academy data is real Postgres, drop the mock-array half of this function entirely |
 | 2026-09-19 | Landing page's temporary "Preview (no login yet)" buttons on all three role cards were removed now that `/login`/`/signup` are real. | Done — removed in the same change that shipped T013/T014 |
+| 2026-09-19 | Design system migration covered every page/component for the *material* system (glass tiers, colour, radius, shadow, shell) and the primary reference screens (all three dashboards, mentee detail, practice list pages) got the full new content-pattern treatment (`StatCard`/`ListPanel`/`PageHeader`). Secondary pages (batches, students, mentors, reports, settings, evaluations, sessions, resources detail, progress) were swept for token correctness and typography-scale consistency but still use ad-hoc `glass-regular` divs in places `StatCard`/`ListPanel` would be a cleaner fit. Dropdown menus (profile menu, `<Select>`) still use shadcn's default solid chrome, not an explicit `glass-thick` treatment. | A future T070-equivalent consistency pass — visually acceptable now, not yet swept against every §7.13 acceptance-test item on every screen |
 
 ---
 
@@ -546,6 +587,57 @@ Next task:
 - Confirm real signup/login/logout work end-to-end in the browser (user testing in progress).
 - Then resolve B3 (AI feedback), or scope the backend data migration needed to close the
   per-academy-isolation gap before Phase 6.
+```
+
+```text
+Date: 2026-09-19
+Task: App-wide design system replacement — "Glass Capsule" → "Apple-Inspired Glass UI v3"
+Status: Complete (verified — build/lint/type-check clean; rendered-HTML checks on /, /login, /signup;
+not yet visually confirmed in a live browser by the agent, no Chrome extension connection this
+session — user should click through /student, /mentor, /academy to confirm)
+
+What changed:
+- User supplied a full design spec (`UI design.md`, repo root) and confirmed via direct questions:
+  (1) applies app-wide, not just Academy Admin; (2) AGENTS.md §7 should be rewritten to make it the
+  new binding system, superseding Glass Capsule in full.
+- AGENTS.md §7 fully rewritten (tokens, app shell, page-header pattern, content patterns, typography,
+  radius/shadow scale, responsive/accessibility/motion rules, screen acceptance test) plus two stray
+  "capsule"/"navy" references elsewhere in the file corrected.
+- app/globals.css rewritten: ink/surface/hairline tokens, --brand-accent (named to avoid colliding
+  with shadcn's own --accent semantic slot), three glass tiers as plain CSS classes (glass-thin/
+  regular/thick — stateful, so CSS not Tailwind utilities, same rule as before), radius scale wired
+  into Tailwind's @theme (rounded-control/button/card/panel/pill), shadow-sm/md overridden to spec,
+  shadow-glow-accent added, .nav-item / .filter-chip / .row-hover-tint state classes, .ambient-wash
+  keyframe background. shadcn semantic tokens (--primary, --ring, etc.) remapped onto the new tokens.
+- New shared layout: components/layout/{app-shell,sidebar,top-header,mobile-tab-bar}.tsx — one shell
+  used identically by Student/Mentor/Academy layouts, replacing three separate per-role header/nav
+  component sets (deleted).
+- New shared content components: components/ui/{stat-card,page-header,list-panel,filter-chip,
+  detail-header,status-tag,nav-icons}.tsx; empty-state/error-state/loading-state redesigned in place.
+- Retired components/ui/capsule.tsx (CapsulePrimary/Secondary/Small) entirely — 9 call sites migrated
+  to the new components (FilterChip for role/stage toggles, ListPanel/ListRow for lists, StatCard for
+  metrics, a custom Link card for Today's Mission).
+- Full-codebase sweep (56 files) for now-deleted token names (glass-surface, text-text-primary/muted,
+  brand-navy*, bg-bg-base/ambient) — mechanical renames where safe, structural rewrites where the old
+  Capsule API was in use. Verified zero remaining references by grep after each pass.
+- Typography consistency pass: remaining old-scale headers (text-2xl page titles, text-sm section
+  headers, text-xs stat labels) bumped to the new 28px/700 · 18px/600 · 11px/600 scale across the
+  handful of secondary pages that hadn't already been rewritten with the new shared components.
+
+What remains (see Technical Debt):
+- Secondary pages (batches, students, mentors, reports, settings, evaluations, sessions, resources
+  detail, progress) still use ad-hoc glass-regular divs in some spots rather than StatCard/ListPanel —
+  visually consistent (same tokens) but not yet using the shared components throughout.
+- Dropdown menus / <Select> still shadcn's default solid chrome, not explicit glass-thick.
+- Live browser visual confirmation still pending (user to check).
+
+Blocker:
+- None for this task. B3 (AI provider) remains open and unrelated.
+
+Next task:
+- User to visually confirm the redesign in a browser.
+- Then: AI feedback (B3), backend data migration for per-academy isolation, or a full T070-style
+  consistency pass on the remaining secondary pages.
 ```
 
 ## 14. North Star

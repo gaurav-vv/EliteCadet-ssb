@@ -112,7 +112,7 @@ export function EvaluationForm({ mentees, defaultMenteeId }: EvaluationFormProps
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-8">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-8">
       {status === "error" && errorMessage && (
         <Alert variant="destructive">
           <AlertDescription>{errorMessage}</AlertDescription>

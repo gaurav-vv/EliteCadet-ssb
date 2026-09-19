@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CapsuleSmall } from "@/components/ui/capsule";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   Select,
   SelectContent,
@@ -92,7 +92,7 @@ export function ProfileForm({ realFullName }: ProfileFormProps) {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-8">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-8">
       {status === "saved" && (
         <Alert>
           <AlertDescription>Your profile was updated.</AlertDescription>
@@ -139,13 +139,11 @@ export function ProfileForm({ realFullName }: ProfileFormProps) {
           <Label>Preparation stage</Label>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Preparation stage">
             {STAGE_OPTIONS.map((option) => (
-              <CapsuleSmall
+              <FilterChip
                 key={option.value}
                 label={option.label}
                 selected={values.preparationStage === option.value}
                 onClick={() => setValues((v) => ({ ...v, preparationStage: option.value }))}
-                role="radio"
-                aria-checked={values.preparationStage === option.value}
               />
             ))}
           </div>

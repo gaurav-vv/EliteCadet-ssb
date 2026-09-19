@@ -30,14 +30,14 @@ export default async function ResourceDetailPage({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-10">
-      <Link href="/student/resources" className="text-xs text-brand-navy hover:underline">
+      <Link href="/student/resources" className="text-xs text-brand-accent hover:underline">
         ← Resources
       </Link>
       <div>
-        <p className="text-xs font-medium tracking-wide text-text-muted uppercase">{resource.category}</p>
-        <h1 className="text-2xl font-semibold text-text-primary">{resource.title}</h1>
+        <p className="text-[11px] font-semibold tracking-[0.04em] text-ink-secondary uppercase">{resource.category}</p>
+        <h1 className="text-[28px] font-bold text-ink">{resource.title}</h1>
       </div>
-      <div className="glass-surface px-6 py-6 text-sm leading-relaxed text-text-primary">
+      <div className="glass-regular px-6 py-6 text-sm leading-relaxed text-ink">
         {resource.body}
       </div>
       <ResourceReadToggle slug={resource.slug} />

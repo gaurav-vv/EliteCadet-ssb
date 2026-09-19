@@ -12,8 +12,8 @@ export default async function MentorsPage() {
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Mentors</h1>
-        <p className="text-sm text-text-muted">{mentors.length} mentors in your academy.</p>
+        <h1 className="text-[28px] font-bold text-ink">Mentors</h1>
+        <p className="text-sm text-ink-secondary">{mentors.length} mentors in your academy.</p>
       </div>
 
       <InviteMentorForm />
@@ -23,12 +23,12 @@ export default async function MentorsPage() {
       ) : (
         <ul className="flex flex-col gap-2">
           {mentors.map((mentor) => (
-            <li key={mentor.id} className="glass-surface flex items-center justify-between px-5 py-4">
+            <li key={mentor.id} className="glass-regular flex items-center justify-between px-5 py-4">
               <div>
-                <p className="text-sm font-medium text-text-primary">{mentor.fullName}</p>
-                <p className="text-xs text-text-muted">{mentor.email}</p>
+                <p className="text-sm font-medium text-ink">{mentor.fullName}</p>
+                <p className="text-xs text-ink-secondary">{mentor.email}</p>
               </div>
-              <div className="flex items-center gap-4 text-xs text-text-muted">
+              <div className="flex items-center gap-4 text-xs text-ink-secondary">
                 {mentor.status === "invited" ? (
                   <span className="text-warning font-medium">Invited — not yet accepted</span>
                 ) : (

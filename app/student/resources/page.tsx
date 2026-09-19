@@ -24,13 +24,13 @@ export default async function ResourcesPage() {
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Resources</h1>
-        <p className="text-sm text-text-muted">Guides to help you prepare beyond practice reps.</p>
+        <h1 className="text-[28px] font-bold text-ink">Resources</h1>
+        <p className="text-sm text-ink-secondary">Guides to help you prepare beyond practice reps.</p>
       </div>
 
       {categories.map((category) => (
         <section key={category} className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-text-muted">{category}</h2>
+          <h2 className="text-[18px] font-semibold text-ink">{category}</h2>
           <ul className="flex flex-col gap-2">
             {resources
               .filter((r) => r.category === category)
@@ -38,13 +38,13 @@ export default async function ResourcesPage() {
                 <li key={resource.slug}>
                   <Link
                     href={`/student/resources/${resource.slug}`}
-                    className="glass-surface flex flex-col gap-1 px-5 py-3 no-underline hover:-translate-y-0.5 hover:scale-[1.01]"
+                    className="glass-regular flex flex-col gap-1 px-5 py-3 no-underline hover:-translate-y-0.5 hover:scale-[1.01]"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-text-primary">{resource.title}</span>
+                      <span className="text-sm font-medium text-ink">{resource.title}</span>
                       <ResourceReadBadge slug={resource.slug} />
                     </div>
-                    <span className="text-xs text-text-muted">{resource.description}</span>
+                    <span className="text-xs text-ink-secondary">{resource.description}</span>
                   </Link>
                 </li>
               ))}

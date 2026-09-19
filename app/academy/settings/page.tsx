@@ -20,8 +20,8 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Settings</h1>
-        <p className="text-sm text-text-muted">Academy information and admin profile.</p>
+        <h1 className="text-[28px] font-bold text-ink">Settings</h1>
+        <p className="text-sm text-ink-secondary">Academy information and admin profile.</p>
       </div>
       <SettingsForm settings={settings} academyId={profile?.academyId ?? null} />
       <DemoDataControls

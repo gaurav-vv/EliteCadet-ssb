@@ -51,7 +51,7 @@ export function MentorProfileForm({ realFullName }: MentorProfileFormProps) {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-8">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-8">
       {status === "saved" && (
         <Alert>
           <AlertDescription>Your profile was updated.</AlertDescription>

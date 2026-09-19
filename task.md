@@ -400,10 +400,15 @@ evaluation, academy access, academy isolation, form validation.
 # Phase 7 — MVP Polish
 
 ## T070 — Design system consistency pass — P1 — `[ ]`
-**Requirements:** verify every screen against `AGENTS.md` §7.11; remove card-stack clutter; confirm
-capsule hierarchy, navy usage, icon family, spacing, typography, token usage.
-**Acceptance:** zero raw colour/radius/blur/duration literals in components; all twelve checklist
-answers are "yes" on every screen.
+**Updated 2026-09-19:** the design system itself changed (Glass Capsule → Apple-Inspired Glass UI v3,
+`AGENTS.md` §7, see `status.md` → Decisions). The core migration (tokens, shell, primary dashboards)
+is done; this task now means finishing the sweep on secondary pages (batches, students, mentors,
+reports, settings, evaluations, sessions, resources, progress) onto `StatCard`/`ListPanel`/`PageHeader`
+throughout, plus dropdown/`<Select>` glass-thick styling — see `status.md` → Technical Debt.
+**Requirements:** verify every screen against `AGENTS.md` §7.13; confirm glass tier usage, accent
+usage, icon family, spacing, typography, token usage.
+**Acceptance:** zero raw colour/radius/blur/duration literals in components; every acceptance-test
+item in §7.13 answers "yes" on every screen.
 
 ## T071 — Dashboard review — P1 — `[ ]`
 Student: clear daily action, progress, improvement area.

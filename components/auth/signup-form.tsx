@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CapsuleSmall } from "@/components/ui/capsule";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { signUp } from "@/lib/api/auth";
 import type { Role } from "@/types/auth";
 
@@ -48,10 +48,10 @@ export function SignupForm() {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-6 px-8 py-10">
+    <div className="glass-regular flex flex-col gap-6 px-8 py-10">
       <div className="flex flex-col gap-1 text-center">
-        <h1 className="text-xl font-semibold text-text-primary">Create your account</h1>
-        <p className="text-sm text-text-muted">Start preparing, or set up your academy.</p>
+        <h1 className="text-xl font-semibold text-ink">Create your account</h1>
+        <p className="text-sm text-ink-secondary">Start preparing, or set up your academy.</p>
       </div>
 
       {status === "error" && errorMessage && (
@@ -61,21 +61,11 @@ export function SignupForm() {
       )}
 
       <div className="flex justify-center gap-2" role="radiogroup" aria-label="Account type">
-        <CapsuleSmall
-          icon="student"
-          label="I'm a student"
-          selected={role === "student"}
-          onClick={() => setRole("student")}
-          aria-checked={role === "student"}
-          role="radio"
-        />
-        <CapsuleSmall
-          icon="academy"
+        <FilterChip label="I'm a student" selected={role === "student"} onClick={() => setRole("student")} />
+        <FilterChip
           label="I run an academy"
           selected={role === "academy_admin"}
           onClick={() => setRole("academy_admin")}
-          aria-checked={role === "academy_admin"}
-          role="radio"
         />
       </div>
 
@@ -136,9 +126,9 @@ export function SignupForm() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-text-muted">
+      <p className="text-center text-sm text-ink-secondary">
         Already have an account?{" "}
-        <Link href="/login" className="text-brand-navy hover:underline">
+        <Link href="/login" className="text-brand-accent hover:underline">
           Log in
         </Link>
       </p>

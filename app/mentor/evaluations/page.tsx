@@ -25,8 +25,8 @@ export default async function EvaluationsPage() {
     <div className="flex flex-col gap-6 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Evaluations</h1>
-          <p className="text-sm text-text-muted">{evaluations.length} submitted so far.</p>
+          <h1 className="text-[28px] font-bold text-ink">Evaluations</h1>
+          <p className="text-sm text-ink-secondary">{evaluations.length} submitted so far.</p>
         </div>
         <Button asChild size="sm">
           <Link href="/mentor/evaluations/new">New evaluation</Link>
@@ -38,17 +38,17 @@ export default async function EvaluationsPage() {
       ) : (
         <ul className="flex flex-col gap-2">
           {evaluations.map((evaluation) => (
-            <li key={evaluation.id} className="glass-surface flex flex-col gap-1 px-5 py-4">
+            <li key={evaluation.id} className="glass-regular flex flex-col gap-1 px-5 py-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-text-primary">
+                <span className="text-sm font-medium text-ink">
                   {evaluation.menteeName} · {evaluation.activityOrSession}
                 </span>
-                <span className="text-sm font-semibold text-text-primary">{evaluation.score}</span>
+                <span className="text-sm font-semibold text-ink">{evaluation.score}</span>
               </div>
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-ink-secondary">
                 {STATUS_LABEL[evaluation.status]} · {formatDate(evaluation.createdAt)} · {evaluation.evaluatorName}
               </p>
-              {evaluation.comments && <p className="text-sm text-text-muted">{evaluation.comments}</p>}
+              {evaluation.comments && <p className="text-sm text-ink-secondary">{evaluation.comments}</p>}
             </li>
           ))}
         </ul>

@@ -11,8 +11,8 @@ export default async function ProfilePage() {
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Profile</h1>
-        <p className="text-sm text-text-muted">Update your preparation details.</p>
+        <h1 className="text-[28px] font-bold text-ink">Profile</h1>
+        <p className="text-sm text-ink-secondary">Update your preparation details.</p>
       </div>
       <ProfileForm realFullName={profile?.fullName ?? ""} />
       <ResetLocalData />

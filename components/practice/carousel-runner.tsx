@@ -86,13 +86,13 @@ function CarouselStep({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between text-sm text-text-muted">
+      <div className="flex items-center justify-between text-sm text-ink-secondary">
         <span>
           Item {index + 1} of {total}
         </span>
         <span aria-live="polite">{secondsLeft}s left</span>
       </div>
-      <div className="glass-surface px-6 py-8 text-center text-text-primary">{prompt}</div>
+      <div className="glass-regular px-6 py-8 text-center text-ink">{prompt}</div>
       {phase === "respond" ? (
         <Textarea
           autoFocus
@@ -102,7 +102,7 @@ function CarouselStep({
           className="min-h-32"
         />
       ) : (
-        <p className="text-center text-sm text-text-muted">
+        <p className="text-center text-sm text-ink-secondary">
           Read the scene. The writing window opens automatically.
         </p>
       )}

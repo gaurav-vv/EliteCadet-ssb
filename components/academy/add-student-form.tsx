@@ -46,8 +46,8 @@ export function AddStudentForm({ batches }: AddStudentFormProps) {
   }
 
   return (
-    <div className="glass-surface flex flex-col gap-4 px-6 py-6">
-      <h2 className="text-sm font-medium text-text-muted">Add a student</h2>
+    <div className="glass-regular flex flex-col gap-4 px-6 py-6">
+      <h2 className="text-sm font-medium text-ink-secondary">Add a student</h2>
       {status === "error" && errorMessage && (
         <Alert variant="destructive">
           <AlertDescription>{errorMessage}</AlertDescription>

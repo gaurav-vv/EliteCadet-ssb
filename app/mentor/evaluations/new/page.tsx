@@ -16,10 +16,10 @@ export default async function NewEvaluationPage({
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4 pb-10">
-      <Link href="/mentor/evaluations" className="text-xs text-brand-navy hover:underline">
+      <Link href="/mentor/evaluations" className="text-xs text-brand-accent hover:underline">
         ← Evaluations
       </Link>
-      <h1 className="text-2xl font-semibold text-text-primary">New evaluation</h1>
+      <h1 className="text-[28px] font-bold text-ink">New evaluation</h1>
       <EvaluationForm mentees={mentees} defaultMenteeId={menteeId} />
     </div>
   );

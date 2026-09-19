@@ -21,8 +21,8 @@ export default async function StudentsPage() {
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Students</h1>
-        <p className="text-sm text-text-muted">{students.length} students across your academy.</p>
+        <h1 className="text-[28px] font-bold text-ink">Students</h1>
+        <p className="text-sm text-ink-secondary">{students.length} students across your academy.</p>
       </div>
 
       <AddStudentForm batches={batches.map(({ id, name }) => ({ id, name }))} />
@@ -35,17 +35,17 @@ export default async function StudentsPage() {
             <li key={student.id}>
               <Link
                 href={`/academy/students/${student.id}`}
-                className="glass-surface flex flex-col gap-1 px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01] sm:flex-row sm:items-center sm:justify-between"
+                className="glass-regular flex flex-col gap-1 px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01] sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="text-sm font-medium text-text-primary">{student.fullName}</p>
-                  <p className="text-xs text-text-muted">
+                  <p className="text-sm font-medium text-ink">{student.fullName}</p>
+                  <p className="text-xs text-ink-secondary">
                     {getBatchName(student.batchId)} · {getMentorName(student.mentorId)} · {formatDate(student.lastActivityAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-text-primary">{student.readiness ?? "—"}</span>
-                  <span className="text-xs text-text-muted">{STATUS_LABEL[student.status]}</span>
+                  <span className="text-sm font-semibold text-ink">{student.readiness ?? "—"}</span>
+                  <span className="text-xs text-ink-secondary">{STATUS_LABEL[student.status]}</span>
                 </div>
               </Link>
             </li>

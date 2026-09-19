@@ -1,30 +1,34 @@
 import type { Metadata } from "next";
-import { CapsuleSecondary } from "@/components/ui/capsule";
+import { PageHeader } from "@/components/ui/page-header";
+import { ListPanel, ListRow } from "@/components/ui/list-panel";
+import { navIcons } from "@/components/ui/nav-icons";
 
 export const metadata: Metadata = { title: "Practice" };
 
 export default function PracticePage() {
+  const PsychologyIcon = navIcons.psychology;
+  const InterviewIcon = navIcons.interview;
+
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Practice</h1>
-        <p className="text-sm text-text-muted">Choose a category to start practicing.</p>
-      </div>
+      <PageHeader title="Practice" subtitle="Choose a category to start practicing." />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <CapsuleSecondary
-          href="/student/practice/psychology"
-          icon="psychology"
-          label="Psychology"
-          description="TAT, WAT, SRT and SDT"
-        />
-        <CapsuleSecondary
-          href="/student/practice/interview"
-          icon="interview"
-          label="Interview"
-          description="Coming soon"
-        />
-      </div>
+      <ListPanel>
+        <ListRow href="/student/practice/psychology">
+          <span className="flex items-center gap-3 text-sm font-medium text-ink">
+            <PsychologyIcon aria-hidden="true" size={18} className="text-ink-secondary" />
+            Psychology
+          </span>
+          <span className="text-xs text-ink-secondary">TAT, WAT, SRT and SDT</span>
+        </ListRow>
+        <ListRow href="/student/practice/interview">
+          <span className="flex items-center gap-3 text-sm font-medium text-ink">
+            <InterviewIcon aria-hidden="true" size={18} className="text-ink-secondary" />
+            Interview
+          </span>
+          <span className="text-xs text-ink-secondary">Coming soon</span>
+        </ListRow>
+      </ListPanel>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CapsuleSecondary } from "@/components/ui/capsule";
 import { ErrorState } from "@/components/ui/error-state";
+import { ListPanel, ListRow } from "@/components/ui/list-panel";
 import { getActivities } from "@/lib/api/practice";
 
 export const metadata: Metadata = { title: "Psychology" };
@@ -16,26 +16,25 @@ export default async function PsychologyPage() {
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div>
-        <Link href="/student/practice" className="text-xs text-brand-navy hover:underline">
+        <Link href="/student/practice" className="text-xs text-brand-accent hover:underline">
           ← Practice
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-text-primary">Psychology</h1>
-        <p className="text-sm text-text-muted">
+        <h1 className="mt-1 text-[28px] font-bold text-ink">Psychology</h1>
+        <p className="text-[14px] text-ink-secondary">
           Four tests, same format as the actual SSB screening. Read the instructions before you start.
         </p>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <ListPanel>
         {result.data.map((activity) => (
-          <CapsuleSecondary
-            key={activity.testType}
-            href={`/student/practice/psychology/${activity.testType}`}
-            icon="psychology"
-            label={activity.title}
-            description={`${activity.description} · ${activity.durationLabel}`}
-          />
+          <ListRow key={activity.testType} href={`/student/practice/psychology/${activity.testType}`}>
+            <span className="text-sm font-medium text-ink">{activity.title}</span>
+            <span className="text-xs text-ink-secondary">
+              {activity.description} · {activity.durationLabel}
+            </span>
+          </ListRow>
         ))}
-      </div>
+      </ListPanel>
     </div>
   );
 }

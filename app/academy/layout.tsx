@@ -1,20 +1,28 @@
-import { AcademyHeader } from "@/components/academy/academy-header";
-import { AcademyNav } from "@/components/academy/academy-nav";
+import { AppShell } from "@/components/layout/app-shell";
+import type { SidebarNavItem } from "@/components/layout/sidebar";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
+
+const NAV_ITEMS: SidebarNavItem[] = [
+  { href: "/academy", label: "Dashboard", icon: "dashboard" },
+  { href: "/academy/students", label: "Students", icon: "students" },
+  { href: "/academy/batches", label: "Batches", icon: "batches" },
+  { href: "/academy/mentors", label: "Mentors", icon: "mentees" },
+  { href: "/academy/reports", label: "Reports", icon: "reports" },
+  { href: "/academy/settings", label: "Settings", icon: "settings" },
+];
 
 export default async function AcademyLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await getCurrentUserAndProfile();
-  const adminName = profile?.fullName || "Admin";
 
   return (
-    <div className="flex min-h-full flex-col">
-      <AcademyHeader adminName={adminName} />
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col md:flex-row md:gap-6 md:px-6 md:py-6">
-        <aside className="md:w-52 md:shrink-0">
-          <AcademyNav />
-        </aside>
-        <main className="flex flex-1 flex-col px-4 py-4 md:px-0 md:py-0">{children}</main>
-      </div>
-    </div>
+    <AppShell
+      roleLabel="Academy Admin"
+      items={NAV_ITEMS}
+      searchPlaceholder="Search students, mentors…"
+      userName={profile?.fullName || "Admin"}
+      profileHref="/academy/settings"
+    >
+      {children}
+    </AppShell>
   );
 }

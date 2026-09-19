@@ -24,8 +24,8 @@ export default async function MenteesPage() {
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Mentees</h1>
-        <p className="text-sm text-text-muted">{mentees.length} students assigned to you.</p>
+        <h1 className="text-[28px] font-bold text-ink">Mentees</h1>
+        <p className="text-sm text-ink-secondary">{mentees.length} students assigned to you.</p>
       </div>
 
       {mentees.length === 0 ? (
@@ -36,20 +36,20 @@ export default async function MenteesPage() {
             <li key={mentee.id}>
               <Link
                 href={`/mentor/mentees/${mentee.id}`}
-                className="glass-surface flex flex-col gap-2 px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01] sm:flex-row sm:items-center sm:justify-between"
+                className="glass-regular flex flex-col gap-2 px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01] sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="text-sm font-medium text-text-primary">{mentee.fullName}</p>
-                  <p className="text-xs text-text-muted">
+                  <p className="text-sm font-medium text-ink">{mentee.fullName}</p>
+                  <p className="text-xs text-ink-secondary">
                     {mentee.batch} · {formatDate(mentee.lastActivityAt)}
                   </p>
                   {mentee.weakAreas.length > 0 && (
-                    <p className="text-xs text-text-muted">Weak areas: {mentee.weakAreas.join(", ")}</p>
+                    <p className="text-xs text-ink-secondary">Weak areas: {mentee.weakAreas.join(", ")}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-text-primary">{mentee.overallScore ?? "—"}</span>
-                  <span className="text-xs text-text-muted">{STATUS_LABEL[mentee.evaluationStatus]}</span>
+                  <span className="text-sm font-semibold text-ink">{mentee.overallScore ?? "—"}</span>
+                  <span className="text-xs text-ink-secondary">{STATUS_LABEL[mentee.evaluationStatus]}</span>
                 </div>
               </Link>
             </li>
