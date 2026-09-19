@@ -15,6 +15,14 @@ import {
   Users,
   Building2,
   Settings,
+  LayoutDashboard,
+  Library,
+  UserCircle,
+  ClipboardCheck,
+  CalendarClock,
+  GraduationCap,
+  Layers,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "cn";
@@ -33,6 +41,14 @@ export const capsuleIcons = {
   mentees: Users,
   academy: Building2,
   settings: Settings,
+  dashboard: LayoutDashboard,
+  resources: Library,
+  profile: UserCircle,
+  evaluations: ClipboardCheck,
+  sessions: CalendarClock,
+  students: GraduationCap,
+  batches: Layers,
+  reports: BarChart3,
 } satisfies Record<string, LucideIcon>;
 
 export type CapsuleIconName = keyof typeof capsuleIcons;
