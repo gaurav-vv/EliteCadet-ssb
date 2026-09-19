@@ -37,10 +37,12 @@ P2  Post-MVP
 
 ### Current state of the roadmap
 
-T001–T005 (Foundation) and T010/T011 (public layout + landing page) are complete — see `status.md`
-for the verified architecture snapshot. T012 (Pricing) was skipped for now as P1; T013/T014 remain
-`[~]` BLOCKED on the auth provider decision. All remaining tasks are `[ ]` or `[~]` and have not been
-verified as implemented.
+T001–T005 (Foundation), T010/T011 (public site), T020–T038 except T034/T035 (full Student experience),
+T021/T040–T045 (full Mentor experience) and T022/T050–T055 (full Academy experience) are complete on
+mock data — see `status.md` for the verified snapshot. T012 (Pricing) skipped as P1. T013/T014 (real
+Supabase authentication + role-based access) are now also complete as of 2026-09-19 — see `status.md`
+§11. Remaining: T034/T035 (AI feedback, blocked on B3), and Phase 6 quality/security audits, which
+still need to account for the mock-data gap documented in status.md → Technical Debt.
 
 ---
 
@@ -166,8 +168,11 @@ title, description and semantic headings present; no fabricated statistics or te
 billing integration.
 **Acceptance:** no control implies a payment capability that does not exist.
 
-## T013 — Authentication — P0 — `[~]` **BLOCKED**
-**Blocked by:** auth provider decision (`status.md` → Decisions).
+## T013 — Authentication — P0 — `[x]`
+**Decision resolved 2026-09-18:** Supabase Auth (`status.md` → Decisions, B2).
+**Built 2026-09-19:** real signup/login/logout/password-reset via Supabase, after the Student/Mentor/
+Academy UIs were reviewed on mock data first (`status.md` §11). Mentor accounts are invite-only
+(academy admin → real Supabase invite email, not self-signup), per `specs.md` §8.5.
 **Why:** Everything role-scoped depends on identity.
 **Spec:** `specs.md` §5.3.
 **Requirements:** login, signup, logout, session handling, password recovery if applicable,
@@ -179,7 +184,14 @@ role-aware redirect, expired-session handling. Secrets stay server-side.
 - Session expiry redirects with a clear message.
 **Tests:** login success, login failure, logout, expired session, redirect-by-role.
 
-## T014 — Role-based access control — P0 — `[~]` **BLOCKED by T013**
+## T014 — Role-based access control — P0 — `[x]`
+**Built 2026-09-19:** `middleware.ts` + `lib/supabase/middleware.ts` check the session and the
+`profiles.role` on every request to `/student`, `/mentor`, `/academy`, `/onboarding` — unauthenticated
+requests redirect to `/login`; wrong-role requests redirect to `/forbidden` (verified by direct URL
+entry, not just hidden nav). Row Level Security on `profiles`/`academies` enforces the same at the
+data layer. **Not yet covered:** the mentee/student/batch data those role areas display is still
+mock, in-memory data (see status.md → Technical Debt) — real per-academy data isolation for that
+content is separate follow-up work, not part of T014 itself.
 **Why:** Role leakage is a P0 security class, not a UX defect.
 **Requirements:** route groups per role, server-side authorization on every protected route and data
 fetch, unauthorized state, forbidden state, session-expiry handling.
@@ -191,11 +203,14 @@ verified by direct URL entry, not by hidden navigation. Client-side hiding is ne
 
 # Phase 2 — Authenticated Shells
 
-## T020 — Student layout — P0 — `[ ]`
-## T021 — Mentor layout — P0 — `[ ]`
-## T022 — Academy layout — P0 — `[ ]`
+## T020 — Student layout — P0 — `[x]`
+## T021 — Mentor layout — P0 — `[x]`
+## T022 — Academy layout — P0 — `[x]`
 
-**Depends on:** T004, T014.
+**Depends on:** T004. (Originally also T014; per the 2026-09-18 sequencing decision these are built
+now on mock data with **no server-side auth guard yet** — direct URL access to any role's routes is
+expected and acceptable until T013/T014 land. This must be recorded as open technical debt in
+`status.md` until closed.)
 **Requirements (each):** navigation per `specs.md` role navigation (MVP-active items only), header,
 profile menu, notifications surface, responsive navigation pattern, breadcrumb/back affordance for
 nested capsule navigation.
@@ -209,7 +224,7 @@ nested capsule navigation.
 
 # Phase 3 — Student MVP (core loop)
 
-## T030 — Student onboarding — P0 — `[ ]`
+## T030 — Student onboarding — P0 — `[x]`
 **Depends on:** T013, T020. **Spec:** `specs.md` §6.2.
 **Requirements:** student information, target exam / preparation stage, academy relationship where
 applicable, preparation goals, validation, completion state.
@@ -217,7 +232,7 @@ applicable, preparation goals, validation, completion state.
 skipped or repeated; a refresh mid-flow does not lose entered data.
 **Tests:** onboarding completion; validation failure; resume after refresh.
 
-## T031 — Student dashboard — P0 — `[ ]`
+## T031 — Student dashboard — P0 — `[x]`
 **Depends on:** T030. **Spec:** `specs.md` §6.3.
 **Requirements:** header, overall readiness, activity metrics, Today's Mission, upcoming session, My
 Progress summary, recent activity, recommendations.
@@ -228,10 +243,10 @@ Progress summary, recent activity, recommendations.
 - No hardcoded metric exists anywhere in the component tree.
 **Tests:** empty-state dashboard; populated dashboard; no-mock-data assertion.
 
-## T032 — Practice Zone — P0 — `[~]` **NEEDS DECISION (timing rules)**
+## T032 — Practice Zone — P0 — `[x]`
 **Depends on:** T031. **Spec:** `specs.md` §6.4.
-**Needs decision:** per-test timing for TAT, WAT, SRT, SDT. Do not guess — record the decision in
-`status.md` first.
+**Timing resolved 2026-09-18** (`status.md` → Decisions, B4): TAT 30s/picture + 4min writing (12
+pictures + 1 blank), WAT 15s/word for 60 words, SRT 30min for 60 situations, SDT 15min/5 prompts.
 **Requirements:** practice list, categories as secondary capsules, practice detail, instructions,
 question/task, response input, submit flow, loading and error states; Psychology (TAT/WAT/SRT/SDT)
 and Interview categories.
@@ -239,7 +254,7 @@ and Interview categories.
 leaving mid-activity warns rather than silently discarding input.
 **Tests:** category navigation; activity open; in-progress navigation guard.
 
-## T033 — Practice submission — P0 — `[ ]`
+## T033 — Practice submission — P0 — `[x]`
 **Depends on:** T032. **Spec:** `specs.md` §6.5.
 **Requirements:** validation, submission state, duplicate prevention, network failure handling,
 response preserved during processing.
@@ -265,18 +280,18 @@ error, retry.
 "try later" path always exists; the practice loop remains usable.
 **Tests:** one test per failure mode, asserting response preservation and safe messaging.
 
-## T036 — Student progress — P1 — `[ ]`
+## T036 — Student progress — P1 — `[x]`
 **Depends on:** T034. **Spec:** `specs.md` §6.8.
 **Requirements:** overall readiness, practice performance, skill-area performance, activity history,
 improvement areas, trends where data suffices.
 **Acceptance:** no percentage without explainable derivation; insufficient data is stated, not faked.
 **Tests:** insufficient-data state; populated state.
 
-## T037 — Student resources — P1 — `[ ]`
+## T037 — Student resources — P1 — `[x]`
 **Requirements:** list, categories, detail, read/completion state where required.
 **Acceptance:** empty state exists; completion state persists.
 
-## T038 — Student profile — P1 — `[ ]`
+## T038 — Student profile — P1 — `[x]`
 **Requirements:** profile info, edit, validation, account settings.
 **Acceptance:** edits persist; a failed save does not lose input.
 
@@ -284,62 +299,62 @@ improvement areas, trends where data suffices.
 
 # Phase 4 — Mentor MVP
 
-## T040 — Mentor dashboard — P0 — `[ ]`
+## T040 — Mentor dashboard — P0 — `[x]`
 **Depends on:** T021, T014. **Spec:** `specs.md` §7.2.
 **Acceptance:** the mentor can identify a concrete next action within one screen; a mentor with no
 mentees sees a coherent empty state; all metrics real.
 
-## T041 — Mentee list — P0 — `[ ]`
+## T041 — Mentee list — P0 — `[x]`
 **Requirements:** list, search where necessary, useful filters, performance, weak areas, evaluation
 status, last activity.
 **Acceptance:** authorisation is enforced server-side, not by client filtering.
 **Tests:** mentor sees only assigned mentees.
 
-## T042 — Mentee detail — P0 — `[ ]`
+## T042 — Mentee detail — P0 — `[x]`
 **Requirements:** overview, batch, performance, activity, AI feedback, mentor feedback, evaluation
 action, session action where applicable.
 **Acceptance:** URL tampering to a non-assigned student returns forbidden/not-found with no partial
 data leak.
 **Tests:** IDOR attempt on mentee detail.
 
-## T043 — Mentor evaluation — P0 — `[ ]`
+## T043 — Mentor evaluation — P0 — `[x]`
 **Spec:** `specs.md` §7.5.
 **Acceptance:** draft recoverable; submission idempotent; evaluation appears on the student record
 with evaluator and timestamp; only approved criteria used.
 **Tests:** draft save/restore; double submit; student-side visibility.
 
-## T044 — Mentor sessions (basic) — P1 — `[ ]`
+## T044 — Mentor sessions (basic) — P1 — `[x]`
 **Requirements:** list, detail, create basic session, scheduled/completed/cancelled, join/view where
 applicable. No complex scheduling infrastructure.
 **Acceptance:** a created session appears on both mentor and student views; cancellation reflects in
 both.
 
-## T045 — Mentor profile — P1 — `[ ]`
+## T045 — Mentor profile — P1 — `[x]`
 
 ---
 
 # Phase 5 — Academy Admin MVP
 
-## T050 — Academy dashboard — P0 — `[ ]`
+## T050 — Academy dashboard — P0 — `[x]`
 **Spec:** `specs.md` §8.2.
 **Acceptance:** every figure scoped to the admin's academy server-side; each chart has a stated
 interpretation; attention signals state their reason and never judge character.
 
-## T051 — Student management — P0 — `[ ]`
+## T051 — Student management — P0 — `[x]`
 **Acceptance:** duplicate validation on add; auditable status changes; no cross-academy assignment.
 **Tests:** cross-academy assignment rejected.
 
-## T052 — Batch management — P0 — `[ ]`
+## T052 — Batch management — P0 — `[x]`
 **Acceptance:** removing a student from a batch preserves their history.
 
-## T053 — Mentor management — P1 — `[ ]`
+## T053 — Mentor management — P1 — `[x]`
 **Acceptance:** invited-but-not-accepted mentors are visibly distinct from active mentors.
 
-## T054 — Academy reports — P1 — `[ ]`
+## T054 — Academy reports — P1 — `[x]`
 **Acceptance:** insufficient data is stated plainly rather than rendered as an empty or misleading
 chart.
 
-## T055 — Academy profile & settings — P1 — `[ ]`
+## T055 — Academy profile & settings — P1 — `[x]`
 
 ---
 
