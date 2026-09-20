@@ -41,8 +41,9 @@ T001–T005 (Foundation), T010/T011 (public site), T020–T038 except T034/T035 
 T021/T040–T045 (full Mentor experience) and T022/T050–T055 (full Academy experience) are complete on
 mock data — see `status.md` for the verified snapshot. T012 (Pricing) skipped as P1. T013/T014 (real
 Supabase authentication + role-based access) are now also complete as of 2026-09-19 — see `status.md`
-§11. Remaining: T034/T035 (AI feedback, blocked on B3), and Phase 6 quality/security audits, which
-still need to account for the mock-data gap documented in status.md → Technical Debt.
+§11. T039 (5-Day SSB Practice Journey, previously deferred) complete as of 2026-09-20. Remaining:
+T034/T035 (AI feedback, blocked on B3), and Phase 6 quality/security audits, which still need to
+account for the mock-data gap documented in status.md → Technical Debt.
 
 ---
 
@@ -294,6 +295,34 @@ improvement areas, trends where data suffices.
 ## T038 — Student profile — P1 — `[x]`
 **Requirements:** profile info, edit, validation, account settings.
 **Acceptance:** edits persist; a failed save does not lose input.
+
+## T039 — 5-Day SSB Practice Journey — P1 — `[x]`
+**Why:** Un-deferred 2026-09-20 by explicit user direction, referencing Target SSB (targetssb.in) as
+functional/structural inspiration. **Spec:** `specs.md` §6.4a (also see §3 Scope Decisions and §13).
+**Depends on:** T032 (Practice Zone), T037 (reuses the resources reading/detail pattern).
+**Requirements:** `/student/practice` becomes a 5-day overview (progress ring + Day 1–5 list); each
+day lists its modules (`app/student/practice/[day]/page.tsx`); each module resolves via
+`app/student/practice/[day]/[module]/page.tsx` to reading/info content, a self-paced practice bank
+(MCQ or free-text), a timed test (new MCQ runner for OIR/OIR Non-verbal; PPDT reuses the existing
+carousel runner), the Final Self Assessment checklist, or the Day 5 summary. Day 2's Test cards and
+Day 4's Personal Interview card link to the *existing* Psychology/Interview routes (T032/T033)
+instead of duplicating that flow — a direct hit on a module URL with an `href` redirects to the real
+page rather than rendering empty content.
+**Acceptance:**
+- Every module in `specs.md` §6.4a resolves to a working page; no dead links.
+- Progress counts/percentages are always computed from real content-array lengths, never invented.
+- Existing Psychology/Interview behavior (T032/T033) is unchanged.
+- No hydration mismatch: components reading localStorage-derived progress start at the SSR-safe
+  default and update post-mount, not via a value computed directly (or via a lazy initializer) during
+  render — verified by a full signed-up walkthrough with zero client console/page errors.
+**Tests:** manual full-journey walkthrough (signup → every day → a practice bank → a timed test →
+self-assessment → final summary) in a production build, zero console/page errors; `npm run build` /
+`npx tsc --noEmit` / `npx eslint .` all clean.
+**Technical debt carried forward (see `status.md` → Technical Debt):** all bank content is small
+placeholder data (real counts, not the reference product's production-scale banks); no backend
+persistence (same mock/localStorage pattern as the rest of Student, T014's known gap); no mentor/
+academy visibility into journey progress; AI feedback on journey submissions is blocked on B3, same
+as T034.
 
 ---
 

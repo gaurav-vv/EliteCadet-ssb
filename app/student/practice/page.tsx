@@ -1,33 +1,35 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPanel, ListRow } from "@/components/ui/list-panel";
-import { navIcons } from "@/components/ui/nav-icons";
+import { JourneyProgressRing } from "@/components/practice/journey-progress-ring";
+import { getAllBankModuleItemIds, getDays } from "@/lib/api/ssb-journey";
 
 export const metadata: Metadata = { title: "Practice" };
 
-export default function PracticePage() {
-  const PsychologyIcon = navIcons.psychology;
-  const InterviewIcon = navIcons.interview;
+export default async function PracticePage() {
+  const daysResult = await getDays();
+  const days = daysResult.data ?? [];
+  const bankModules = getAllBankModuleItemIds();
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <PageHeader title="Practice" subtitle="Choose a category to start practicing." />
+      <PageHeader title="Practice" subtitle="Your 5-day SSB preparation journey." />
+
+      <div className="glass-regular px-6 py-6">
+        <JourneyProgressRing modules={bankModules} />
+      </div>
 
       <ListPanel>
-        <ListRow href="/student/practice/psychology">
-          <span className="flex items-center gap-3 text-sm font-medium text-ink">
-            <PsychologyIcon aria-hidden="true" size={18} className="text-ink-secondary" />
-            Psychology
-          </span>
-          <span className="text-xs text-ink-secondary">TAT, WAT, SRT and SDT</span>
-        </ListRow>
-        <ListRow href="/student/practice/interview">
-          <span className="flex items-center gap-3 text-sm font-medium text-ink">
-            <InterviewIcon aria-hidden="true" size={18} className="text-ink-secondary" />
-            Interview
-          </span>
-          <span className="text-xs text-ink-secondary">Coming soon</span>
-        </ListRow>
+        {days.map((day) => (
+          <ListRow key={day.id} href={`/student/practice/${day.id}`}>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-ink">
+                Day {day.dayNumber} — {day.title}
+              </span>
+              <span className="text-xs text-ink-secondary">{day.description}</span>
+            </span>
+          </ListRow>
+        ))}
       </ListPanel>
     </div>
   );

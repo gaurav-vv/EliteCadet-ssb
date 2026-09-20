@@ -23,12 +23,12 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 
 | Field | Value |
 |---|---|
-| Stage | Foundation (T001–T005) + public shell/landing (T010/T011) + full Student (T020, T030–T038 except T034/T035) + full Mentor (T021, T040–T045) + full Academy (T022, T050–T055) experiences + **real Supabase authentication and role-based access (T013/T014)** complete |
-| Current focus | Web platform MVP — auth is real now. Only AI feedback (T034/T035) and Phase 6 audits remain |
-| Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16; re-sequenced 2026-09-18 |
-| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives + shadcn/ui base UI system + public site + full Student, Mentor and Academy experiences + Supabase auth, committed to git (`.env.local` holds real project credentials, gitignored, not committed) |
-| Build | `VERIFIED` — `npm run build`, `npm run lint`, `npx tsc --noEmit` all succeed (Next.js 16.3.5, Turbopack). Middleware redirect behavior smoke-tested with curl (unauthenticated → `/login`, confirmed for `/student`, `/mentor`, `/academy`, `/onboarding`) |
-| Tests | `UNVERIFIED` — no test runner configured yet. Real signup/login has not been click-tested in a browser this session (no Chrome extension connection) — user should verify manually |
+| Stage | Foundation (T001–T005) + public shell/landing (T010/T011) + full Student (T020, T030–T038 except T034/T035, **+ T039 5-Day SSB Practice Journey**) + full Mentor (T021, T040–T045) + full Academy (T022, T050–T055) experiences + **real Supabase authentication and role-based access (T013/T014)** complete |
+| Current focus | Web platform MVP — auth is real now, Practice now covers the full 5-day journey. Only AI feedback (T034/T035) and Phase 6 audits remain |
+| Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16; re-sequenced 2026-09-18; `specs.md` un-deferred the 5-Day journey 2026-09-20 |
+| Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives + shadcn/ui base UI system + public site + full Student (incl. the 5-Day Practice Journey), Mentor and Academy experiences + Supabase auth, committed to git (`.env.local` holds real project credentials, gitignored, not committed) |
+| Build | `VERIFIED` — `npm run build`, `npm run lint`, `npx tsc --noEmit` all succeed (Next.js 16.3.5, Turbopack). Middleware redirect behavior smoke-tested with curl (unauthenticated → `/login`, confirmed for `/student`, `/mentor`, `/academy`, `/onboarding`). T039's full journey walkthrough smoke-tested end-to-end via Playwright against a production build (see §13a, 2026-09-20) |
+| Tests | `UNVERIFIED` — no test runner configured yet on this branch. Real signup/login has not been click-tested in a browser by a human this session — the T039 verification above was agent-driven (Playwright), not a substitute for the user's own click-through |
 | Next action | Resolve B3 (AI provider) to unblock T034/T035 — the only remaining MVP feature gap. Then Phase 6 quality/security audits (T060–T066), which must also close the mock-data gap under T014 (see Technical Debt) |
 
 Core loop being built:
@@ -177,7 +177,9 @@ standard SSB timing per B4; Interview is an explicit stub — no activities are 
 Practice submission `VERIFIED` (idempotency-keyed mock submission, retry-safe) · AI feedback `BLOCKED`
 (B3 — AI provider not yet decided) · AI failure handling `BLOCKED` (same) · Progress `VERIFIED` (mock
 data, zero/populated states) · Resources `VERIFIED` (mock content, list/detail/read-state) · Profile
-`VERIFIED` (edit form, localStorage-persisted)
+`VERIFIED` (edit form, localStorage-persisted) · **5-Day SSB Practice Journey (T039) `VERIFIED`**
+(un-deferred 2026-09-20; full signup→Day1-5 walkthrough in a production build, zero console/page
+errors; mock content, localStorage progress tracking, same pattern as Resources)
 
 ### Mentor
 Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `VERIFIED` (mock data) · Mentees
@@ -266,6 +268,9 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-19 | Public signup offers **Student** and **Academy Admin** only. **Mentor accounts are invite-only** — an academy admin invites a mentor from `/academy/mentors`, which now creates a **real** Supabase account via `admin.inviteUserByEmail` (service-role key, server-side only) | Matches `specs.md` §8.5 exactly (mentors are invited, not self-signup). User explicitly asked for this to be real rather than mocked, unlike the rest of the academy domain — see Technical Debt for the mock/real bridge this required |
 | 2026-09-19 | Each role's Settings-equivalent page (Academy → Settings, Mentor → Profile, Student → Profile) gained "Load demo data" / "Clear demo data" controls | User's request: once real auth exists, every new account starts genuinely empty, losing the rich populated mock view built during T031/T040/T050. For Mentor/Academy this resets the shared in-memory mock arrays to their original snapshot (Server Actions in `lib/actions/{mentor,academy}.ts`, snapshotted at module load in `lib/mock/{mentor,academy}.ts`); for Student (no shared mutable mock state) it clears the relevant `localStorage` keys instead |
 | 2026-09-19 | Design system replaced app-wide: "Glass Capsule" (`AGENTS.md` §7, navy accent, `CapsulePrimary/Secondary/Small`) → **Apple-Inspired Glass UI v3** (indigo `--brand-accent`, three glass material tiers, sidebar+header app shell, stat cards/list-tables instead of capsule hierarchy). Full spec: `UI design.md` (repo root, descriptive reference, not a governing file). `AGENTS.md` §7 rewritten in full to be the binding summary | User provided a complete, detailed design doc and explicitly confirmed: (1) applies to the whole app, not just Academy Admin (even though the doc's own nav list — Dashboard/Students/Batches/Mentors/Reports/Settings — matches Academy's nav exactly), and (2) `AGENTS.md` should be updated to reflect it as the new mandatory system, the same way Glass Capsule itself superseded an earlier rounded-cards/purple direction |
+| 2026-09-20 | The 5-Day SSB Mission programme, deferred (P1) since 2026-09-16, is **un-deferred and built as T039 "5-Day SSB Practice Journey"** | Explicit user direction, referencing Target SSB (targetssb.in) as functional/structural inspiration (content and information architecture only — the existing Apple-Inspired Glass UI v3 design system governs the actual UI, per user instruction to fix visual consistency later). `specs.md` §3/§6.4a/§13 updated to record the reversal rather than silently ignoring the prior deferred status |
+| 2026-09-20 | T039's practice-mode banks track per-item completion under `(dayId, moduleId, itemId)` in a new `ssb-journey-progress` localStorage key; test-mode banks (single timed submission) are deliberately excluded from that tracking and from all progress totals | A test is pass/fail-once, not incrementally completable — including its items in a "done" count would permanently dilute the percentage with items that can never individually be marked done. Found and fixed during manual verification: an earlier version wrongly used "has an `href`" as the exclusion signal instead of "is test-mode", which incorrectly excluded Personal Interview (a practice-mode bank that happens to link to an existing route) from Day 4's progress entirely |
+| 2026-09-20 | Client components deriving from `ssb-journey-progress` (the progress ring, module badges, the final summary, the self-assessment checklist, the bank practice runner) all initialize state to the SSR-safe default and populate the real value in a post-mount `useEffect`, with a targeted `eslint-disable-next-line react-hooks/set-state-in-effect` on each — not a `useState` lazy initializer | A lazy initializer still re-runs during the client's hydration render, which happens *before* React finishes reconciling against the server HTML — so it reads real localStorage data at exactly the moment hydration is comparing text content, producing React error #418 the first time any progress exists. Confirmed via a full Playwright-driven signup-to-final-progress walkthrough in a production build; the bug reproduced consistently and was fixed by moving each read into `useEffect`, matching the pattern eslint's own rule description recommends ("subscribe for updates from external system, calling setState in a callback") |
 
 ---
 
@@ -280,6 +285,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-19 | Mentor invites are a hybrid: `inviteMentorAction` creates a **real** Supabase auth user (service-role `admin.inviteUserByEmail`, real email sent) so the person can actually log in as a mentor, but also pushes a matching row into the **mock** `lib/mock/academy.ts` `MENTORS` array purely so the existing mock-backed mentor list/dashboard/batch-assignment UI shows them immediately. `app/mentor/layout.tsx` flips that mock row from "invited" to "active" the first time the real mentor loads their own dashboard. This bridge is deliberate, not an oversight — documented in code comments in both files. | Same backend migration as the rows above; once academy data is real Postgres, drop the mock-array half of this function entirely |
 | 2026-09-19 | Landing page's temporary "Preview (no login yet)" buttons on all three role cards were removed now that `/login`/`/signup` are real. | Done — removed in the same change that shipped T013/T014 |
 | 2026-09-19 | Design system migration covered every page/component for the *material* system (glass tiers, colour, radius, shadow, shell) and the primary reference screens (all three dashboards, mentee detail, practice list pages) got the full new content-pattern treatment (`StatCard`/`ListPanel`/`PageHeader`). Secondary pages (batches, students, mentors, reports, settings, evaluations, sessions, resources detail, progress) were swept for token correctness and typography-scale consistency but still use ad-hoc `glass-regular` divs in places `StatCard`/`ListPanel` would be a cleaner fit. Dropdown menus (profile menu, `<Select>`) still use shadcn's default solid chrome, not an explicit `glass-thick` treatment. | A future T070-equivalent consistency pass — visually acceptable now, not yet swept against every §7.13 acceptance-test item on every screen |
+| 2026-09-20 | T039 (5-Day SSB Practice Journey) module/day grid cards are hand-built `glass-regular` cards (matching Target SSB's reference layout) rather than the shared `StatCard`/`ListPanel` components used elsewhere in Practice/Resources. Content banks (OIR verbal/non-verbal MCQs, PPDT, interview/conference questions) are small realistic placeholder sets, not a production-scale content bank, and use the same localStorage-only, per-browser progress tracking as `lib/student/resource-completion.ts` (not account-scoped — same root cause as the row above). No mentor/academy visibility into a student's journey progress exists. AI feedback on journey submissions is not wired up (blocked on B3, same as T034). | Same future T070 pass could fold the day/module cards into `StatCard`; same backend migration as the rows above would make progress account-scoped; mentor/academy visibility and AI feedback are new scope, not yet a task |
 
 ---
 
@@ -638,6 +644,76 @@ Next task:
 - User to visually confirm the redesign in a browser.
 - Then: AI feedback (B3), backend data migration for per-academy isolation, or a full T070-style
   consistency pass on the remaining secondary pages.
+```
+
+```text
+Date: 2026-09-20
+Task: T039 — 5-Day SSB Practice Journey (un-deferred, built)
+Status: Complete (verified — build/lint/type-check clean; full signup-to-final-progress walkthrough
+run against a production build via Playwright, zero client console/page errors; see Decisions
+Register for two real bugs found and fixed during that verification)
+
+What changed:
+- Un-deferred by explicit user direction, referencing Target SSB (targetssb.in) for content/IA only
+  (existing Apple-Inspired Glass UI v3 design system governs the actual UI — user said the visuals
+  will be reconciled later). `specs.md` §3/§6.4a/§13 and this file's Decisions Register updated to
+  record the reversal rather than silently building over the prior "deferred" status.
+- `types/ssb-journey.ts`, `lib/mock/ssb-journey.ts` (day/module content — reuses `lib/mock/practice.ts`'s
+  WAT/TAT/SRT/SDT item banks for Day 2's Practice modules instead of duplicating them), `lib/api/ssb-journey.ts`
+  (typed read layer + a submission function for the new bank tests, kept separate from
+  `lib/api/practice.ts`'s existing psychology-specific contract per AGENTS.md §19), `lib/student/ssb-journey-progress.ts`
+  (localStorage completion store, same pattern as `resource-completion.ts`).
+- `app/student/practice/page.tsx` rewritten as the 5-day overview (progress ring + Day 1–5 list),
+  replacing the old flat Psychology/Interview category list.
+- `app/student/practice/[day]/page.tsx` (module grid per day) and
+  `app/student/practice/[day]/[module]/page.tsx` (generic module dispatcher: reading/info/practice
+  bank/timed test/checklist/summary) — one dynamic route pair instead of ~30 near-duplicate pages.
+- New components: `journey-progress-ring`, `module-progress-badge`, `bank-practice-runner` (untimed,
+  self-paced, mcq or free-text), `mcq-test-runner` (new — timed MCQ test, mirrors `budget-runner.tsx`'s
+  structure), `ssb-bank-test-session` (generic test-mode session wrapper, mirrors
+  `practice-session.tsx`, reuses the *existing* `carousel-runner.tsx` for PPDT rather than duplicating
+  it), `journey-final-summary`, `self-assessment-checklist`.
+- `app/student/practice/interview/page.tsx` upgraded from a "coming soon" placeholder to a real
+  practice bank (12 questions) — `components/student/coming-soon.tsx` deleted as now-unused.
+- Day 2's Test cards and Day 4's Personal Interview card link to the *existing* Psychology/Interview
+  routes (`href` override) instead of duplicating that flow; visiting the generic module URL for one
+  of those directly now `redirect()`s to the real page instead of rendering empty content.
+- `components/ui/nav-icons.tsx`: added `ssbDay`/`oir`/`ppdt`/`gto`/`obstacle`/`command`/`lecture`/
+  `conference`/`checklist`/`finalProgress` to the icon registry (AGENTS.md §7.12 — string keys, not
+  component references).
+- `app/globals.css`: added `.mcq-option[data-selected/correct/incorrect]` modifier classes (plain CSS,
+  not conditional Tailwind utilities on a `.glass-thin` base — AGENTS.md §7.12).
+- Two real bugs found and fixed during manual verification (see Decisions Register for detail):
+  (1) test-mode bank items were being included in progress totals via the wrong exclusion signal
+  (`href` presence instead of `mode`), which also wrongly zeroed out Day 4's progress entirely; (2) a
+  hydration mismatch (React error #418) in every localStorage-reading client component, fixed by
+  moving the read into `useEffect` with an SSR-matching default instead of a `useState` lazy
+  initializer.
+- Verification method: production build + Playwright (not `npm run dev` — Turbopack's HMR websocket
+  fails to complete its handshake in this sandboxed environment, which silently breaks all client-side
+  hydration/interactivity in dev mode only; confirmed by reproducing the exact same broken-click
+  symptom on the untouched, pre-existing signup form, then confirming it works correctly in a
+  production build. Recorded here in case it resurfaces elsewhere in this environment). A disposable
+  Supabase test account (`ssb-journey-check-<timestamp>@example.com`) was created during this
+  verification and left in the project — no `SUPABASE_SERVICE_ROLE_KEY` was available this session to
+  clean it up via the admin API; harmless, but the user may want to delete it from the Supabase
+  dashboard.
+
+What remains (see Technical Debt):
+- Content banks are small realistic placeholder sets, not production-scale.
+- Progress tracking is localStorage-only (per-browser, not account-scoped) — same root cause as the
+  rest of Student's mock-data gap.
+- No mentor/academy visibility into a student's journey progress.
+- AI feedback on journey submissions: blocked on B3, same as T034.
+- Day/module grid cards are hand-built rather than using the shared `StatCard` component.
+
+Blocker:
+- None for this task. B3 (AI provider) and the backend migration remain open and unrelated.
+
+Next task:
+- User to click through the journey in their own browser to confirm.
+- Then: AI feedback (B3), backend data migration for per-academy isolation, or T070-style consistency
+  pass (which could now also cover T039's day/module cards).
 ```
 
 ## 14. North Star
