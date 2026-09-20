@@ -28,8 +28,8 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 | Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16; re-sequenced 2026-09-18 |
 | Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives + shadcn/ui base UI system + public site + full Student, Mentor and Academy experiences + Supabase auth, committed to git (`.env.local` holds real project credentials, gitignored, not committed) |
 | Build | `VERIFIED` — `npm run build`, `npm run lint`, `npx tsc --noEmit` all succeed (Next.js 16.3.5, Turbopack). Middleware redirect behavior smoke-tested with curl (unauthenticated → `/login`, confirmed for `/student`, `/mentor`, `/academy`, `/onboarding`) |
-| Tests | `UNVERIFIED` — no test runner configured yet. Real signup/login has not been click-tested in a browser this session (no Chrome extension connection) — user should verify manually |
-| Next action | Resolve B3 (AI provider) to unblock T034/T035 — the only remaining MVP feature gap. Then Phase 6 quality/security audits (T060–T066), which must also close the mock-data gap under T014 (see Technical Debt) |
+| Tests | `PARTIAL` — Vitest + Playwright installed and passing (32 + 9 cases; see `tests/TEST_CASES.md`), not yet wired into CI. Real signup/login has not been click-tested in a browser this session (no Chrome extension connection) — user should verify manually |
+| Next action | Resolve B3 (AI provider) to unblock T034/T035 — the only remaining MVP feature gap. Then Phase 6 quality/security audits (T060–T066, T066 now in progress), which must also close the mock-data gap under T014 (see Technical Debt) |
 
 Core loop being built:
 
@@ -67,7 +67,7 @@ Onboard → Practice → AI Feedback → Improve → Practice Again
 | AI feedback integration | `UNVERIFIED` + `BLOCKED` (provider undecided, B3) |
 | Backend / database | `PARTIAL` — Supabase Postgres is live for auth (`profiles`, `academies` — migration `supabase/migrations/0001_init_auth.sql`, must be run in the Supabase SQL Editor); every other domain (students, batches, mentees, evaluations, sessions, resources, practice) is still mock/in-memory |
 | Storage | `UNVERIFIED` + `BLOCKED` |
-| Testing infrastructure | `UNVERIFIED` — no test runner installed |
+| Testing infrastructure | `PARTIAL` — Vitest + React Testing Library (unit/component) and Playwright (e2e) installed and passing (`npm test`, `npm run test:e2e`); not yet wired into CI. See `tests/TEST_CASES.md` |
 | Lint | `VERIFIED` — `npm run lint` passes clean |
 | Build | `VERIFIED` — `npm run build` (Turbopack) succeeds |
 | Git | `VERIFIED` — repository initialized, ongoing commits |
@@ -638,6 +638,70 @@ Next task:
 - User to visually confirm the redesign in a browser.
 - Then: AI feedback (B3), backend data migration for per-academy isolation, or a full T070-style
   consistency pass on the remaining secondary pages.
+```
+
+```text
+Date: 2026-09-20
+Task: T066 — Critical testing (started)
+Status: In Progress
+
+What changed:
+- Installed Vitest 3 + @vitejs/plugin-react + jsdom + React Testing Library + user-event
+  (unit/component tests), and @playwright/test + chromium binary (e2e). `vitest.config.ts`,
+  `playwright.config.ts`, `tests/setup.ts` added. `npm test` / `npm run test:watch` /
+  `npm run test:coverage` / `npm run test:e2e` scripts added to `package.json`.
+- `tests/unit/lib/auth-validation.test.ts` (15 cases): validateEmail/validatePassword/
+  validateSignupInput/validateLoginInput (`lib/api/auth.ts`).
+- `tests/unit/lib/redirect.test.ts` (4 cases): `dashboardPathForRole`.
+- `tests/unit/lib/middleware-role.test.ts` (6 cases): the route→role authorization mapping.
+  Exported `roleForPath` from `lib/supabase/middleware.ts` (previously module-private) specifically
+  so this P0 authorization surface has a direct unit test instead of only indirect coverage through
+  `updateSession`. One case documents a **found-not-fixed latent gap**: `startsWith("/mentor")` /
+  `startsWith("/student")` are unanchored, so a future top-level route like `/mentorship` would
+  silently inherit that role's guard — logged here rather than silently patched, since changing
+  matcher behavior wasn't in scope for a testing task.
+- `tests/unit/lib/academy-isolation.test.ts`: documents (as passing assertions) that
+  `STUDENTS`/`BATCHES`/`MENTORS` in `lib/mock/academy.ts` have no `academyId` field and are shared
+  module-level arrays — direct evidence for the Technical Debt row below. `.todo` cases define the
+  isolation behavior to enable once real per-academy data lands (T060).
+- `tests/unit/components/login-form.test.tsx` (5 cases, RTL + mocked `lib/api/auth`/`next/navigation`):
+  reason banners, submit → redirect (role default and explicit `redirectTo`), error display, and
+  AGENTS.md §11's "student's input must survive any failure" for a network-error response.
+- `tests/e2e/public-pages.spec.ts` + `tests/e2e/auth-guard.spec.ts` (9 cases): `/`, `/login`, `/signup`
+  render logged-out; `/student`, `/mentor`, `/academy`, `/onboarding` (incl. nested paths) redirect to
+  `/login?reason=login_required&next=<path>` when logged out; `/forbidden` itself is reachable. These
+  run against the real middleware and a real (but unauthenticated) Supabase project via `.env.local`.
+  Needed `baseURL: "http://127.0.0.1:3000"` (not `localhost`) and Chromium `--no-sandbox` in
+  `playwright.config.ts` — `localhost` navigation hung/timed out for every route in this sandboxed
+  dev environment even though the same routes responded in well under a second to direct HTTP
+  requests; recorded here in case it resurfaces elsewhere.
+- `tests/TEST_CASES.md`: full manual + automated test-case index across Auth & Authorization,
+  Academy Isolation/IDOR, Student Practice Loop, and Mentor & Academy Workflows, each case tagged
+  `VERIFIED`/`MANUAL`/`GAP`/`BLOCKED` with the reason stated, per AGENTS.md §20 ("never write a claim
+  about implementation that has not been verified").
+- `.gitignore`: added `/test-results`, `/playwright-report`, `/blob-report`, `/playwright/.cache`.
+- Verified clean: `npm test` (32 passed, 5 todo), `npx playwright test` (9 passed), `npx tsc --noEmit`,
+  `npx eslint .`, `npm run build`.
+
+What remains:
+- Not wired into CI yet — T066's acceptance criterion ("runs in CI and fails the build on
+  regression") is not met until a pipeline exists to run `npm test` + `npm run test:e2e` on push/PR.
+- Most P0/P1 cases in `tests/TEST_CASES.md` §§2, 4, 5 (real-account login/logout, role-mismatch
+  `/forbidden` checks, onboarding, practice submission, mentor evaluation persistence, academy
+  student/batch/mentor management) are still `MANUAL` — they need either a seeded second real account
+  or are straightforward next unit-test targets (e.g. `isDuplicateName`/`assignStudentBatchAction` in
+  `lib/actions/academy.ts`) not yet written.
+- All of §3 (Academy Isolation/IDOR) is `GAP`, not testable until T060's backend migration.
+- `STU-05`/`STU-06` (AI feedback + AI failure handling) blocked on B3, same as the feature itself.
+
+Blocker:
+- B3 (AI provider undecided) — blocks STU-05/STU-06 only, not the rest of this task.
+- T060 backend migration (not yet scheduled) — blocks all of Academy Isolation/IDOR (§3) and MEN-02.
+
+Next task:
+- Wire `npm test` + `npm run test:e2e` into CI so T066's acceptance criterion is actually met.
+- Pick off more `MANUAL` cases from `tests/TEST_CASES.md` as unit/component/e2e tests where they
+  don't require a live second account or a blocked decision.
 ```
 
 ## 14. North Star
