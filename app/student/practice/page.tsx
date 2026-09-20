@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPanel, ListRow } from "@/components/ui/list-panel";
 import { JourneyProgressRing } from "@/components/practice/journey-progress-ring";
-import { getAllBankModuleItemIds, getDays } from "@/lib/api/ssb-journey";
+import { ContinueJourneyCard } from "@/components/practice/continue-journey-card";
+import { getAllBankModuleItemIds, getContinueCandidates, getDays } from "@/lib/api/ssb-journey";
 
 export const metadata: Metadata = { title: "Practice" };
 
@@ -10,6 +11,7 @@ export default async function PracticePage() {
   const daysResult = await getDays();
   const days = daysResult.data ?? [];
   const bankModules = getAllBankModuleItemIds();
+  const continueCandidates = getContinueCandidates();
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -18,6 +20,8 @@ export default async function PracticePage() {
       <div className="glass-regular px-6 py-6">
         <JourneyProgressRing modules={bankModules} />
       </div>
+
+      <ContinueJourneyCard candidates={continueCandidates} />
 
       <ListPanel>
         {days.map((day) => (

@@ -71,6 +71,7 @@ export default async function SsbModulePage({
           ← {backLabel}
         </Link>
         <h1 className="text-[28px] font-bold text-ink">{mod.title}</h1>
+        {mod.info.durationLabel && <p className="text-[13px] text-ink-secondary">{mod.info.durationLabel}</p>}
         <div className="glass-regular px-6 py-6 text-sm leading-relaxed text-ink">{mod.info.overview}</div>
         <div className="glass-regular flex flex-col gap-2 px-6 py-5">
           <h2 className="text-[16px] font-semibold text-ink">What assessors look for</h2>
@@ -94,6 +95,7 @@ export default async function SsbModulePage({
         moduleId={mod.id}
         backHref={backHref}
         backLabel={backLabel}
+        context={mod.context}
         mcqItems={mod.mcqItems}
         responseItems={mod.responseItems}
       />
@@ -105,6 +107,7 @@ export default async function SsbModulePage({
       <SsbBankTestSession
         title={mod.title}
         description={mod.description}
+        context={mod.context}
         backHref={backHref}
         backLabel={backLabel}
         itemKind={mod.bank.itemKind}
@@ -124,6 +127,7 @@ export default async function SsbModulePage({
         <div>
           <h1 className="text-[28px] font-bold text-ink">{mod.title}</h1>
           <p className="text-[14px] text-ink-secondary">{mod.description}</p>
+          {mod.context && <p className="mt-2 text-[14px] leading-relaxed text-ink-secondary">{mod.context}</p>}
         </div>
         <SelfAssessmentChecklist />
       </div>
@@ -149,6 +153,7 @@ export default async function SsbModulePage({
         <div>
           <h1 className="text-[28px] font-bold text-ink">{mod.title}</h1>
           <p className="text-[14px] text-ink-secondary">{mod.description}</p>
+          {mod.context && <p className="mt-2 text-[14px] leading-relaxed text-ink-secondary">{mod.context}</p>}
         </div>
         <JourneyFinalSummary days={daysWithModules} />
       </div>

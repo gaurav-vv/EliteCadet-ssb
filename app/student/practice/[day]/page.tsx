@@ -39,6 +39,7 @@ export default async function SsbDayPage({ params }: { params: Promise<{ day: st
         </Link>
         <h1 className="mt-1 text-[28px] font-bold text-ink">Day {dayMeta.dayNumber}</h1>
         <p className="text-[14px] text-ink-secondary">{dayMeta.description}</p>
+        <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-ink-secondary">{dayMeta.longDescription}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -65,6 +66,9 @@ export default async function SsbDayPage({ params }: { params: Promise<{ day: st
                   itemIds={module.bank.itemIds ?? []}
                   mode={module.bank.mode}
                 />
+              )}
+              {module.durationLabel && (
+                <span className="text-xs whitespace-nowrap text-ink-secondary">{module.durationLabel}</span>
               )}
             </Link>
           );

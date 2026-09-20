@@ -14,6 +14,7 @@ import type { PracticeItem } from "@/types/practice";
 interface SsbBankTestSessionProps {
   title: string;
   description: string;
+  context?: string;
   backHref: string;
   backLabel: string;
   itemKind: SsbBankItemKind;
@@ -43,6 +44,7 @@ function useLeavePageGuard(active: boolean) {
 export function SsbBankTestSession({
   title,
   description,
+  context,
   backHref,
   backLabel,
   itemKind,
@@ -91,6 +93,7 @@ export function SsbBankTestSession({
         </div>
         <div className="glass-regular flex flex-col gap-3 px-6 py-6">
           <p className="text-sm text-ink">{description}</p>
+          {context && <p className="text-sm text-ink-secondary">{context}</p>}
           <ul className="flex flex-col gap-1 text-sm text-ink-secondary">
             <li>{itemCount} {itemCount === 1 ? "item" : "items"}</li>
             <li>Once started, the timer runs automatically — read the instructions fully before you begin.</li>

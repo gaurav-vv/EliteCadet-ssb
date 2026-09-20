@@ -13,6 +13,7 @@ interface BankPracticeRunnerProps {
   moduleId: string;
   backHref: string;
   backLabel: string;
+  context?: string;
   mcqItems?: McqItem[];
   responseItems?: PracticeItem[];
 }
@@ -22,7 +23,7 @@ interface BankPracticeRunnerProps {
 // out of order, and revisit items — completion is saved per item so the
 // progress ring (journey-progress-ring.tsx) reflects real, incremental work
 // rather than a single all-or-nothing submission.
-export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, mcqItems, responseItems }: BankPracticeRunnerProps) {
+export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, context, mcqItems, responseItems }: BankPracticeRunnerProps) {
   const items = mcqItems ?? responseItems ?? [];
   const [index, setIndex] = useState(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -75,6 +76,7 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, mcqIt
         <Link href={backHref} className="text-xs text-brand-accent hover:underline">
           ← {backLabel}
         </Link>
+        {context && <p className="mt-2 text-[13px] leading-relaxed text-ink-secondary">{context}</p>}
       </div>
 
       <div className="flex items-center justify-between text-sm text-ink-secondary">

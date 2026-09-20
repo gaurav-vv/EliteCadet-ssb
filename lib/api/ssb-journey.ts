@@ -56,6 +56,35 @@ export function getAllBankModuleItemIds(): { dayId: SsbDayId; moduleId: string; 
     }));
 }
 
+export interface ContinueCandidate {
+  dayId: SsbDayId;
+  dayNumber: number;
+  moduleId: string;
+  title: string;
+  href: string;
+  itemIds: string[];
+}
+
+/**
+ * Practice-mode bank modules in day/module order, for the Practice
+ * overview's "Continue where you left off" card. The card itself decides
+ * which one to surface (first with `done < total`, client-side, since that
+ * needs localStorage) — this just supplies the real, ordered candidate list.
+ */
+export function getContinueCandidates(): ContinueCandidate[] {
+  const dayNumberById = new Map(SSB_DAYS.map((d) => [d.id, d.dayNumber]));
+  return getAllModules()
+    .filter((m) => m.kind === "bank" && m.bank?.mode === "practice")
+    .map((m) => ({
+      dayId: m.dayId,
+      dayNumber: dayNumberById.get(m.dayId) ?? 0,
+      moduleId: m.id,
+      title: m.title,
+      href: m.href ?? `/student/practice/${m.dayId}/${m.id}`,
+      itemIds: (m.mcqItems ?? m.responseItems ?? []).map((item) => item.id),
+    }));
+}
+
 const processedSubmissions = new Map<string, { submissionId: string; submittedAt: string }>();
 
 export async function submitSsbBankTest(

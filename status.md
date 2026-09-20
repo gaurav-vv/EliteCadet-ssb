@@ -716,6 +716,54 @@ Next task:
   pass (which could now also cover T039's day/module cards).
 ```
 
+```text
+Date: 2026-09-21
+Task: T039 follow-up — content depth + a "Continue where you left off" card
+Status: Complete (verified — build/lint/type-check clean; Playwright walkthrough against a production
+build covering the overview, a Day 1 practice module, Day 3's info cards, the self-assessment, and
+the final progress page, zero console/page errors)
+
+What changed:
+- User feedback after reviewing T039: "make it more informative, take reference from Target SSB" plus
+  a dev-mode load-time complaint. Load time was confirmed to be Turbopack's per-route first-compile
+  cost in dev mode only (not a real bug — the production build already loads pages in ~100-200ms, per
+  T039's own verification); switched the local server to production mode for review per user's choice.
+- `SsbDaySummary.longDescription`: a 2-3 sentence paragraph per day (what actually happens, why it
+  matters), rendered under the existing one-line description on each `[day]/page.tsx`.
+- `SsbModuleDetail.context`: a short "why this matters" line for bank/checklist/summary modules
+  (OIR/PPDT/WAT/TAT/SRT-practice, Personal Interview, Conference Questions, Final Self Assessment,
+  Final Progress) — the equivalent of reading/info's existing `overview` for module kinds that
+  otherwise jumped straight into the interactive UI with no context. Threaded through
+  `BankPracticeRunner`/`SsbBankTestSession` as a new optional prop, rendered once above the item
+  content.
+- `SsbInfoContent.durationLabel` (e.g. "~10-15 min · Group of 8-10, no leader"): added to all 9 Day
+  3/4 info-only modules (GD, Group Planning, PGT, HGT, Race, Lecturette, Individual Obstacles, Command
+  Task, FGT) plus Mock Conference — shown on the day grid card and the module's own page. Card
+  one-line descriptions for these same modules were also expanded to be more descriptive than a bare
+  task name.
+- `components/practice/continue-journey-card.tsx` (new): a "Continue where you left off" card on the
+  Practice overview, visually mirroring the dashboard's existing "Today's Mission" card
+  (`app/student/page.tsx`) rather than inventing a new style. Points at the first practice-mode bank
+  module with incomplete progress (day/module order via a new `getContinueCandidates()` in
+  `lib/api/ssb-journey.ts`), defaulting to the very first module (Day 1 OIR Practice) for a
+  fresh/no-progress account, or a "every practice bank is done" state if all are complete. Follows the
+  same SSR-safe-default-then-useEffect pattern as the rest of T039's progress components to avoid a
+  hydration mismatch.
+
+What remains:
+- Same Technical Debt as T039 itself (mock content scale, localStorage-only progress, no mentor/
+  academy visibility, AI feedback blocked on B3) — this was a content/informativeness pass, not a
+  architecture change.
+- Day/module grid cards are still hand-built rather than the shared `StatCard` component (unchanged
+  from T039).
+
+Blocker:
+- None. B3 and the backend migration remain open and unrelated.
+
+Next task:
+- User to review the production-mode server in their own browser.
+```
+
 ## 14. North Star
 
 > **Build the smallest reliable web product that proves students prepare better with structured

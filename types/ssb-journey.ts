@@ -15,6 +15,8 @@ export interface SsbDaySummary {
   dayNumber: number;
   title: string;
   description: string;
+  /** A short paragraph shown on the day's own page, under the one-line description — more context than fits on the Practice overview's list row. */
+  longDescription: string;
 }
 
 // "reading"/"info": static content, no completion tracking (matches the
@@ -47,6 +49,8 @@ export interface SsbModuleSummary {
   /** When set, this module links straight to an existing dedicated route (e.g. an already-built Psychology test) instead of the generic module page. */
   href?: string;
   bank?: SsbBankMeta;
+  /** "info"-kind modules only: a short at-a-glance caption for the day grid card, e.g. "~10-15 min · Group task". */
+  durationLabel?: string;
 }
 
 export interface McqOption {
@@ -69,6 +73,8 @@ export interface SsbReadingContent {
 export interface SsbInfoContent {
   overview: string;
   tips: string[];
+  /** Short at-a-glance caption, e.g. "~10-15 min · Group of 8-10, no leader" — also copied onto the module summary's `durationLabel` for the day grid card. */
+  durationLabel?: string;
 }
 
 export interface SsbModuleDetail extends SsbModuleSummary {
@@ -78,4 +84,6 @@ export interface SsbModuleDetail extends SsbModuleSummary {
   responseItems?: PracticeItem[];
   /** Only set for the one response-kind test module (PPDT) — every other response test reuses an existing dedicated route via `href` instead. */
   carouselTiming?: CarouselTiming;
+  /** A short "why this matters" line shown above bank/checklist/summary content — the equivalent of reading/info's `overview` for module kinds that otherwise jump straight into the interactive UI. */
+  context?: string;
 }
