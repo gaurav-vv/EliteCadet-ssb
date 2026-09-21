@@ -174,6 +174,9 @@ billing integration.
 **Built 2026-09-19:** real signup/login/logout/password-reset via Supabase, after the Student/Mentor/
 Academy UIs were reviewed on mock data first (`status.md` §11). Mentor accounts are invite-only
 (academy admin → real Supabase invite email, not self-signup), per `specs.md` §8.5.
+**Fixed 2026-09-21:** `app/auth/callback/route.ts` only handled the PKCE `code` link format; mentor
+invite and password-reset emails are server-initiated and arrive as `token_hash`+`type` instead, so
+every such link landed on "link invalid or expired" (bug S49). Now handles both. See `status.md` §13a.
 **Why:** Everything role-scoped depends on identity.
 **Spec:** `specs.md` §5.3.
 **Requirements:** login, signup, logout, session handling, password recovery if applicable,

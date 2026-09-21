@@ -2,8 +2,9 @@
 
 **Type:** Current project state. Reporting only — never a source of requirements.
 **Question this file answers:** *If I open this project today, what is the exact state?*
-**Last updated:** 2026-09-21 (merged `origin/main` — T066 critical test suite — into this branch;
-resolved status.md merge conflicts by unioning both branches' facts, see §8 Decisions Register)
+**Last updated:** 2026-09-22 (merged `origin/main` — PR #2, T039 follow-up work — into local `main`,
+which also carried two previously-unlogged local commits: an auth-callback fix and a dev-preview
+restore. No file conflicts; see §8 Decisions Register and §13a for what those commits changed)
 
 ---
 
@@ -273,6 +274,9 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-20 | T039's practice-mode banks track per-item completion under `(dayId, moduleId, itemId)` in a new `ssb-journey-progress` localStorage key; test-mode banks (single timed submission) are deliberately excluded from that tracking and from all progress totals | A test is pass/fail-once, not incrementally completable — including its items in a "done" count would permanently dilute the percentage with items that can never individually be marked done. Found and fixed during manual verification: an earlier version wrongly used "has an `href`" as the exclusion signal instead of "is test-mode", which incorrectly excluded Personal Interview (a practice-mode bank that happens to link to an existing route) from Day 4's progress entirely |
 | 2026-09-20 | Client components deriving from `ssb-journey-progress` (the progress ring, module badges, the final summary, the self-assessment checklist, the bank practice runner) all initialize state to the SSR-safe default and populate the real value in a post-mount `useEffect`, with a targeted `eslint-disable-next-line react-hooks/set-state-in-effect` on each — not a `useState` lazy initializer | A lazy initializer still re-runs during the client's hydration render, which happens *before* React finishes reconciling against the server HTML — so it reads real localStorage data at exactly the moment hydration is comparing text content, producing React error #418 the first time any progress exists. Confirmed via a full Playwright-driven signup-to-final-progress walkthrough in a production build; the bug reproduced consistently and was fixed by moving each read into `useEffect`, matching the pattern eslint's own rule description recommends ("subscribe for updates from external system, calling setState in a callback") |
 | 2026-09-21 | Merged `origin/main` (PR #1, T066 critical test suite) into `feat/5-day-ssb-practice-journey`. `status.md` conflicted in two places — the §1 state-summary table (`Tests`/`Next action` rows) and the §13a dated log (both branches appended an entry under the same `Date: 2026-09-20` line). Resolved by **union, not override**: both branches' facts are true simultaneously (T039 shipped *and* a real test suite now exists), so nothing was discarded. The log's two same-day entries were split into separate `Date:` blocks and ordered T039 → T066 → T039 follow-up (2026-09-21) to keep it chronological. `task.md` merged automatically with no conflict | Per `AGENTS.md` §0/§20: status.md is a reporting file, never a source of requirements, and must reflect exact current state — picking one branch's version would have silently deleted verified facts from the other. Recorded here per §0's instruction to log conflict resolutions in the Decisions Register |
+| 2026-09-21 | Landing page's role "Preview" links, removed 2026-09-19 when real auth shipped, were **restored in a different form**: `/dev-preview/[role]` (`app/dev-preview/[role]/route.ts`, `lib/auth/dev-preview.ts`) signs in as a seeded demo account per role via real Supabase auth, rather than bypassing auth. Hard-gated on `NODE_ENV !== "production"` (route 404s and the landing-page links don't render otherwise) | Real auth + middleware (T013/T014) turned the old no-login preview links into dead links (they'd just bounce to `/login`), which made repeated manual role-testing slow. A real seeded session (not a bypass) means every downstream authorization/RLS check still runs exactly as it does for a real user, so this cannot mask an authorization bug the way a client-side bypass would |
+| 2026-09-21 | Fixed `app/auth/callback/route.ts` to also handle Supabase's `token_hash`+`type` email-link format, not only the PKCE `code` format | Server-initiated email links (mentor invites, password resets) have no browser-held PKCE verifier to exchange, so Supabase issues them as `token_hash`+`type` instead of `code` — the callback only handled `code`, so every invite/reset link landed on "link invalid or expired" (first surfaced as bug S49, 2026-09-19). `redirectTo` was also pointed at the final destination directly, to match the `token_hash` email template variable. Affects `lib/actions/academy.ts` (mentor invite) and `lib/api/auth.ts` (password reset) |
+| 2026-09-22 | Merged `origin/main` (PR #2, `feat/5-day-ssb-practice-journey` — T039 content-depth follow-up, already covered above) into local `main`, alongside the two local-only commits above (dev-preview restore, auth-callback token_hash fix). No file overlap between the two sides, so `git merge` produced a clean merge with zero conflicts; `npm run build` verified clean afterward | Routine sync — local `main` and `origin/main` had diverged (2 local commits, 4 remote commits) since the previous merge on 2026-09-21 |
 
 ---
 
@@ -828,6 +832,58 @@ Blocker:
 
 Next task:
 - User to review the production-mode server in their own browser.
+```
+
+```text
+Date: 2026-09-21
+Task: Auth-callback fix + dev-preview restore (not tracked against a task.md ID — small fixes to
+already-`[x]` T013/T014)
+Status: Complete (verified — build/lint/type-check clean)
+
+What changed:
+- app/auth/callback/route.ts: now handles Supabase's token_hash+type email-link format (mentor
+  invites, password resets) in addition to the PKCE code format it already handled. Fixes bug S49
+  ("email authentication links not displaying properly, mentor login option missing").
+- lib/actions/academy.ts, lib/api/auth.ts: redirectTo now points at the final destination directly,
+  to match the token_hash email template variable.
+- app/dev-preview/[role]/route.ts, lib/auth/dev-preview.ts, app/(public)/page.tsx: landing-page role
+  "Preview" links restored as a dev-only real-auth sign-in (seeded demo account per role), gated on
+  NODE_ENV !== "production". Not a bypass — creates a real session, so every downstream authorization
+  check still runs.
+
+What remains:
+- Same as T013/T014's existing Technical Debt row — unrelated to this fix.
+
+Blocker:
+- None.
+
+Next task:
+- Merge with origin/main (this session) to pick up the T039 follow-up work built in parallel.
+```
+
+```text
+Date: 2026-09-22
+Task: Sync local main with origin/main
+Status: Complete (verified)
+
+What changed:
+- git merge origin/main into local main: pulled in PR #2 (T039 content-depth follow-up, already
+  logged above under 2026-09-21) alongside the two local-only commits logged directly above. No file
+  overlap, clean merge, zero conflicts.
+- npm install + npm run build verified clean post-merge (all 35 routes compile).
+- This file (status.md) and task.md reviewed and reconciled against the merged code — see the two
+  entries directly above, which were committed locally but never logged here or in task.md.
+
+What remains:
+- Two local commits from this merge (auth-callback fix, dev-preview restore) are not yet pushed to
+  origin/main.
+
+Blocker:
+- None.
+
+Next task:
+- Push local main to origin so origin/main has the auth-callback fix and dev-preview restore too.
+- Then resolve B3 (AI provider) — still the only remaining MVP feature gap.
 ```
 
 ## 14. North Star
