@@ -111,7 +111,7 @@ export async function requestPasswordReset(email: string): Promise<AuthResult<nu
 
   try {
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
   } catch {
     // Fall through — never reveal whether the email exists either way.

@@ -187,7 +187,7 @@ export async function inviteMentorAction(input: MentorInviteInput): Promise<Acti
       role: "mentor",
       academy_id: profile.academyId,
     },
-    redirectTo: `${origin}/auth/callback?next=/reset-password`,
+    redirectTo: `${origin}/reset-password`,
   });
 
   if (error || !data.user) {
