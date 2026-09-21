@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type Role = "student" | "mentor" | "academy_admin";
 
-function roleForPath(pathname: string): Role | null {
+// Exported for unit testing (tests/unit/lib/middleware-role.test.ts) — the
+// route→role mapping is the entire authorization surface of the middleware,
+// so it's tested directly rather than only indirectly through updateSession.
+export function roleForPath(pathname: string): Role | null {
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/") || pathname.startsWith("/student")) {
     return "student";
   }

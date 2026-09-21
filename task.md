@@ -419,10 +419,19 @@ blur cost (no stacked or animated `backdrop-filter`).
 No committed secrets, environment variables checked, server-side authorization, input validation,
 cross-academy isolation, sensitive API responses, safe error messages, rate limiting where required.
 
-## T066 — Critical testing — P0 — `[ ]`
+## T066 — Critical testing — P0 — `[-]`
 Authentication, role access, onboarding, practice submission, AI feedback, AI failure, mentor
 evaluation, academy access, academy isolation, form validation.
 **Acceptance:** the suite runs in CI and fails the build on regression.
+**Progress (2026-09-20):** Test runners installed (Vitest + React Testing Library for unit/component,
+Playwright for e2e) — `npm test` / `npm run test:e2e`. 32 Vitest cases + 9 Playwright cases passing,
+covering auth validation, the route→role authorization mapping, login-form behavior (including
+AGENTS.md §11's "never lose the student's input" rule), and unauthenticated route-guard redirects.
+Full manual + automated test-case index: `tests/TEST_CASES.md`. **Still open:** CI wiring (no
+pipeline exists yet to make this "fail the build on regression"); academy-isolation cases are
+written as `.todo`/`GAP` because the behavior they'd test doesn't exist until T060's backend
+migration; AI feedback cases (`STU-05`, `STU-06`) blocked on B3; several P0/P1 cases across mentor/
+academy workflows remain manual-only (see `tests/TEST_CASES.md` §§2–5 status column).
 
 ---
 
