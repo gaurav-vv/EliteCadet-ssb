@@ -230,6 +230,22 @@
   color: var(--brand-accent);
 }
 
+/* MCQ option state (5-Day SSB Practice Journey, T039) — modifier classes
+   next to glass-thin's own rules, not conditional Tailwind utilities:
+   glass-thin sets border/background as plain CSS, which silently ignores a
+   component-level border- or bg- utility (§7.12). */
+.mcq-option[data-selected="true"] {
+  border-color: var(--brand-accent);
+}
+.mcq-option[data-correct="true"] {
+  border-color: var(--status-success);
+  background: var(--status-success-bg);
+}
+.mcq-option[data-incorrect="true"] {
+  border-color: var(--status-danger);
+  background: var(--status-danger-bg);
+}
+
 /* Sidebar / nav item states (§7.3) */
 .nav-item {
   transition:
