@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GraduationCap, Users, Building2, ClipboardList, Sparkles, LineChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isDevPreviewEnabled } from "@/lib/auth/dev-preview";
 
 const roles = [
   {
@@ -8,18 +9,21 @@ const roles = [
     title: "For Students",
     description:
       "Practise Psychology tests and interview scenarios, get AI-assisted feedback on every response, and see exactly what to work on next.",
+    previewHref: "/dev-preview/student",
   },
   {
     icon: Users,
     title: "For Mentors",
     description:
       "Review your mentees' activity and AI feedback, evaluate their performance, and follow up with the students who need attention.",
+    previewHref: "/dev-preview/mentor",
   },
   {
     icon: Building2,
     title: "For Academies",
     description:
       "Manage students, batches and mentors from one place, and see readiness across your academy so nothing falls through the cracks.",
+    previewHref: "/dev-preview/academy_admin",
   },
 ];
 
@@ -42,6 +46,8 @@ const loop = [
 ];
 
 export default function LandingPage() {
+  const showDevPreview = isDevPreviewEnabled();
+
   return (
     <>
       <section className="border-b border-border/60">
@@ -69,11 +75,16 @@ export default function LandingPage() {
           Built for every role in your preparation journey
         </h2>
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
-          {roles.map(({ icon: Icon, title, description }) => (
+          {roles.map(({ icon: Icon, title, description, previewHref }) => (
             <div key={title} className="glass-regular flex flex-col gap-3 p-6 text-left">
               <Icon aria-hidden="true" size={24} className="text-brand-accent" />
               <h3 className="font-semibold text-ink">{title}</h3>
               <p className="text-sm text-ink-secondary">{description}</p>
+              {showDevPreview && (
+                <Link href={previewHref} className="text-xs text-brand-accent hover:underline">
+                  Preview (no login yet) →
+                </Link>
+              )}
             </div>
           ))}
         </div>
