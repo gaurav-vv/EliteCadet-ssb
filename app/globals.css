@@ -63,6 +63,33 @@
   /* Motion (§7.8, §7.11) */
   --motion-duration: 200ms;
   --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  /* A calmer, "settling" curve for motion that should read as premium rather
+     than mechanical — slower deceleration than --motion-easing, no overshoot.
+     Used for the Day 2 flip (round 2 of the redesign: the first pass's flip
+     felt too fast/snappy). */
+  --motion-easing-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  /* One-time entrance motion (hero, staggered grids) — deliberately longer
+     than the 180–220ms interaction range since it plays once, not on every
+     hover; used across Day 2 hero + card grids so it is a token, not a
+     one-off value (§7.2). */
+  --motion-duration-entrance: 520ms;
+  --motion-duration-flip: 650ms;
+
+  /*
+   * Day 2 category accents — a deliberate, scoped exception to §7.1's "no
+   * section accent colour" rule, approved 2026-09-22 (status.md → Decisions)
+   * for the Day 2 test identity only. Five restrained, desaturated hues, one
+   * per test, distinct from the three status colours above. Never used as a
+   * full-card/full-icon fill — only a thin accent line, an icon tint, a low-
+   * opacity background wash, a hover border, or that test's own CTA. Every
+   * other section of the product stays governed by the single --brand-accent
+   * system.
+   */
+  --day2-tat: #c2703d;
+  --day2-wat: #2e9e86;
+  --day2-srt: #c4577a;
+  --day2-sdt: #8a5cb0;
+  --day2-full: var(--brand-accent);
 
   /*
    * shadcn/ui semantic tokens — remapped onto the tokens above so generated
@@ -112,6 +139,12 @@
   --color-warning-bg: var(--status-warning-bg);
   --color-danger: var(--status-danger);
   --color-danger-bg: var(--status-danger-bg);
+
+  --color-day2-tat: var(--day2-tat);
+  --color-day2-wat: var(--day2-wat);
+  --color-day2-srt: var(--day2-srt);
+  --color-day2-sdt: var(--day2-sdt);
+  --color-day2-full: var(--day2-full);
 
   --radius-control: var(--radius-control);
   --radius-button: var(--radius-button);
@@ -228,6 +261,115 @@
 .filter-chip[data-active="true"] {
   border-color: var(--brand-accent);
   color: var(--brand-accent);
+}
+
+/* Day 2 hero / grid entrance — a single fade + small rise, played once on
+   mount (and replayed on filter change via a remounted key). Neutralised by
+   the prefers-reduced-motion block below like every other animation here. */
+@keyframes day2-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.day2-rise-in {
+  animation: day2-rise-in var(--motion-duration-entrance) var(--motion-easing) both;
+}
+
+/*
+ * Day 2 flip cards — one generic card used for both the five test cards on
+ * the Day 2 overview and every category's "what do you want to do?" section
+ * cards (§7 Day 2 exception, status.md → Decisions, 2026-09-22). Flip is
+ * driven by a `data-flipped` attribute the component sets from React state
+ * (the dedicated info toggle — click, Enter/Space, or tap) and, on
+ * hover-capable devices, by plain `:hover` on the outer element; both paths
+ * animate the same transform, so there is nothing to reconcile between mouse
+ * and keyboard/touch. Category identity comes from a `--cat-accent` custom
+ * property the component sets inline per test — never a per-category
+ * literal in this file or in a component (§7.2).
+ */
+.day2-flip-card {
+  perspective: 1400px;
+  transition: transform var(--motion-duration) var(--motion-easing-premium);
+}
+.day2-flip-inner {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--motion-duration-flip) var(--motion-easing-premium);
+}
+@media (hover: hover) {
+  .day2-flip-card:hover .day2-flip-inner {
+    transform: rotateY(180deg);
+  }
+  /* Hover reads as "interactive" even before the flip settles: a small lift
+     on the card itself plus a stronger shadow on whichever face is facing
+     the viewer (§7.8 — tasteful, not a jump). */
+  .day2-flip-card:hover {
+    transform: translateY(-3px);
+  }
+  .day2-flip-card:hover .day2-flip-face {
+    box-shadow: var(--shadow-elevated);
+  }
+}
+.day2-flip-card[data-flipped="true"] .day2-flip-inner {
+  transform: rotateY(180deg);
+}
+.day2-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: box-shadow var(--motion-duration) var(--motion-easing);
+}
+.day2-flip-face-back {
+  transform: rotateY(180deg);
+}
+
+/* Day 2 hero illustration — a slow, gentle float on the summit marker only
+   (≤2px, §7.6's amplitude cap), so the hero reads as alive without being
+   distracting. Neutralised by the prefers-reduced-motion block below. */
+@keyframes day2-illus-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+.day2-illus-float {
+  animation: day2-illus-float 3.6s ease-in-out infinite;
+}
+
+/* Day 2 category accent surfaces — the only places a test's colour appears
+   (§7 Day 2 exception): a thin top line, an icon tint, a faint wash and a
+   hover border. Always driven by the `--cat-accent` variable a component
+   sets inline, never a literal here. */
+.day2-cat-line {
+  background: var(--cat-accent);
+}
+.day2-cat-icon {
+  color: var(--cat-accent);
+}
+.day2-cat-wash {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--cat-accent) 14%, transparent),
+    color-mix(in srgb, var(--cat-accent) 4%, transparent)
+  );
+}
+@media (hover: hover) {
+  .day2-cat-hover:hover {
+    border-color: color-mix(in srgb, var(--cat-accent) 45%, transparent);
+  }
+}
+.day2-cat-hover:focus-visible {
+  border-color: color-mix(in srgb, var(--cat-accent) 55%, transparent);
 }
 
 /* Sidebar / nav item states (§7.3) */

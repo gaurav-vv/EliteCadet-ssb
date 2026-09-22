@@ -37,12 +37,13 @@ P2  Post-MVP
 
 ### Current state of the roadmap
 
-T001–T005 (Foundation), T010/T011 (public site), T020–T038 except T034/T035 (full Student experience),
-T021/T040–T045 (full Mentor experience) and T022/T050–T055 (full Academy experience) are complete on
-mock data — see `status.md` for the verified snapshot. T012 (Pricing) skipped as P1. T013/T014 (real
-Supabase authentication + role-based access) are now also complete as of 2026-09-19 — see `status.md`
-§11. Remaining: T034/T035 (AI feedback, blocked on B3), and Phase 6 quality/security audits, which
-still need to account for the mock-data gap documented in status.md → Technical Debt.
+T001–T005 (Foundation), T010/T011 (public site), T020–T038 except T034/T035 (full Student experience,
+including T037a Day 2 Resources), T021/T040–T045 (full Mentor experience) and T022/T050–T055 (full
+Academy experience) are complete on mock data — see `status.md` for the verified snapshot. T012
+(Pricing) skipped as P1. T013/T014 (real Supabase authentication + role-based access) are now also
+complete as of 2026-09-19 — see `status.md` §11. Remaining: T034/T035 (AI feedback, blocked on B3), and
+Phase 6 quality/security audits, which still need to account for the mock-data gap documented in
+status.md → Technical Debt.
 
 ---
 
@@ -290,6 +291,69 @@ improvement areas, trends where data suffices.
 ## T037 — Student resources — P1 — `[x]`
 **Requirements:** list, categories, detail, read/completion state where required.
 **Acceptance:** empty state exists; completion state persists.
+
+## T037a — Day 2 Resources (TAT/WAT/SRT/SDT/Full Day 2 external library) — P1 — `[x]`
+**Depends on:** T037. **Spec:** curated externally-sourced practice library for Day 2 psychology
+testing, not part of the original `specs.md` §6 wording — logged here retroactively (AGENTS.md §20)
+since the feature was built as an untracked side change before this entry existed.
+**Requirements (round 3, 2026-09-23):** round 2's IA held up under user review, but the UI was still too
+text-heavy and visually flat. Cut redundant copy across every level (hero dropped its description line
+and resource count; category hero dropped its explanation paragraph and count — that copy now lives
+once, on the test card's flip-back; section-picker/test-grid headings dropped their repeat-the-heading
+subtitles; the Full Day 2 banner dropped a sentence the chain visual right below it already said; the
+overview page's closing "Start with TAT" line was removed as pure redundancy with the hero's own Quick
+Start button). Replaced the second-level taxonomy: Learn Basics/**Examples**/Practice/Videos/Feedback →
+Learn Basics/Practice/**Tests**/Videos/**Articles**/Feedback (`lib/day2/sections.ts`, rewritten) —
+verified against the real dataset that dropping "Examples" orphans nothing (every `example`-tagged
+resource also carries `learn` or a practice/test purpose). Replaced all five `Day2Visual` category marks
+with fuller illustrated scenes (same line-art language) instead of sparse sketches, added a subtle
+gradient wash to card visual bands, and slowed/smoothed the flip and entrance animations
+(`--motion-duration-flip` 480ms→650ms with a new calmer `--motion-easing-premium` curve,
+`--motion-duration-entrance` 420ms→520ms, longer stagger) — all still `prefers-reduced-motion`-safe via
+the existing global rule. No change to the underlying dataset or to Supabase auth.
+**Requirements (round 2, 2026-09-22):** round 1 (below) still dumped a whole category's resources on
+one page; the user rejected it after visual inspection as "a database/resource dump" and asked for a
+true three-level progressive-disclosure IA instead:
+`/student/resources/day-2` (orientation only — short hero with an illustration + Quick Start CTA, a
+TAT→WAT→SRT→SD/SDT→Full Day 2 journey strip, a slim "Recommended for beginners" row, a 5-card flip-card
+test grid, an optional Recently Viewed strip) →
+`/student/resources/day-2/[tat|wat|srt|sd-sdt|full-day]` (category hero, then "What do you want to
+do?" — only the sections with a real matching resource: Learn Basics/Examples/Practice/Videos/Feedback,
+`lib/day2/sections.ts`; Full Day 2 additionally gets its own chain banner + "Start Full Day 2" CTA) →
+`/student/resources/day-2/[category]?do=<section>` (only then do resources actually render, scoped to
+that one section, with its own search). Five test cards and every section card use one shared flip-card
+component (`day2-flip-card.tsx`) — front: visual + title + count + Explore; back (hover on desktop,
+or an independent keyboard/tap info-toggle button): one-sentence "what is this". Five restrained
+per-category accent colours were added as a deliberate, scoped exception to `AGENTS.md` §7.1 (Decisions
+Register, status.md). Resource cards dropped verification-status and pricing/access badges from the
+card face entirely — that research metadata still lives in the data, it's just not printed. Every
+resource still links out to its real source; AI-feedback tools still carry their accuracy disclosure.
+No change to the underlying curated dataset (`lib/mock/day2-resources.ts`) — only which of its fields
+the UI prints.
+**Requirements (round 1):** a hub-and-spoke IA, not a single-page dump of all 57 resources:
+`/student/resources/day-2` is orientation only — hero, a TAT→WAT→SRT→SD/SDT→Full Day 2 journey strip,
+a "New to Day 2?" guided flow, and a 5-card category grid with real, data-driven resource counts — and
+shows no individual resource. Each test has its own page at
+`/student/resources/day-2/[tat|wat|srt|sd-sdt|full-day]` (`lib/day2/categories.ts` holds the slug↔
+category mapping) showing only that test's resources: a breadcrumb + back link, a category hero, that
+category's featured resource as "Recommended starting point", the rest grouped into Study
+Guides/Examples/Practice/Videos/Feedback (`lib/mock/day2-resources.ts`, sourced from
+`docs/day2-final-curated-resources.md`) with only non-empty groups rendered — SD/SDT stays honestly
+thin rather than padded — plus a category-scoped search + group filter. Every resource links out to
+its real source (no scraped/reproduced content); AI-feedback tools carry an unverified-claims
+disclaimer.
+**Acceptance:** no invented resources, URLs, ratings, reviews, statistics or resource counts; an
+invalid category slug 404s; empty states exist at all three levels; accessible (keyboard, focus states,
+status never colour-only; flip cards keyboard/tap-operable independent of hover); responsive with no
+horizontal overflow (verified at 1440/768/390px); animations respect `prefers-reduced-motion`; reachable
+only through the normal authenticated student flow (no route-specific auth bypass, dev or otherwise) —
+verified in round 2 with a real signed-up browser session (not just an anonymous-redirect check).
+**Tests:** `tests/unit/components/day2-section-picker.test.tsx` (non-empty-only sections, thin-category
+case, links carry a `?do=` query) and `tests/unit/components/day2-resource-list.test.tsx` (section-scoped
+results, back link, search + empty state, no verification/pricing text on a card, real-URL/new-tab link
+safety) — both run against the real curated dataset via `getDay2ResourcesByCategory`. Round 1's
+`day2-category-explorer.test.tsx` was deleted along with the component it tested (split into the two
+files above).
 
 ## T038 — Student profile — P1 — `[x]`
 **Requirements:** profile info, edit, validation, account settings.
