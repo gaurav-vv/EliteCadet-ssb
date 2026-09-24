@@ -25,9 +25,14 @@ export default async function InterviewPracticePage() {
       responseItems={mod.responseItems}
       selfReview={mod.selfReview}
       actions={
-        <Button asChild variant="outline" size="sm">
-          <Link href="/student/practice/interview/piq">My PIQ questions</Link>
-        </Button>
+        <>
+          <Button asChild size="sm">
+            <Link href="/student/practice/interview/mock">Start mock interview</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/student/practice/interview/piq">My PIQ questions</Link>
+          </Button>
+        </>
       }
     />
   );

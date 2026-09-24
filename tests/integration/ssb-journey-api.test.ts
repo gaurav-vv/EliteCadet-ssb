@@ -80,6 +80,11 @@ describe("5-Day SSB Journey API", () => {
     }
   });
 
+  it("Day 5's Mock Conference card links to the mock conference route", async () => {
+    const { data } = await getSsbModuleDetail("day-5", "mock-conference");
+    expect(data?.href).toBe("/student/practice/conference/mock");
+  });
+
   it("progress totals include practice banks only, never timed tests", async () => {
     const entries = getAllBankModuleItemIds();
     expect(entries.length).toBeGreaterThan(0);
