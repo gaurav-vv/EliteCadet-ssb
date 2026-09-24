@@ -2,7 +2,7 @@
 
 **Type:** Manual test plan + index of the automated suite.
 **Answers:** T066 (Critical testing) in `task.md`, and the "Testing" section of `AGENTS.md` §17.
-**Last updated:** 2026-09-20.
+**Last updated:** 2026-09-24.
 
 This file is reporting/planning material, same tier as `status.md` — it does not change what the
 product must do (`specs.md`) or how it's built (`AGENTS.md`). Update it whenever a case is added,
@@ -17,27 +17,45 @@ exist yet — see `status.md` → Technical Debt).
 ## 1. Automated suite (what actually runs today)
 
 ```text
-npm test              # Vitest — unit + component tests, no network, no browser
-npm run test:watch    # Vitest in watch mode
-npm run test:coverage # Vitest with coverage (lib/, components/)
-npm run test:e2e      # Playwright — real browser, real dev server, real (unauthenticated) Supabase calls
+npm test                 # Vitest — unit + integration together, no network, no browser
+npm run test:unit        # Vitest — tests/unit only
+npm run test:integration # Vitest — tests/integration only
+npm run test:watch       # Vitest in watch mode
+npm run test:coverage    # Vitest with coverage (lib/, components/, hooks/)
+npm run test:e2e         # Playwright — real browser, real server, real (unauthenticated) Supabase calls
 ```
+
+CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → integration on every PR and push to
+`main`, then a production build + e2e. The e2e job needs the `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` repo secrets and skips with a notice when they're missing.
 
 | Layer | Tool | Needs a live server? | Needs Supabase reachable? |
 |---|---|---|---|
-| Unit (`tests/unit/lib`) | Vitest | No | No — Supabase client is never constructed in these tests |
+| Unit (`tests/unit/lib`, `tests/unit/hooks`) | Vitest | No | No — Supabase client is never constructed in these tests |
 | Component (`tests/unit/components`) | Vitest + React Testing Library | No | No — `lib/api/auth` is mocked |
+| Integration (`tests/integration`) | Vitest (+ React Testing Library) | No | No — real modules wired together; only the Supabase client is faked (middleware suite) |
 | End-to-end (`tests/e2e`) | Playwright | Yes (auto-started via `webServer` in `playwright.config.ts`) | Yes — the real middleware calls `supabase.auth.getUser()` on every request, so `.env.local` must point at a reachable Supabase project. No test ever signs in, so no seeded account is required for the cases below |
 
 First-time e2e setup: `npx playwright install chromium` (downloads a browser binary, not committed).
 
-Currently verified (32 Vitest cases + 9 Playwright cases, all green as of this update):
+Locally Playwright reuses a running `npm run dev` and uses one worker (parallel workers starve the
+dev server's per-route compile and time out); CI uses the production build and default workers.
+
+Currently verified (84 Vitest cases — 52 unit/component + 32 integration — plus 9 Playwright cases,
+all green as of this update):
 
 - `tests/unit/lib/auth-validation.test.ts` — email/password/signup/login field validation (`lib/api/auth.ts`)
 - `tests/unit/lib/redirect.test.ts` — `dashboardPathForRole`
 - `tests/unit/lib/middleware-role.test.ts` — the route→role authorization mapping (`roleForPath`), including a documented latent gap (unanchored `startsWith` prefix matching)
 - `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
+- `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
+- `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
+- `tests/unit/hooks/use-countdown.test.tsx` — countdown ticks, `onExpire` fires exactly once, latest callback used
+- `tests/integration/middleware-session.test.ts` — `updateSession()` with a faked Supabase client: logged-out → `/login`, every wrong-role combination and a missing profile → `/forbidden`, correct role allowed, browser-supplied `?role=` ignored (AGENTS.md §10)
+- `tests/integration/practice-api.test.ts` — `lib/api/practice.ts` against real content: advertised item counts equal real counts (AGENTS.md §8), unknown activity, empty submit, idempotent submit
+- `tests/integration/ssb-journey-api.test.ts` — every 5-Day Journey day/module resolves and has content, unique ids, valid MCQ answers, progress totals exclude timed tests, idempotent test submit
+- `tests/integration/bank-practice-runner.test.tsx` — practice runner + real progress store: MCQ check/feedback text, navigation, mark done persists across remount
 - `tests/e2e/public-pages.spec.ts` — `/`, `/login`, `/signup` render for a logged-out visitor
 - `tests/e2e/auth-guard.spec.ts` — `/student`, `/mentor`, `/academy`, `/onboarding` redirect to `/login?reason=login_required&next=<path>` when logged out; nested paths preserve `next`; `/forbidden` itself is reachable
 

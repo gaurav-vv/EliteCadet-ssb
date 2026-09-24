@@ -435,6 +435,14 @@ pipeline exists yet to make this "fail the build on regression"); academy-isolat
 written as `.todo`/`GAP` because the behavior they'd test doesn't exist until T060's backend
 migration; AI feedback cases (`STU-05`, `STU-06`) blocked on B3; several P0/P1 cases across mentor/
 academy workflows remain manual-only (see `tests/TEST_CASES.md` §§2–5 status column).
+**Progress (2026-09-24):** Suite split into three explicit layers — `tests/unit`, new
+`tests/integration`, `tests/e2e` — each runnable on its own (`test:unit` / `test:integration` /
+`test:e2e`). 84 Vitest (52 unit/component + 32 integration) + 9 Playwright cases passing. New
+integration coverage includes the logged-in role guard (wrong role / missing profile → `/forbidden`),
+which e2e can't reach without seeded accounts. CI added (`.github/workflows/ci.yml`). Local e2e
+timeouts fixed (one worker against the dev server). **Still open:** CI hasn't run on GitHub yet —
+needs the branch pushed and the two Supabase repo secrets set for the e2e job; "fail the build on
+regression" also needs a branch-protection rule requiring the CI checks on `main`.
 
 ---
 
