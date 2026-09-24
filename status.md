@@ -2,9 +2,8 @@
 
 **Type:** Current project state. Reporting only — never a source of requirements.
 **Question this file answers:** *If I open this project today, what is the exact state?*
-**Last updated:** 2026-09-22 (merged `origin/main` — PR #2, T039 follow-up work — into local `main`,
-which also carried two previously-unlogged local commits: an auth-callback fix and a dev-preview
-restore. No file conflicts; see §8 Decisions Register and §13a for what those commits changed)
+**Last updated:** 2026-09-24 (test suite split into unit / integration / e2e layers, new tests
+added, CI workflow added on `chore/test-structure-audit`; see §13a)
 
 ---
 
@@ -30,7 +29,7 @@ Status vocabulary used throughout: `VERIFIED` · `UNVERIFIED` · `PARTIAL` · `B
 | Documentation | `VERIFIED` — all four files rewritten and reconciled 2026-09-16; re-sequenced 2026-09-18; `specs.md` un-deferred the 5-Day journey 2026-09-20 |
 | Codebase | `VERIFIED` — Next.js scaffold + Glass Capsule tokens + capsule primitives + shadcn/ui base UI system + public site + full Student (incl. the 5-Day Practice Journey), Mentor and Academy experiences + Supabase auth, committed to git (`.env.local` holds real project credentials, gitignored, not committed) |
 | Build | `VERIFIED` — `npm run build`, `npm run lint`, `npx tsc --noEmit` all succeed (Next.js 16.3.5, Turbopack). Middleware redirect behavior smoke-tested with curl (unauthenticated → `/login`, confirmed for `/student`, `/mentor`, `/academy`, `/onboarding`). T039's full journey walkthrough smoke-tested end-to-end via Playwright against a production build (see §13a, 2026-09-20) |
-| Tests | `PARTIAL` — Vitest + Playwright installed and passing (32 + 9 cases; see `tests/TEST_CASES.md`), not yet wired into CI (T066). Real signup/login has not been click-tested in a browser by a human this session; T039's full journey walkthrough was separately smoke-tested end-to-end via Playwright against a production build (see §13a, 2026-09-20) — neither substitutes for the user's own click-through |
+| Tests | `PARTIAL` — unit / integration / e2e layers, all passing locally (84 Vitest + 9 Playwright cases; see `tests/TEST_CASES.md`). CI workflow added but not yet run on GitHub — needs push + Supabase secrets (T066). Real signup/login has not been click-tested in a browser by a human this session; T039's full journey walkthrough was separately smoke-tested end-to-end via Playwright against a production build (see §13a, 2026-09-20) — neither substitutes for the user's own click-through |
 | Next action | Resolve B3 (AI provider) to unblock T034/T035 — the only remaining MVP feature gap. Then finish Phase 6 quality/security audits (T060–T066 — T066's test suite is in progress: Vitest + Playwright installed and passing, not yet wired into CI), which must also close the mock-data gap under T014 (see Technical Debt) |
 
 Core loop being built:
@@ -885,6 +884,36 @@ Next task:
 - Push local main to origin so origin/main has the auth-callback fix and dev-preview restore too.
 - Then resolve B3 (AI provider) — still the only remaining MVP feature gap.
 ```
+
+Date: 2026-09-24
+Task: T066 — test layer audit, missing tests, CI
+Status: Partial (verified locally — 84/84 Vitest, 9/9 Playwright, lint and typecheck clean; CI not
+yet run on GitHub)
+
+What changed:
+- Audit: unit (`tests/unit`) and e2e (`tests/e2e`) layers existed; there was no integration layer and
+  no CI. Several client helpers and the logged-in half of the role guard had no tests at all.
+- New unit tests: journey progress store, resource read state, `useCountdown`.
+- New `tests/integration/`: `updateSession()` middleware with a faked Supabase client (wrong role /
+  missing profile → `/forbidden`), practice and 5-Day Journey API clients against their real
+  content, and `BankPracticeRunner` wired to the real progress store. New `test:unit` /
+  `test:integration` / `typecheck` scripts.
+- e2e: 6 of 9 specs timed out locally. Cause: parallel workers starving the dev server's per-route
+  compile; the middleware itself was correct (`/student` → 307 to `/login` in 0.02s via curl). Fixed
+  by using one local worker; CI serves the production build instead.
+- `.github/workflows/ci.yml`: lint, typecheck, unit, integration, then build + e2e.
+
+What remains:
+- Push the branch, add `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` repo secrets,
+  confirm the first CI run, and require the checks on `main` via branch protection.
+- Logged-in e2e flows (student journey, wrong-role redirect in a real browser) still need seeded
+  test accounts.
+
+Blocker:
+- None for this task. AI feedback tests remain blocked on B3.
+
+Next task:
+- Push and verify CI; then decide on seeded e2e accounts.
 
 ## 14. North Star
 
