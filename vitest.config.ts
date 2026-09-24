@@ -13,11 +13,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setup.ts"],
-    include: ["tests/unit/**/*.test.{ts,tsx}"],
+    include: ["tests/unit/**/*.test.{ts,tsx}", "tests/integration/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["lib/**", "components/**"],
+      include: ["lib/**", "components/**", "hooks/**"],
       exclude: ["lib/mock/**"],
     },
   },
