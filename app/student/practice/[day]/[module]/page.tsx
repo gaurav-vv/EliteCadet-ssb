@@ -98,6 +98,7 @@ export default async function SsbModulePage({
         context={mod.context}
         mcqItems={mod.mcqItems}
         responseItems={mod.responseItems}
+        selfReview={mod.selfReview}
       />
     );
   }

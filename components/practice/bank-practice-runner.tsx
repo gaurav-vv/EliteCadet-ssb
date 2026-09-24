@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { QuestionGuidance } from "@/components/practice/question-guidance";
+import { SelfReviewChecklist } from "@/components/practice/self-review-checklist";
 import { isItemDone, setItemDone } from "@/lib/student/ssb-journey-progress";
-import { readAnswer, saveAnswerText } from "@/lib/student/practice-answers";
-import type { McqItem } from "@/types/ssb-journey";
-import type { PracticeItem } from "@/types/practice";
+import { readAnswer, saveAnswerText, saveSelfReview } from "@/lib/student/practice-answers";
+import type { GuidedPracticeItem, McqItem } from "@/types/ssb-journey";
 
 interface BankPracticeRunnerProps {
   dayId: string;
@@ -16,7 +17,9 @@ interface BankPracticeRunnerProps {
   backLabel: string;
   context?: string;
   mcqItems?: McqItem[];
-  responseItems?: PracticeItem[];
+  responseItems?: GuidedPracticeItem[];
+  /** Free-text banks only: checklist shown under each answer, ticks saved with it. */
+  selfReview?: string[];
 }
 
 // Untimed, self-paced practice: unlike the timed Test flow (mcq-test-runner /
@@ -24,12 +27,22 @@ interface BankPracticeRunnerProps {
 // out of order, and revisit items — completion is saved per item so the
 // progress ring (journey-progress-ring.tsx) reflects real, incremental work
 // rather than a single all-or-nothing submission.
-export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, context, mcqItems, responseItems }: BankPracticeRunnerProps) {
+export function BankPracticeRunner({
+  dayId,
+  moduleId,
+  backHref,
+  backLabel,
+  context,
+  mcqItems,
+  responseItems,
+  selfReview,
+}: BankPracticeRunnerProps) {
   const items = mcqItems ?? responseItems ?? [];
   const [index, setIndex] = useState(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [draft, setDraft] = useState("");
+  const [reviewChecks, setReviewChecks] = useState<string[]>([]);
   // Starts empty (matching SSR) and is filled in after mount — a direct
   // isItemDone() call in the render body, even via a useState lazy
   // initializer, reruns on the client's hydration pass too and would return
@@ -38,10 +51,16 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
   // journey-progress-ring.tsx for the fuller explanation.
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
 
+  function loadAnswer(itemId: string) {
+    const saved = readAnswer(dayId, moduleId, itemId);
+    setDraft(saved?.text ?? "");
+    setReviewChecks(saved?.selfReview ?? []);
+  }
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe external-store (localStorage) read, not derived state
     setDoneIds(new Set(items.filter((i) => isItemDone(dayId, moduleId, i.id)).map((i) => i.id)));
-    if (items[0]) setDraft(readAnswer(dayId, moduleId, items[0].id)?.text ?? "");
+    if (items[0]) loadAnswer(items[0].id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on mount; `items` is a fresh array from the server each render
   }, []);
 
@@ -54,12 +73,17 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
     setSelectedOptionId(null);
     setRevealed(false);
     const nextItem = items[nextIndex];
-    setDraft(nextItem ? (readAnswer(dayId, moduleId, nextItem.id)?.text ?? "") : "");
+    if (nextItem) loadAnswer(nextItem.id);
   }
 
   function handleDraftChange(text: string) {
     setDraft(text);
     saveAnswerText(dayId, moduleId, item.id, text);
+  }
+
+  function handleReviewChange(checked: string[]) {
+    setReviewChecks(checked);
+    saveSelfReview(dayId, moduleId, item.id, checked);
   }
 
   function markCurrentDone() {
@@ -77,6 +101,7 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
 
   const mcqItem = isMcq ? (item as McqItem) : null;
   const done = doneIds.has(item.id);
+  const guidance = isMcq ? undefined : (item as GuidedPracticeItem).guidance;
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -102,6 +127,7 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
 
       <div className="glass-regular flex flex-col gap-4 px-6 py-8">
         <p className="text-center text-ink">{item.prompt}</p>
+        {guidance && <QuestionGuidance guidance={guidance} />}
 
         {mcqItem ? (
           <div className="flex flex-col gap-2">
@@ -143,6 +169,9 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
               className="min-h-28"
             />
             <p className="text-xs text-ink-secondary">Your answer is saved on this device as you type.</p>
+            {selfReview && selfReview.length > 0 && (
+              <SelfReviewChecklist items={selfReview} checked={reviewChecks} onChange={handleReviewChange} />
+            )}
             {!done && (
               <Button type="button" size="sm" onClick={markCurrentDone} className="self-start">
                 Mark done

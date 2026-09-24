@@ -11,6 +11,7 @@ import { getPracticeItems } from "@/lib/mock/practice";
 import type { PracticeItem } from "@/types/practice";
 import type {
   McqItem,
+  GuidedPracticeItem,
   SsbDayId,
   SsbDaySummary,
   SsbModuleDetail,
@@ -141,30 +142,111 @@ const PPDT_ITEM: PracticeItem = {
     "A hazy, indistinct picture: a figure stands near a river at dusk, with two other shadowy figures nearby and what could be a boat or a fallen log in the water.",
 };
 
-const INTERVIEW_QUESTIONS: PracticeItem[] = [
-  { id: "int-1", prompt: "Tell us about yourself in a few sentences." },
-  { id: "int-2", prompt: "Why do you want to join the Armed Forces?" },
-  { id: "int-3", prompt: "What are your strengths and weaknesses?" },
-  { id: "int-4", prompt: "Describe a situation where you showed leadership." },
-  { id: "int-5", prompt: "What do you know about the role you have applied for?" },
-  { id: "int-6", prompt: "How do you handle failure or criticism?" },
-  { id: "int-7", prompt: "Tell us about your hobbies and how they help you." },
-  { id: "int-8", prompt: "What is your family's reaction to your decision to join the forces?" },
-  { id: "int-9", prompt: "Describe a difficult decision you had to make and how you made it." },
-  { id: "int-10", prompt: "What are your short-term and long-term goals?" },
-  { id: "int-11", prompt: "How do you stay updated with current affairs?" },
-  { id: "int-12", prompt: "Why should we select you over other candidates?" },
+// Guidance is placeholder preparation advice written for this app (same
+// status as the questions themselves — specs.md §6.4a/§6.4b), not an
+// official SSB assessment rubric.
+function q(id: string, prompt: string, assesses: string, tips: string[]): GuidedPracticeItem {
+  return { id, prompt, guidance: { assesses, tips } };
+}
+
+const INTERVIEW_QUESTIONS: GuidedPracticeItem[] = [
+  q("int-1", "Tell us about yourself in a few sentences.", "How clearly and honestly you summarise yourself — the IO compares it with your PIQ.", [
+    "Cover background, education, interests and why the forces in about a minute.",
+    "Only mention what you can talk about in depth — every point invites a follow-up.",
+  ]),
+  q("int-2", "Why do you want to join the Armed Forces?", "Whether your motivation is genuine and thought through, not borrowed.", [
+    "Give a personal reason — a person, experience or value that led you here.",
+    "Avoid lines you can't expand on, whether that's 'job security' or a rehearsed patriotic speech.",
+  ]),
+  q("int-3", "What are your strengths and weaknesses?", "Self-awareness and honesty.", [
+    "Back each strength with a real example.",
+    "Name a real weakness and what you're doing about it — not a disguised strength.",
+  ]),
+  q("int-4", "Describe a situation where you showed leadership.", "Initiative and how you influence others.", [
+    "Use situation → what you did → what happened.",
+    "A small, real example (a college event, a team, family) beats an invented big one.",
+  ]),
+  q("int-5", "What do you know about the role you have applied for?", "Whether you've researched the service and entry you chose.", [
+    "Know the academy, training length and what a young officer in that branch actually does.",
+    "It's fine to say what you don't know yet rather than guess.",
+  ]),
+  q("int-6", "How do you handle failure or criticism?", "Emotional stability and ability to learn.", [
+    "Pick a real setback, own your part, and say what changed afterwards.",
+    "Don't blame other people.",
+  ]),
+  q("int-7", "Tell us about your hobbies and how they help you.", "Whether the interests in your PIQ are real.", [
+    "Expect detailed follow-ups — only list hobbies you actively pursue.",
+    "Link one hobby to a quality it built, like patience or teamwork.",
+  ]),
+  q("int-8", "What is your family's reaction to your decision to join the forces?", "Your support system and how you handle differing views.", [
+    "If your family has concerns, say so honestly and explain how you discussed them.",
+    "Speak about family members with respect.",
+  ]),
+  q("int-9", "Describe a difficult decision you had to make and how you made it.", "How soundly and quickly you decide.", [
+    "Explain the options you weighed and why you chose one.",
+    "Say what you'd do differently now, if anything.",
+  ]),
+  q("int-10", "What are your short-term and long-term goals?", "How clear and realistic your plans are.", [
+    "Give concrete short-term steps (fitness, studies) and a long-term direction.",
+    "Have a calm answer ready for what you'll do if you're not recommended this time.",
+  ]),
+  q("int-11", "How do you stay updated with current affairs?", "Awareness and a real habit of staying informed.", [
+    "Name the sources you actually use and how often.",
+    "Be ready to discuss one recent national and one international event.",
+  ]),
+  q("int-12", "Why should we select you over other candidates?", "Confidence without arrogance.", [
+    "Point to qualities you've already shown with real examples.",
+    "Talk about yourself, not about other candidates.",
+  ]),
 ];
 
-const CONFERENCE_QUESTIONS: PracticeItem[] = [
-  { id: "conf-1", prompt: "Looking back at your GTO tasks, what would you do differently?" },
-  { id: "conf-2", prompt: "What feedback did you receive during the psychology tests, and how do you view it?" },
-  { id: "conf-3", prompt: "How would you describe your overall performance across the five days?" },
-  { id: "conf-4", prompt: "What is one Officer-Like Quality you feel you demonstrated well?" },
-  { id: "conf-5", prompt: "What is one area you plan to work on regardless of the result?" },
-  { id: "conf-6", prompt: "How did you handle disagreements within your group during tasks?" },
-  { id: "conf-7", prompt: "What did this SSB experience teach you about yourself?" },
-  { id: "conf-8", prompt: "If selected, how will you prepare for the next stage?" },
+const CONFERENCE_QUESTIONS: GuidedPracticeItem[] = [
+  q("conf-1", "Looking back at your GTO tasks, what would you do differently?", "Whether you can reflect honestly on your own performance.", [
+    "Name one specific moment and what you'd change.",
+    "Keep it short — the board saw the task.",
+  ]),
+  q("conf-2", "What feedback did you receive during the psychology tests, and how do you view it?", "Openness to feedback.", [
+    "If you received no direct feedback, say so plainly.",
+    "Show you can take a critical point without getting defensive.",
+  ]),
+  q("conf-3", "How would you describe your overall performance across the five days?", "Balanced self-assessment.", [
+    "Mention one thing that went well and one that didn't.",
+    "Avoid both 'everything was perfect' and 'I did badly'.",
+  ]),
+  q("conf-4", "What is one Officer-Like Quality you feel you demonstrated well?", "Whether your self-view matches what the board observed.", [
+    "Pick one OLQ and tie it to a moment from this week.",
+    "Don't list several without evidence.",
+  ]),
+  q("conf-5", "What is one area you plan to work on regardless of the result?", "Commitment to improving.", [
+    "Name a concrete area and a first step you'll take.",
+    "It shouldn't depend on being recommended.",
+  ]),
+  q("conf-6", "How did you handle disagreements within your group during tasks?", "Cooperation under pressure.", [
+    "Describe what you actually did, not what you'd ideally do.",
+    "Show you listened as well as argued your point.",
+  ]),
+  q("conf-7", "What did this SSB experience teach you about yourself?", "Self-awareness.", [
+    "One honest insight is enough.",
+    "Keep it about you, not about the process.",
+  ]),
+  q("conf-8", "If selected, how will you prepare for the next stage?", "Forward planning.", [
+    "Mention the medical exam, fitness and how you'll prepare for training.",
+    "Keep it brief and practical.",
+  ]),
+];
+
+export const INTERVIEW_SELF_REVIEW = [
+  "I answered the question that was actually asked",
+  "I gave a specific, real example",
+  "It matches what I wrote in my PIQ",
+  "I was honest, including about weaker points",
+  "It would take about 1–2 minutes to say aloud",
+];
+
+export const CONFERENCE_SELF_REVIEW = [
+  "I answered briefly and directly",
+  "It matches how I actually performed this week",
+  "I stayed composed and didn't oversell myself",
 ];
 
 export const SELF_ASSESSMENT_TRAITS = [
@@ -294,7 +376,7 @@ const MODULE_DETAIL: Record<SsbDayId, SsbModuleDetail[]> = {
     { id: "individual-obstacles", dayId: "day-4", title: "Individual Obstacles", description: "Solo obstacle task — up to 10 obstacles, points per one completed.", icon: "obstacle", kind: "info", info: info("Each candidate attempts up to 10 physical obstacles solo within a time limit, earning points per obstacle completed.", ["Attempt obstacles you're confident about first to bank points early.", "Follow the demonstrated technique for each obstacle rather than improvising unsafely.", "Keep moving — points come from obstacles attempted within the time limit, not from any single one."], "~10 min · Solo, 10 obstacles") },
     { id: "command-task", dayId: "day-4", title: "Command Task", description: "You lead a small team you choose yourself to complete a given task.", icon: "command", kind: "info", info: info("You're given a task and told to pick 2-3 subordinates from the group to help you complete it, then briefed by the GTO afterward.", ["Choose subordinates for the task, not just your friends in the group.", "Give clear instructions rather than doing everything yourself.", "Be ready to explain your plan and reasoning to the GTO afterward."], "~15-20 min · You + 2-3 chosen subordinates") },
     { id: "fgt", dayId: "day-4", title: "FGT", description: "Final Group Task — one last group obstacle before individual tasks and the interview.", icon: "gto", kind: "info", info: info("A last group obstacle task, similar to the PGT, giving the GTO a final, focused look at your teamwork before individual tasks and the interview.", ["Treat it with the same seriousness as the PGT — it's still being assessed.", "Apply anything you learned about the group's dynamic from earlier tasks.", "Stay cooperative even if the group is tired by this point in the day."], "~30-45 min · Whole group") },
-    { id: "personal-interview", dayId: "day-4", title: "Personal Interview", description: "One-on-one interview with the IO, based on your PIQ form.", icon: "interview", kind: "bank", href: "/student/practice/interview", bank: { itemKind: "response", mode: "practice" }, responseItems: INTERVIEW_QUESTIONS, context: "The interview cross-checks everything against your PIQ form and your other tests. Answer honestly and consistently — a rehearsed 'ideal' answer that contradicts what you wrote elsewhere is worse than an honest, ordinary one." },
+    { id: "personal-interview", dayId: "day-4", title: "Personal Interview", description: "One-on-one interview with the IO, based on your PIQ form.", icon: "interview", kind: "bank", href: "/student/practice/interview", bank: { itemKind: "response", mode: "practice" }, responseItems: INTERVIEW_QUESTIONS, selfReview: INTERVIEW_SELF_REVIEW, context: "The interview cross-checks everything against your PIQ form and your other tests. Answer honestly and consistently — a rehearsed 'ideal' answer that contradicts what you wrote elsewhere is worse than an honest, ordinary one." },
   ],
   "day-5": [
     {
@@ -312,7 +394,7 @@ const MODULE_DETAIL: Record<SsbDayId, SsbModuleDetail[]> = {
         ],
       ),
     },
-    { id: "conference-questions", dayId: "day-5", title: "Conference Questions", description: "Practice common conference questions.", icon: "conference", kind: "bank", bank: { itemKind: "response", mode: "practice" }, responseItems: CONFERENCE_QUESTIONS, context: "The conference rarely changes an assessor's mind at this point — it's a final, honest check, not a chance to oversell yourself. Practising these helps you answer calmly, not to script a performance." },
+    { id: "conference-questions", dayId: "day-5", title: "Conference Questions", description: "Practice common conference questions.", icon: "conference", kind: "bank", bank: { itemKind: "response", mode: "practice" }, responseItems: CONFERENCE_QUESTIONS, selfReview: CONFERENCE_SELF_REVIEW, context: "The conference rarely changes an assessor's mind at this point — it's a final, honest check, not a chance to oversell yourself. Practising these helps you answer calmly, not to script a performance." },
     { id: "mock-conference", dayId: "day-5", title: "Mock Conference", description: "A walkthrough of what the real conference actually looks like.", icon: "conference", kind: "info", info: info("A short, informal run-through of how the real conference typically proceeds, to reduce surprises on the day.", ["Expect to wait — conferences often run candidate-by-candidate through the whole batch.", "Answer only what's asked; keep responses brief and direct.", "There's nothing to 'perform' here beyond being consistent with how you've behaved all week."], "~5 min read · Whole batch, one at a time") },
     { id: "final-self-assessment", dayId: "day-5", title: "Final Self Assessment", description: "Rate yourself 1-5 across the ten standard OLQs.", icon: "checklist", kind: "checklist", context: "An honest rating here — including in areas you're weaker at — is more useful for your preparation than a flattering one. No one else sees this; it's stored on this device only." },
     { id: "ssb-journey-final-progress", dayId: "day-5", title: "SSB Journey / Final Progress", description: "Your full 5-day journey, at a glance.", icon: "finalProgress", kind: "summary", context: "A snapshot of how much of each day's practice bank you've actually worked through — use it to spot which day needs another pass before you feel ready." },
@@ -354,5 +436,3 @@ export function getModuleDetail(dayId: SsbDayId, moduleId: string): SsbModuleDet
 export function getAllModules(): SsbModuleDetail[] {
   return Object.values(MODULE_DETAIL).flat();
 }
-
-export { INTERVIEW_QUESTIONS };
