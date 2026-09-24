@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { BankPracticeRunner } from "@/components/practice/bank-practice-runner";
 import { getSsbModuleDetail } from "@/lib/api/ssb-journey";
 
@@ -22,6 +24,11 @@ export default async function InterviewPracticePage() {
       context={mod.context}
       responseItems={mod.responseItems}
       selfReview={mod.selfReview}
+      actions={
+        <Button asChild variant="outline" size="sm">
+          <Link href="/student/practice/interview/piq">My PIQ questions</Link>
+        </Button>
+      }
     />
   );
 }

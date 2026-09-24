@@ -20,6 +20,8 @@ interface BankPracticeRunnerProps {
   responseItems?: GuidedPracticeItem[];
   /** Free-text banks only: checklist shown under each answer, ticks saved with it. */
   selfReview?: string[];
+  /** Optional links shown under the back link, e.g. the interview's PIQ and mock modes. */
+  actions?: React.ReactNode;
 }
 
 // Untimed, self-paced practice: unlike the timed Test flow (mcq-test-runner /
@@ -36,6 +38,7 @@ export function BankPracticeRunner({
   mcqItems,
   responseItems,
   selfReview,
+  actions,
 }: BankPracticeRunnerProps) {
   const items = mcqItems ?? responseItems ?? [];
   const [index, setIndex] = useState(0);
@@ -110,6 +113,7 @@ export function BankPracticeRunner({
           ← {backLabel}
         </Link>
         {context && <p className="mt-2 text-[13px] leading-relaxed text-ink-secondary">{context}</p>}
+        {actions && <div className="mt-3 flex flex-wrap gap-2">{actions}</div>}
       </div>
 
       <div className="flex items-center justify-between text-sm text-ink-secondary">
