@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { isItemDone, setItemDone } from "@/lib/student/ssb-journey-progress";
+import { readAnswer, saveAnswerText } from "@/lib/student/practice-answers";
 import type { McqItem } from "@/types/ssb-journey";
 import type { PracticeItem } from "@/types/practice";
 
@@ -40,6 +41,7 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe external-store (localStorage) read, not derived state
     setDoneIds(new Set(items.filter((i) => isItemDone(dayId, moduleId, i.id)).map((i) => i.id)));
+    if (items[0]) setDraft(readAnswer(dayId, moduleId, items[0].id)?.text ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on mount; `items` is a fresh array from the server each render
   }, []);
 
@@ -51,7 +53,13 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
     setIndex(nextIndex);
     setSelectedOptionId(null);
     setRevealed(false);
-    setDraft("");
+    const nextItem = items[nextIndex];
+    setDraft(nextItem ? (readAnswer(dayId, moduleId, nextItem.id)?.text ?? "") : "");
+  }
+
+  function handleDraftChange(text: string) {
+    setDraft(text);
+    saveAnswerText(dayId, moduleId, item.id, text);
   }
 
   function markCurrentDone() {
@@ -128,11 +136,13 @@ export function BankPracticeRunner({ dayId, moduleId, backHref, backLabel, conte
         ) : (
           <div className="flex flex-col gap-3">
             <Textarea
+              aria-label="Your answer"
               placeholder="Type your response…"
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => handleDraftChange(e.target.value)}
               className="min-h-28"
             />
+            <p className="text-xs text-ink-secondary">Your answer is saved on this device as you type.</p>
             {!done && (
               <Button type="button" size="sm" onClick={markCurrentDone} className="self-start">
                 Mark done

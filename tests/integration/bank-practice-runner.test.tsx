@@ -88,6 +88,25 @@ describe("BankPracticeRunner (free-text)", () => {
     expect(screen.getByText("Marked done.")).toBeInTheDocument();
   });
 
+  it("keeps a typed answer when moving to another question and back", async () => {
+    render(<BankPracticeRunner {...baseProps} moduleId="personal-interview" responseItems={RESPONSES} />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Your answer" }), "To serve the nation.");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("textbox", { name: "Your answer" })).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.getByRole("textbox", { name: "Your answer" })).toHaveValue("To serve the nation.");
+  });
+
+  it("restores a typed answer after a reload (remount)", async () => {
+    const props = { ...baseProps, moduleId: "personal-interview", responseItems: RESPONSES };
+    const { unmount } = render(<BankPracticeRunner {...props} />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Your answer" }), "Draft answer");
+    unmount();
+
+    render(<BankPracticeRunner {...props} />);
+    expect(await screen.findByDisplayValue("Draft answer")).toBeInTheDocument();
+  });
+
   it("renders nothing when a module has no items", () => {
     const { container } = render(<BankPracticeRunner {...baseProps} responseItems={[]} />);
     expect(container).toBeEmptyDOMElement();
