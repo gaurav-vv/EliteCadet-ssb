@@ -4,6 +4,7 @@
 **Question this file answers:** *If I open this project today, what is the exact state?*
 **Last updated:** 2026-09-24 (test suite split into unit / integration / e2e layers, new tests
 added, CI workflow added on `chore/test-structure-audit`; see §13a)
+**Last updated:** 2026-09-23 (Day 2 Resources visual/text refinement, round 3; includes the latest `origin/main` changes merged into this branch)
 
 ---
 
@@ -177,8 +178,15 @@ persistence) · Dashboard `VERIFIED` (mock data) · Practice Zone `VERIFIED` (Ps
 standard SSB timing per B4; Interview is an explicit stub — no activities are specced for it yet) ·
 Practice submission `VERIFIED` (idempotency-keyed mock submission, retry-safe) · AI feedback `BLOCKED`
 (B3 — AI provider not yet decided) · AI failure handling `BLOCKED` (same) · Progress `VERIFIED` (mock
-data, zero/populated states) · Resources `VERIFIED` (mock content, list/detail/read-state) · Profile
-`VERIFIED` (edit form, localStorage-persisted) · **5-Day SSB Practice Journey (T039) `VERIFIED`**
+data, zero/populated states) · Resources `VERIFIED` (mock content, list/detail/read-state) · Day 2
+Resources `VERIFIED` — curated, human-verified external resource library (TAT/WAT/SRT/SDT/Full Day 2;
+`lib/mock/day2-resources.ts`, sourced from `docs/day2-final-curated-resources.md`) restructured 2026-
+09-22 into a hub-and-spoke IA: `/student/resources/day-2` is orientation-only (hero, TAT→WAT→SRT→SDT→
+Full Day 2 journey, "New to Day 2?" guided flow, a 5-card category grid) and each test has its own page
+at `/student/resources/day-2/[tat|wat|srt|sd-sdt|full-day]` showing only that test's resources, grouped
+by Study Guides/Examples/Practice/Videos/Feedback (only non-empty groups render) with its own search +
+group filter (`components/student/day2/`, `lib/day2/categories.ts`); real auth-gated like the rest of
+`/student/*`, no dev bypass · Profile `VERIFIED` (edit form, localStorage-persisted) · **5-Day SSB Practice Journey (T039) `VERIFIED`**
 (un-deferred 2026-09-20; full signup→Day1-5 walkthrough in a production build, zero console/page
 errors; mock content, localStorage progress tracking, same pattern as Resources)
 
@@ -269,13 +277,10 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-19 | Public signup offers **Student** and **Academy Admin** only. **Mentor accounts are invite-only** — an academy admin invites a mentor from `/academy/mentors`, which now creates a **real** Supabase account via `admin.inviteUserByEmail` (service-role key, server-side only) | Matches `specs.md` §8.5 exactly (mentors are invited, not self-signup). User explicitly asked for this to be real rather than mocked, unlike the rest of the academy domain — see Technical Debt for the mock/real bridge this required |
 | 2026-09-19 | Each role's Settings-equivalent page (Academy → Settings, Mentor → Profile, Student → Profile) gained "Load demo data" / "Clear demo data" controls | User's request: once real auth exists, every new account starts genuinely empty, losing the rich populated mock view built during T031/T040/T050. For Mentor/Academy this resets the shared in-memory mock arrays to their original snapshot (Server Actions in `lib/actions/{mentor,academy}.ts`, snapshotted at module load in `lib/mock/{mentor,academy}.ts`); for Student (no shared mutable mock state) it clears the relevant `localStorage` keys instead |
 | 2026-09-19 | Design system replaced app-wide: "Glass Capsule" (`AGENTS.md` §7, navy accent, `CapsulePrimary/Secondary/Small`) → **Apple-Inspired Glass UI v3** (indigo `--brand-accent`, three glass material tiers, sidebar+header app shell, stat cards/list-tables instead of capsule hierarchy). Full spec: `UI design.md` (repo root, descriptive reference, not a governing file). `AGENTS.md` §7 rewritten in full to be the binding summary | User provided a complete, detailed design doc and explicitly confirmed: (1) applies to the whole app, not just Academy Admin (even though the doc's own nav list — Dashboard/Students/Batches/Mentors/Reports/Settings — matches Academy's nav exactly), and (2) `AGENTS.md` should be updated to reflect it as the new mandatory system, the same way Glass Capsule itself superseded an earlier rounded-cards/purple direction |
+| 2026-09-22 | Day 2 Resources gets five **per-category accent colours** (`--day2-tat`/`wat`/`srt`/`sdt`/`full`, `app/globals.css`) — a deliberate, scoped exception to `AGENTS.md` §7.1's "no section-specific accent colour" rule, for the Day 2 test identity only. Restrained (a thin card-top line, icon tint, ~7% background wash, hover border, that test's own CTA — never a full-card/full-icon fill); every other section of the product stays governed by the single `--brand-accent` system | User's explicit redesign brief (2026-09-22) asked for a distinct, tasteful accent per TAT/WAT/SRT/SD-SDT/Full Day 2 ("images should have visual identity... introduce tasteful colour... NOT giant neon blocks... still professional"), directly and knowingly in tension with §7.1. Per `AGENTS.md` §0's conflict-resolution order, a direct, explicit, current user instruction on product/visual scope for one named section outranks the standing rule for that section; recorded here rather than silently applied |
 | 2026-09-20 | The 5-Day SSB Mission programme, deferred (P1) since 2026-09-16, is **un-deferred and built as T039 "5-Day SSB Practice Journey"** | Explicit user direction, referencing Target SSB (targetssb.in) as functional/structural inspiration (content and information architecture only — the existing Apple-Inspired Glass UI v3 design system governs the actual UI, per user instruction to fix visual consistency later). `specs.md` §3/§6.4a/§13 updated to record the reversal rather than silently ignoring the prior deferred status |
 | 2026-09-20 | T039's practice-mode banks track per-item completion under `(dayId, moduleId, itemId)` in a new `ssb-journey-progress` localStorage key; test-mode banks (single timed submission) are deliberately excluded from that tracking and from all progress totals | A test is pass/fail-once, not incrementally completable — including its items in a "done" count would permanently dilute the percentage with items that can never individually be marked done. Found and fixed during manual verification: an earlier version wrongly used "has an `href`" as the exclusion signal instead of "is test-mode", which incorrectly excluded Personal Interview (a practice-mode bank that happens to link to an existing route) from Day 4's progress entirely |
 | 2026-09-20 | Client components deriving from `ssb-journey-progress` (the progress ring, module badges, the final summary, the self-assessment checklist, the bank practice runner) all initialize state to the SSR-safe default and populate the real value in a post-mount `useEffect`, with a targeted `eslint-disable-next-line react-hooks/set-state-in-effect` on each — not a `useState` lazy initializer | A lazy initializer still re-runs during the client's hydration render, which happens *before* React finishes reconciling against the server HTML — so it reads real localStorage data at exactly the moment hydration is comparing text content, producing React error #418 the first time any progress exists. Confirmed via a full Playwright-driven signup-to-final-progress walkthrough in a production build; the bug reproduced consistently and was fixed by moving each read into `useEffect`, matching the pattern eslint's own rule description recommends ("subscribe for updates from external system, calling setState in a callback") |
-| 2026-09-21 | Merged `origin/main` (PR #1, T066 critical test suite) into `feat/5-day-ssb-practice-journey`. `status.md` conflicted in two places — the §1 state-summary table (`Tests`/`Next action` rows) and the §13a dated log (both branches appended an entry under the same `Date: 2026-09-20` line). Resolved by **union, not override**: both branches' facts are true simultaneously (T039 shipped *and* a real test suite now exists), so nothing was discarded. The log's two same-day entries were split into separate `Date:` blocks and ordered T039 → T066 → T039 follow-up (2026-09-21) to keep it chronological. `task.md` merged automatically with no conflict | Per `AGENTS.md` §0/§20: status.md is a reporting file, never a source of requirements, and must reflect exact current state — picking one branch's version would have silently deleted verified facts from the other. Recorded here per §0's instruction to log conflict resolutions in the Decisions Register |
-| 2026-09-21 | Landing page's role "Preview" links, removed 2026-09-19 when real auth shipped, were **restored in a different form**: `/dev-preview/[role]` (`app/dev-preview/[role]/route.ts`, `lib/auth/dev-preview.ts`) signs in as a seeded demo account per role via real Supabase auth, rather than bypassing auth. Hard-gated on `NODE_ENV !== "production"` (route 404s and the landing-page links don't render otherwise) | Real auth + middleware (T013/T014) turned the old no-login preview links into dead links (they'd just bounce to `/login`), which made repeated manual role-testing slow. A real seeded session (not a bypass) means every downstream authorization/RLS check still runs exactly as it does for a real user, so this cannot mask an authorization bug the way a client-side bypass would |
-| 2026-09-21 | Fixed `app/auth/callback/route.ts` to also handle Supabase's `token_hash`+`type` email-link format, not only the PKCE `code` format | Server-initiated email links (mentor invites, password resets) have no browser-held PKCE verifier to exchange, so Supabase issues them as `token_hash`+`type` instead of `code` — the callback only handled `code`, so every invite/reset link landed on "link invalid or expired" (first surfaced as bug S49, 2026-09-19). `redirectTo` was also pointed at the final destination directly, to match the `token_hash` email template variable. Affects `lib/actions/academy.ts` (mentor invite) and `lib/api/auth.ts` (password reset) |
-| 2026-09-22 | Merged `origin/main` (PR #2, `feat/5-day-ssb-practice-journey` — T039 content-depth follow-up, already covered above) into local `main`, alongside the two local-only commits above (dev-preview restore, auth-callback token_hash fix). No file overlap between the two sides, so `git merge` produced a clean merge with zero conflicts; `npm run build` verified clean afterward | Routine sync — local `main` and `origin/main` had diverged (2 local commits, 4 remote commits) since the previous merge on 2026-09-21 |
 
 ---
 
@@ -292,6 +297,10 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-19 | Design system migration covered every page/component for the *material* system (glass tiers, colour, radius, shadow, shell) and the primary reference screens (all three dashboards, mentee detail, practice list pages) got the full new content-pattern treatment (`StatCard`/`ListPanel`/`PageHeader`). Secondary pages (batches, students, mentors, reports, settings, evaluations, sessions, resources detail, progress) were swept for token correctness and typography-scale consistency but still use ad-hoc `glass-regular` divs in places `StatCard`/`ListPanel` would be a cleaner fit. Dropdown menus (profile menu, `<Select>`) still use shadcn's default solid chrome, not an explicit `glass-thick` treatment. | A future T070-equivalent consistency pass — visually acceptable now, not yet swept against every §7.13 acceptance-test item on every screen |
 | 2026-09-20 | T039 (5-Day SSB Practice Journey) module/day grid cards are hand-built `glass-regular` cards (matching Target SSB's reference layout) rather than the shared `StatCard`/`ListPanel` components used elsewhere in Practice/Resources. Content banks (OIR verbal/non-verbal MCQs, PPDT, interview/conference questions) are small realistic placeholder sets, not a production-scale content bank, and use the same localStorage-only, per-browser progress tracking as `lib/student/resource-completion.ts` (not account-scoped — same root cause as the row above). No mentor/academy visibility into a student's journey progress exists. AI feedback on journey submissions is not wired up (blocked on B3, same as T034). | Same future T070 pass could fold the day/module cards into `StatCard`; same backend migration as the rows above would make progress account-scoped; mentor/academy visibility and AI feedback are new scope, not yet a task |
 
+
+
+| 2026-09-22 | ~~`lib/auth/session.ts` and `lib/supabase/middleware.ts` carried a temporary dev-only bypass (`x-day2-dev-bypass` header) added so `/student/resources/day-2` could be previewed locally without a configured Supabase project. It only activated under `NODE_ENV=development` for that exact path, but shipped no real user/session and was explicitly marked `TEMPORARY — remove before committing`.~~ — **CLOSED 2026-09-22**, both files reverted to their committed, bypass-free state (`git checkout`); confirmed no other reference to `x-day2-dev-bypass`/`DEV_BYPASS_PATH` remains in the repo. | Removed 2026-09-22 |
+| 2026-09-20 | T039 (5-Day SSB Practice Journey) module/day grid cards are hand-built `glass-regular` cards (matching Target SSB's reference layout) rather than the shared `StatCard`/`ListPanel` components used elsewhere in Practice/Resources. Content banks (OIR verbal/non-verbal MCQs, PPDT, interview/conference questions) are small realistic placeholder sets, not a production-scale content bank, and use the same localStorage-only, per-browser progress tracking as `lib/student/resource-completion.ts` (not account-scoped — same root cause as the row above). No mentor/academy visibility into a student's journey progress exists. AI feedback on journey submissions is not wired up (blocked on B3, same as T034). | Same future T070 pass could fold the day/module cards into `StatCard`; same backend migration as the rows above would make progress account-scoped; mentor/academy visibility and AI feedback are new scope, not yet a task |
 ---
 
 ## 10. Deferred (not blocking the MVP)
@@ -786,6 +795,246 @@ Next task:
 ```
 
 ```text
+
+Date: 2026-09-22
+Task: Restore production auth + redesign Day 2 Resources UI
+Status: Complete (verified)
+
+What changed:
+- lib/auth/session.ts, lib/supabase/middleware.ts: reverted to their committed, bypass-free state
+  (`git checkout`) — removed a temporary dev-only auth bypass (`x-day2-dev-bypass` header) that had
+  been added, out-of-process, purely to preview `/student/resources/day-2` without a configured
+  Supabase project. Confirmed no other file referenced it. `/student/resources/day-2` now goes through
+  the real Supabase session check + `roleForPath` student-role gate like every other `/student/*`
+  route — no special-casing remains anywhere for this path.
+- components/student/day2/day2-hero.tsx (new): hero section for `/student/resources/day-2` — title,
+  plain-language explanation of Day 2, a TAT → WAT → SRT → SD/SDT flow visual (icons + arrows, CSS/SVG
+  only, no stock imagery), Full Day 2 Practice shown as a separate combined option, and the real
+  resource count (data-driven, not hardcoded).
+- components/student/day2/day2-resource-explorer.tsx: added an "Explore the Day 2 Tests" category-card
+  section (icon + short beginner-friendly definition + real per-category resource count + click-to-
+  filter, overview-only so its counts never collide on-screen with the filtered-results counter) and a
+  "New to Day 2?" recommended step flow (Learn → Examples → Practice → Timed → Feedback, mapped to the
+  existing `purpose` taxonomy) inside the existing Start Here section. Renamed the type-browsing
+  section from "Browse by Category" to "Browse by Type" now that "category" means TAT/WAT/SRT/SDT
+  elsewhere on the page. Added a subtle staggered entrance animation (new `day2-rise-in` utility) to
+  the category cards, Start Here grid and the filtered-results region (re-keyed per filter combination
+  so it replays as a short transition on search/filter changes, not a full reload).
+- components/student/day2/day2-resource-card.tsx: reduced badge density (verification status moved to
+  a single top-right tag; access/login folded into one compact meta line, login badge shown only when
+  actually required) and gave the external-link CTA a proper button-like glass affordance instead of a
+  bare text link, per AGENTS.md §7.5's "avoid excessive badges" guidance. No resource data, URLs or
+  descriptions changed.
+- app/student/resources/day-2/page.tsx: now renders `Day2Hero` above `Day2ResourceExplorer`; kept the
+  existing empty-state and back-link.
+- app/globals.css: added `--motion-duration-entrance` token, `.day2-rise-in` (fade + 10px rise, one-
+  time/re-triggerable entrance) and `.day2-flow-arrow` (2px-amplitude looping drift on the hero's flow
+  arrows, within the §7.6 cap) — both neutralised by the existing global
+  `prefers-reduced-motion: reduce` block, no separate reduced-motion handling needed.
+- No changes to lib/mock/day2-resources.ts, lib/api/day2-resources.ts or types/day2-resources.ts — the
+  curated dataset, its URLs and its descriptions are untouched (AGENTS.md §8/§13).
+- Verified clean: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run` (41 passed, 5 pre-existing
+  todo), `npm run build`.
+
+What remains:
+- No `.env.local` exists in this environment (no Supabase project configured here), so the restored
+  auth flow and the redesigned page could not be exercised in a real browser this session — only
+  build/lint/type/unit-test verified. Needs a manual click-through against a real Supabase project
+  before sign-off.
+- This page (and this whole Day 2 feature) was built as an untracked side change — it has no T0xx
+  entry in task.md. Not backfilled here; flagged so it gets a real task entry rather than staying
+  permanently off-the-books.
+
+Blocker:
+- None for this change. Manual browser verification blocked only by missing local Supabase
+  credentials, not by anything in the code.
+
+Next task:
+- Add a task.md entry for the Day 2 Resources feature (it predates this session and was never
+  tracked) so future changes to it go through the normal task flow.
+```
+
+```text
+Date: 2026-09-22
+Task: T037a — Day 2 Resources information-architecture overhaul
+Status: Complete (verified)
+
+What changed:
+- Rebuilt the IA from a single-page dump (57 resources on one screen) to a hub-and-spoke structure:
+  `/student/resources/day-2` is now orientation-only (no individual resource is shown there), and each
+  test gets its own page at `/student/resources/day-2/[category]` — `tat`, `wat`, `srt`, `sd-sdt`,
+  `full-day` — showing only that test's resources. Invalid slugs 404 via `notFound()`.
+- lib/day2/categories.ts (new): single source of truth for category labels, full names, one-line and
+  beginner-explanation copy, the URL-slug↔`Day2TestCategory` mapping, and the category icon map — used
+  by every Day 2 component instead of five separate ad-hoc `CATEGORY_LABELS` objects.
+- components/student/day2/day2-visual.tsx (new): five small abstract line-art SVG compositions (one
+  per category — a frame+story-line for TAT, stacked word-bars for WAT, a branching path for SRT,
+  mirrored ellipses for SD/SDT, a connected-dot sequence for Full Day 2), built only from the existing
+  ink/accent tokens — not stock imagery, not a reproduction of any copyrighted test material.
+- components/student/day2/day2-hero.tsx (rewritten): lighter overview hero — title, "Understand ·
+  Practice · Perform", a short plain-language paragraph, a real resource count. The detailed TAT/WAT/
+  SRT/SD/Full Day 2 flow moved out into its own section (below) so the hero doesn't repeat it.
+- components/student/day2/day2-journey.tsx (new): the TAT → WAT → SRT → SD/SDT → Full Day 2 flow —
+  each node is icon + short name + full name + one-liner, linking straight to that category's page; a
+  "+" connector (not an arrow) before Full Day 2 to signal "combination", not "sequence".
+- components/student/day2/day2-beginner-path.tsx (new): the "New to Day 2?" 5-step guide (Learn → See
+  Examples → Practice → Go Timed → Get Feedback) — informational now, not a filter control, since
+  filtering moved to each category page; horizontal with arrows on desktop, vertical with down-arrows
+  on mobile; ends in a CTA anchored to the category grid.
+- components/student/day2/day2-category-grid.tsx (new): the 5-card "Explore the Day 2 Tests" grid on
+  the overview page — visual + short/full name + explanation + a real, per-category resource count
+  (computed from the live dataset) + "Explore Resources →", linking to that category's page.
+- components/student/day2/day2-category-hero.tsx (new): per-category page header — breadcrumb
+  (Resources / Day 2 / <test>), an explicit "← Back to Day 2" link, visual, title, one-paragraph "what
+  is this test" explanation, and the real resource count for that category.
+- components/student/day2/day2-category-explorer.tsx (new, replaces the deleted
+  day2-resource-explorer.tsx): scoped to one category's resources only. Surfaces that category's
+  curated `featured` resource as "Recommended starting point", groups the rest into Study
+  Guides/Examples/Practice/Videos/Feedback by the existing `purpose`/`resourceType` fields (a group
+  only renders if it actually has resources — SD/SDT has no Examples/Videos group, and that's shown
+  honestly rather than padded), with its own search and group-filter chips.
+- components/student/day2/day2-resource-card.tsx (redesigned): dropped the category badge (redundant —
+  the page you're on already tells you the category), dropped the raw verification-status sentence and
+  the separate login-required tag from the card face (kept as an underlying data field / folded into
+  the "Verified"/"Needs verification" tag). Card is now: type icon + eyebrow, title, a 2-line-clamped
+  description, one compact "Access · Platform · Purpose" metadata line, one CTA button. No resource
+  data, URL, name, category, access, timing or verification value was changed — only what's printed on
+  the card face.
+- Deleted components/student/day2/day2-resource-explorer.tsx and its test file (superseded by the
+  category explorer above) — confirmed nothing else referenced either file before removing.
+- tests/unit/components/day2-category-explorer.test.tsx (new, replaces the deleted explorer test):
+  featured/"Recommended starting point", group rendering (incl. a thin-category case with SD/SDT
+  proving empty groups don't render), search + empty state, group-filter chip, and real-URL/new-tab
+  link safety — all against the real curated dataset via `getDay2ResourcesByCategory`.
+- No changes to lib/mock/day2-resources.ts, lib/api/day2-resources.ts or types/day2-resources.ts — the
+  curated dataset, its URLs, names, categories, access info and verification status are untouched.
+- Verified clean: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run` (38 passed, 5 pre-existing todo),
+  `npm run build` (all 6 Day 2 routes compile, including the new `/student/resources/day-2/[category]`
+  dynamic segment).
+- A real `.env.local` (Supabase project credentials) is now present in this environment (it wasn't
+  earlier in the day) — confirmed via a local dev server that every `/student/resources/day-2*` route
+  correctly 307-redirects to `/login` when unauthenticated, i.e. the real auth guard covers the new
+  routes exactly like the rest of `/student/*`, including invalid category slugs (which redirect to
+  login rather than leaking a 404 to an anonymous caller).
+
+What remains:
+- No Chrome browser automation was available this session (declined during setup), so the redesigned
+  pages were not visually click-tested as an authenticated user — only build/lint/type/unit-test
+  verified, plus the anonymous-redirect check above. A real logged-in walkthrough (navigation between
+  pages, filters, external CTA buttons, mobile layout, console errors) is still needed before sign-off.
+- Detail pages (`/student/resources/day-2/[category]/[slug]`) were deliberately not built — every
+  curated resource is an external site/video/app with no useful additional EliteCadet-side context to
+  show, so the card's CTA opens it directly, per the brief's own "don't create detail pages
+  unnecessarily" instruction.
+
+Blocker:
+- None in the code. Only the lack of an in-session browser blocks the visual walkthrough.
+
+Next task:
+- A logged-in manual (or Chrome-automation) pass through all 6 routes once the user has reviewed this
+  round of changes.
+```
+
+```text
+Date: 2026-09-22
+Task: T037a — Day 2 Resources, round 2: information-architecture + visual redesign
+Status: Done
+
+What changed:
+- User visually inspected round 1 (previous entry above) and rejected it as "a database/resource dump
+  rendered onto a page" — too much text on every card, verification/pricing badges dominating the
+  visual hierarchy, all of a category's resources shown at once instead of true progressive
+  disclosure. This entry is a full IA + visual overhaul, not a decoration pass, per the user's explicit
+  brief (pasted in full in the requesting message).
+- New third navigation level: a category page (`/student/resources/day-2/[category]`) no longer dumps
+  every resource. It now shows "What do you want to do?" — a picker of only the sections that actually
+  have a matching resource (Learn Basics/Examples/Practice/Videos/Feedback) — and only after the
+  student picks one does `/student/resources/day-2/[category]?do=<section>` render that section's
+  resources. Section choice is a real URL (`?do=`), so back/forward and deep-linking both work.
+  New: `lib/day2/sections.ts` (single source of truth for the five sections + which resources match
+  each, replacing the group logic that used to live inline in the old category explorer),
+  `components/student/day2/day2-section-picker.tsx`, `components/student/day2/day2-resource-list.tsx`
+  (search now scoped to one section, not the whole category).
+- New generic flip card (`components/student/day2/day2-flip-card.tsx`), used for both the five Day 2
+  test cards and every category's section cards — same fixed dimensions, same structure everywhere.
+  Front: image/visual band + title + tiny subtitle + count + "Explore". Back (hover on desktop via
+  plain CSS `:hover`; a dedicated "i" info-toggle button, independent of hover, for keyboard/touch):
+  "What is X?" + one-sentence explanation + CTA. Flip mechanics in `app/globals.css`
+  (`.day2-flip-card`/`.day2-flip-inner`/`.day2-flip-face*`), reduced-motion already covered by the
+  existing global `prefers-reduced-motion` rule (transition duration zeroed for everyone).
+- Five per-category accent colours introduced (`--day2-tat/wat/srt/sdt/full`, `DAY2_CATEGORY_ACCENT` in
+  `lib/day2/categories.ts`) — a deliberate, scoped exception to `AGENTS.md` §7.1, recorded in the
+  Decisions Register above. Applied only as a thin card-top line, icon tint, faint wash, hover border
+  and that test's CTA (`.day2-cat-line`/`.day2-cat-icon`/`.day2-cat-wash`/`.day2-cat-hover` in
+  `app/globals.css`) — never a full-card fill.
+- `components/student/day2/day2-visual.tsx`: category marks now use `currentColor` for their primary
+  strokes (previously hardcoded to `--brand-accent`) so the same five SVGs pick up each test's accent
+  wherever they're placed, plus a `bare` variant for use inside a surface that already frames it (the
+  flip card's visual band).
+- `components/student/day2/day2-illustration.tsx` (new): the overview hero's one illustration — a
+  notebook with a dotted ascent line to a summit marker, same line-art language as the category marks.
+- `components/student/day2/day2-hero.tsx` (rewritten): shorter copy (title, three-word subtitle, one
+  sentence), the new illustration, and a primary "Quick Start" CTA (Feature 3 below).
+- `components/student/day2/day2-journey.tsx` (rewritten): shorter per-node text (`microLabel`, e.g.
+  "Picture Stories" — new field on `DAY2_CATEGORY_META`), a connecting gradient line behind the nodes,
+  each icon tinted with that test's accent.
+- `components/student/day2/day2-beginner-path.tsx` (rewritten): the old 5-step numbered guide replaced
+  with a single slim "Recommended for beginners" row (Learn → Examples → Practice) — Feature 1 from the
+  brief's "up to 3 small premium features" — so the overview page stays short.
+- `components/student/day2/day2-fullday-banner.tsx` (new): Full Day 2's own special treatment (brief
+  §17) — the TAT→WAT→SRT→SD/SDT→Personal Interview chain and one "Start Full Day 2" CTA straight into
+  its Practice section, shown above the normal section picker only on that one category page.
+- `components/student/day2/day2-resource-card.tsx` (redesigned): dropped the "Verified"/"Needs
+  verification" `StatusTag` and the Free/Freemium/Paid access badge from the card face entirely (brief
+  §14–16 — that research/curation metadata still lives in `lib/mock/day2-resources.ts`, it's just not
+  printed on the card). Card now shows: icon, a tiny purpose label (PRACTICE/LEARN/…), title, one
+  clamped sentence, and a CTA — nothing else. The AI-feedback-confidence note (a genuine AGENTS.md §11
+  safety disclosure, not research metadata) stays, shrunk to one line with the full statement in a
+  native tooltip.
+- `lib/day2/recently-viewed.ts` + `components/student/day2/day2-recently-viewed.tsx` (new) — Feature 2
+  from the brief: a per-browser "recently viewed" strip on the overview page, backed by `localStorage`
+  only (never sent to the server, never blocks navigation if storage is unavailable). Recorded on a
+  resource card's CTA click.
+- No changes to `lib/mock/day2-resources.ts`, `lib/api/day2-resources.ts` or `types/day2-resources.ts`
+  — the curated dataset (URLs, names, categories, access info, verification status) is untouched, only
+  which fields the UI prints changed, per the brief's own "DATA ≠ UI" rule.
+- Deleted `components/student/day2/day2-category-explorer.tsx` and its test (split into
+  `day2-section-picker.tsx` + `day2-resource-list.tsx` above); replaced its test with
+  `tests/unit/components/day2-section-picker.test.tsx` (non-empty-only sections, thin-category case,
+  links carry a `?do=` query) and `tests/unit/components/day2-resource-list.test.tsx` (section-scoped
+  results, back link, search + empty state, no verification/pricing text on a card, real-URL/new-tab
+  link safety).
+- **Two real bugs found only by actually running the app in a browser** (not caught by `tsc`, ESLint,
+  or Vitest) and fixed before sign-off:
+  1. `[category]/page.tsx` (a Server Component) was passing the full section object — including its
+     Lucide icon component reference and its `match` function — as a prop into the client
+     `Day2ResourceList`, the exact Server→Client serialization violation `AGENTS.md` §7.12 warns about,
+     just in the section hand-off rather than a nav icon. Threw at runtime ("Functions cannot be passed
+     directly to Client Components…"). Fixed by passing only the section's `key` (a string) and having
+     `Day2ResourceList` resolve the icon locally from `DAY2_SECTIONS`, matching the existing
+     `lib/day2/categories.ts` pattern.
+  2. `Day2RecentlyViewed` initially read `localStorage` via a `useState(() => …)` lazy initializer (the
+     same pattern already used by `ResourceReadBadge`) — for a returning visitor with existing entries,
+     this produces a real hydration mismatch (server necessarily renders nothing; client renders the
+     strip), confirmed via a browser `pageerror` event. Fixed with `useSyncExternalStore`, whose
+     `getServerSnapshot` always returns the same empty array so the initial client render matches the
+     server exactly, with the real snapshot taking over immediately after hydration.
+- Verified in a real, signed-up browser session (Playwright + system Chrome, no dev-only auth bypass):
+  full `Day 2 → TAT → Practice → resource` and `Day 2 → Full Day 2 → Start Full Day 2 → Practice` flows,
+  the SD/SDT thin-category case (only Learn Basics + Practice offered, matching its actual resource
+  mix), section-scoped search + empty state, the "Recommended starting point" callout, hover-flip and
+  its independent keyboard path (`Tab` to the info button, `Enter` toggles `aria-expanded`), the mobile
+  tap-flip equivalent, the Recently Viewed strip appearing after opening a resource, and zero horizontal
+  overflow at 1440/768/390px across all three hierarchy levels. Also `npx tsc --noEmit`, `npx eslint`
+  (targeted paths), `npx vitest run` (45 passed, 5 pre-existing todo), `npm run build` (all Day 2 routes
+  compile).
+
+What remains:
+- Nothing known-broken. The pre-existing technical debt entries above (mock backend data, per-academy
+  isolation) are unrelated to this feature.
+
+
+
 Date: 2026-09-21
 Task: T039 follow-up — content depth + a "Continue where you left off" card
 Status: Complete (verified — build/lint/type-check clean; Playwright walkthrough against a production
@@ -853,10 +1102,97 @@ What changed:
 What remains:
 - Same as T013/T014's existing Technical Debt row — unrelated to this fix.
 
+
 Blocker:
 - None.
 
 Next task:
+
+
+- User review of this round; then, per the standing instruction for this task, no commit/push until
+  they've inspected it.
+```
+
+```text
+Date: 2026-09-23
+Task: T037a — Day 2 Resources, round 3: visual/text refinement
+Status: Done
+
+What changed:
+- User visually inspected round 2 and, while confirming the IA/UX direction was much better, asked for
+  a further pass: aggressively less text everywhere, a genuinely new second-level taxonomy, slower/
+  calmer animation, and — in their own words — more visual personality because the marks still read as
+  "terrible and too boring." This is a refinement of round 2, not a re-architecture.
+- **Text removed, by location:**
+  - `/student/resources` Day 2 entry card: dropped its two-line description entirely — now icon +
+    "Day 2" + "Explore Day 2 →", nothing else.
+  - Day 2 overview hero: dropped the one-sentence description and the "57 curated resources…" line;
+    "Understand. Practice. Improve." became "Understand → Practice → Improve" per the user's literal
+    suggested hierarchy. `Day2Hero` no longer takes a `resourceCount` prop.
+  - Day 2 overview footer: removed the closing "Not sure where to start? Start with TAT." paragraph —
+    pure redundancy with the hero's own Quick Start button, which already goes to the same place.
+  - Category hero (`Day2CategoryHero`): removed the full explanation paragraph and the resource-count
+    line entirely — it's now just the visual + short label (e.g. "TAT") + a one-line full-name caption.
+    The explanation still exists, just one level up, on the test card's flip-back. `Day2CategoryHero`
+    no longer takes a `resourceCount` prop.
+  - "Choose a Test" and "What do you want to do?" headings lost their subtitle lines (the heading
+    already says what to do; the subtitle repeated it).
+  - Full Day 2 banner: dropped the redundant "TAT → WAT → SRT → SD/SDT, back-to-back" sentence — the
+    chain visual directly below it already shows exactly that.
+  - "New to Day 2?" row: dropped its subtitle line, kept only the eyebrow + pills.
+- **New second-level taxonomy** (`lib/day2/sections.ts`, fully rewritten): the previous
+  Learn/Examples/Practice/Videos/Feedback split is now **Learn Basics / Practice / Tests / Videos /
+  Articles / Feedback**, matching the user's explicit structure. "Examples" is gone as a section —
+  verified against the real dataset that every resource tagged `purpose: "example"` also carries
+  `learn`, `practice`, or `test-series`/`full-mock`, so nothing became unreachable; "Tests" now covers
+  `resourceType: "test"` plus `test-series`/`full-mock` purposes, "Articles" covers
+  `resourceType: "article"`. Recomputed real per-category counts confirm the new taxonomy stays
+  non-empty and meaningful: TAT/SRT/full-day-2 get all 6 sections, WAT gets 5 (no Feedback), SD/SDT
+  stays honestly thin at 3 (Learn Basics/Practice/Articles only — no Tests, Videos or Feedback,
+  confirmed there's real data behind exactly those three and nothing invented for the rest).
+- **Visual personality** (the "boring" complaint): replaced all five `Day2Visual` category marks
+  (`components/student/day2/day2-visual.tsx`) with fuller illustrated scenes in the same line-art
+  language rather than sparse geometric sketches — TAT gained a small landscape inside its picture
+  frame, WAT gained a pen mid-stroke over its notebook, SRT gained a flag marking the chosen fork, SDT
+  became an explicit silhouette-and-mirrored-reflection composition across a dashed axis, Full Day 2
+  gained a finish-line flag at its last checkpoint. `.day2-cat-wash` (`app/globals.css`) changed from a
+  flat 7% tint to a two-stop diagonal gradient (14%→4%) for more depth. The hero illustration's summit
+  flag now has a slow (3.6s), ≤2px float (`.day2-illus-float`, respecting `prefers-reduced-motion` via
+  the existing global rule).
+- **Animation slowed and made more premium**, entirely scoped to Day 2's own CSS (`.day2-rise-in`
+  entrance, `.day2-flip-*`, both already isolated from the rest of the app):
+  `--motion-duration-entrance` 420ms → 520ms, `--motion-duration-flip` 480ms → 650ms, stagger
+  increments 60ms → 90–100ms, and a new `--motion-easing-premium`
+  (`cubic-bezier(0.22, 1, 0.36, 1)`) used for the flip transform instead of the standard, snappier
+  `--motion-easing`. Flip cards also gained a small hover lift + shadow on the outer card (independent
+  of the flip transform on the inner rotator, so the two don't fight) and the front visual now zooms
+  ~1.08× on hover — the "reveal the accent, don't jump" interaction the brief asked for.
+- Resource cards (`Day2ResourceCard`) gained `glass-hover-lift` alongside their existing accent-border
+  hover, so they now lift + gain a stronger shadow on hover like the rest of the product's card pattern,
+  not just a border tint.
+- No changes to `lib/mock/day2-resources.ts`, `lib/api/day2-resources.ts` or `types/day2-resources.ts`,
+  and no change to Supabase auth — confirmed both per the user's explicit constraints for this round.
+- Updated `tests/unit/components/day2-section-picker.test.tsx` for the new taxonomy: TAT now asserts
+  all six section labels present; the thin-category case now asserts SD/SDT shows Learn Basics/Practice/
+  Articles and not Tests/Videos/Feedback (previously asserted against "Examples"/"Videos").
+  `day2-resource-list.test.tsx` needed no changes — the "learn"/"practice" section keys it exercises
+  were unchanged by the taxonomy rewrite.
+- Verified in a real, signed-up browser session (Playwright + system Chrome, no auth bypass), across
+  three separate accounts created this round: the trimmed Resources → Day 2 gateway, the trimmed
+  overview hero/journey/beginner-row, all five flip cards' hover-flip after the slower transition
+  settles, the TAT category page showing all six new sections, the SD/SDT thin-category case exactly as
+  predicted from the real data, the WAT category page following the identical structure, the Full Day 2
+  banner, and the two brand-new section types (Tests, Articles) rendering real, correctly-filtered
+  resources for TAT. Zero console errors/warnings across the whole walkthrough. Confirmed zero
+  horizontal overflow at 390px again after the layout changes. Also `npx tsc --noEmit`, `npx eslint`
+  (targeted paths), `npx vitest run` (40 passed, 5 pre-existing todo), `npm run build` (all Day 2 routes
+  compile).
+
+What remains:
+- Nothing known-broken.
+
+
+
 - Merge with origin/main (this session) to pick up the T039 follow-up work built in parallel.
 ```
 
@@ -877,12 +1213,24 @@ What remains:
 - Two local commits from this merge (auth-callback fix, dev-preview restore) are not yet pushed to
   origin/main.
 
+
+
+
 Blocker:
 - None.
 
 Next task:
+
+
+- User review of this round; per the standing instruction for this task, no commit/push until they've
+  inspected it.
+
+
+
 - Push local main to origin so origin/main has the auth-callback fix and dev-preview restore too.
 - Then resolve B3 (AI provider) — still the only remaining MVP feature gap.
+
+
 ```
 
 Date: 2026-09-24
