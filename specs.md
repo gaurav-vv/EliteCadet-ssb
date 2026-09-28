@@ -59,7 +59,7 @@ These resolve conflicts that previously existed between `AGENTS.md`, `specs.md`,
 | Item | Previous conflict | Resolution |
 |---|---|---|
 | Achievements, Leaderboard | Specified as student dashboard sections *and* listed as "intentionally not started" | **DEFERRED (P2).** Removed from the MVP dashboard and from MVP tasks. |
-| "Mission" | Design brief shows Mission as a top-level primary capsule; status lists "5-Day SSB Mission" as not started | Split: **"Today's Mission"** (daily recommended-task surface) is **MVP**. The **5-Day SSB Mission programme** is **DEFERRED (P1)**. |
+| "Mission" | Design brief shows Mission as a top-level primary capsule; status lists "5-Day SSB Mission" as not started | Split: **"Today's Mission"** (daily recommended-task surface) is **MVP**. The **5-Day SSB Practice Journey** was originally deferred (P1) but was **un-deferred and built 2026-09-20** as `Practice` (T039) — see §6.4a. |
 | Mentor Rating, AI Assistant, Earnings | Present in mentor navigation | **DEFERRED (P1/P2).** Absent from MVP navigation. |
 | Courses, Attendance, Announcements, Messages, Assessments | Present in academy navigation | **DEFERRED (P1).** Absent from MVP navigation. |
 | Visual direction | "Rounded cards", purple as brand accent | **Superseded** by the Glass Capsule system with navy primary. See `AGENTS.md` §7. |
@@ -191,8 +191,10 @@ Resources
 Profile
 ```
 
-Absent from MVP navigation (deferred): 5-Day SSB Mission programme, Mentorship booking, Knowledge
-Base expansion, Groups, Assessments, Events & Live Classes, Achievements, Leaderboard, Career Guide.
+Absent from MVP navigation (deferred): Mentorship booking, Knowledge Base expansion, Groups,
+Assessments, Events & Live Classes, Achievements, Leaderboard, Career Guide. The 5-Day SSB Practice
+Journey is no longer deferred — see §6.4a; it lives inside the existing `Practice` nav item, not as a
+separate top-level entry.
 
 ### 6.2 Onboarding
 
@@ -252,6 +254,54 @@ undefined is `BLOCKED`, not guessed.
 - The list shows only activities that actually exist.
 - Instructions are readable before any timed portion begins.
 - Navigating away and back does not silently destroy an in-progress response without warning.
+
+### 6.4a 5-Day SSB Practice Journey (T039 — un-deferred 2026-09-20)
+
+**Decision:** originally listed as deferred (P1) in §3 above. Un-deferred by explicit user direction
+2026-09-20, referencing Target SSB (targetssb.in) as functional/structural inspiration — content and
+information architecture only, not its visual design (AGENTS.md §7 still governs UI).
+
+```text
+Practice → Day 1..5 → module (reading · info · practice bank · timed test · checklist · summary)
+```
+
+Practice's top-level page is now the 5-day overview (an overall progress ring + Day 1–5 list),
+replacing the flat Psychology/Interview category list. The existing Psychology (TAT/WAT/SRT/SDT) and
+Interview flows from §6.4/§6.5 are reused, not duplicated: Day 2's Test cards and Day 4's Personal
+Interview card link to those existing routes rather than re-implementing the timed-test flow.
+
+| Day | Modules |
+|---|---|
+| Day 1 | Screening (reading) · OIR Practice/Test · OIR Non-verbal Practice/Test · PPDT (test) |
+| Day 2 | WAT/TAT/SRT Practice + Test · Self Description (links to the existing §6.4 flow) |
+| Day 3 | GTO Blogs/Lectures (reading) · GD, Group Planning, PGT, HGT, Race, Lecturette (info) |
+| Day 4 | Individual Obstacles, Command Task, FGT (info) · Personal Interview (practice bank, links to the existing Interview route) |
+| Day 5 | Conference Preparation (reading) · Conference Questions (practice bank) · Mock Conference (info) · Final Self Assessment (checklist) · SSB Journey/Final Progress (summary) |
+
+**Module kinds:**
+- **reading/info** — static guidance content; no completion tracking (matches the reference product,
+  which only tracks progress on question-bank modules).
+- **practice bank** — untimed, self-paced, browsable in any order; per-item completion is tracked and
+  feeds the progress ring/bars. MCQ items (OIR) show correctness immediately; free-text items are
+  self-marked done.
+- **timed test** — a single timed sitting (OIR/OIR Non-verbal Test use a new MCQ runner; PPDT reuses
+  the existing carousel stimulus/response runner from §6.4). No per-item completion tracking — a test
+  is submitted once, matching §6.5's submission requirements.
+- **checklist** — a one-time self-assessment (Final Self Assessment: rate yourself 1–5 across the ten
+  standard OLQs), stored locally, never shown to anyone else.
+- **summary** — Day 5's aggregate view of progress across all five days.
+
+**Data:** all question-bank content (OIR verbal/non-verbal MCQs, PPDT scene, interview/conference
+question sets) is placeholder content per AGENTS.md §8 — realistic in style, small in volume compared
+to a real production content bank, with every displayed count computed from the actual content array
+length (never an invented figure matching the reference product's marketing numbers).
+
+**Acceptance:**
+- Every module listed above resolves to a working page (no dead links, no "coming soon" placeholders
+  except where a module has no interactive form yet — those still carry real descriptive content).
+- A student can complete a full Day 1→5 walkthrough without any client-side error.
+- Progress percentages/counts always equal real completed-item counts over real content-array length.
+- Existing Psychology/Interview routes and their behavior from §6.4/§6.5 are unchanged.
 
 ### 6.5 Practice submission
 
@@ -517,10 +567,14 @@ build. Do not invent guarantees.
 
 ## 13. Out of Scope for the Initial MVP
 
-5-Day SSB Mission programme · Groups · Leaderboard · Achievements · Career Guide · advanced live
-classes · advanced events · advanced attendance · advanced messaging · advanced analytics and
-reports · AI Mentor · Mentor AI Assistant · Earnings · complex scheduling · full ERP functionality ·
-complex finance management · automated billing.
+Groups · Leaderboard · Achievements · Career Guide · advanced live classes · advanced events ·
+advanced attendance · advanced messaging · advanced analytics and reports · AI Mentor · Mentor AI
+Assistant · Earnings · complex scheduling · full ERP functionality · complex finance management ·
+automated billing.
+
+The 5-Day SSB Practice Journey, previously listed here, was un-deferred and built 2026-09-20 — see
+§6.4a. Mentor/Academy visibility into a student's journey progress and AI feedback on journey
+submissions remain out of scope for now (the latter is the same B3 blocker as §6.6).
 
 These belong to the broader vision and must not block the MVP.
 

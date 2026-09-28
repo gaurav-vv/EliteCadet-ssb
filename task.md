@@ -41,9 +41,9 @@ T001–T005 (Foundation), T010/T011 (public site), T020–T038 except T034/T035 
 including T037a Day 2 Resources), T021/T040–T045 (full Mentor experience) and T022/T050–T055 (full
 Academy experience) are complete on mock data — see `status.md` for the verified snapshot. T012
 (Pricing) skipped as P1. T013/T014 (real Supabase authentication + role-based access) are now also
-complete as of 2026-09-19 — see `status.md` §11. Remaining: T034/T035 (AI feedback, blocked on B3), and
-Phase 6 quality/security audits, which still need to account for the mock-data gap documented in
-status.md → Technical Debt.
+complete as of 2026-09-19 — see `status.md` §11. T039 (5-Day SSB Practice Journey, previously deferred)
+complete as of 2026-09-20. Remaining: T034/T035 (AI feedback, blocked on B3), and Phase 6 quality/security
+audits, which still need to account for the mock-data gap documented in status.md → Technical Debt.
 
 ---
 

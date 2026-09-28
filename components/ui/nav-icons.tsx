@@ -16,6 +16,16 @@ import {
   GraduationCap,
   Layers,
   BarChart3,
+  ListChecks,
+  ImageIcon,
+  UsersRound,
+  Flag,
+  ClipboardList,
+  Presentation,
+  CalendarCheck,
+  ListTodo,
+  Award,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +51,16 @@ export const navIcons = {
   students: GraduationCap,
   batches: Layers,
   reports: BarChart3,
+  ssbDay: CalendarDays,
+  oir: ListChecks,
+  ppdt: ImageIcon,
+  gto: UsersRound,
+  obstacle: Flag,
+  command: ClipboardList,
+  lecture: Presentation,
+  conference: CalendarCheck,
+  checklist: ListTodo,
+  finalProgress: Award,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof navIcons;
