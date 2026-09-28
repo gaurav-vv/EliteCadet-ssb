@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+jobs:
+  checks:
+    name: Lint, types, unit & integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run test:integration
+
+  e2e:
+    name: Build & end-to-end tests
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      # The middleware calls supabase.auth.getUser() on every request, so e2e
+      # needs a reachable project. PRs from forks don't get secrets — skip
+      # there with a notice instead of failing.
+      - name: Check Supabase secrets
+        id: secrets
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::notice::Supabase secrets not set; skipping build and e2e."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.available == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.available == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.secrets.outputs.available == 'true'
+      - run: npm run build
+        if: steps.secrets.outputs.available == 'true'
+      - run: npx playwright install --with-deps chromium
+        if: steps.secrets.outputs.available == 'true'
+      - run: npm run test:e2e
+        if: steps.secrets.outputs.available == 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.secrets.outputs.available == 'true'
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
