@@ -27,3 +27,20 @@ export const PRACTICE_TIMING: Record<PsychologyTestType, TimingConfig> = {
   srt: { mode: "budget", totalSeconds: 30 * 60 },
   sdt: { mode: "budget", totalSeconds: 15 * 60 },
 };
+
+// Mock interview / conference pacing (specs.md §6.4b). These are practice
+// values chosen for this app, not official SSB timings: the real interview
+// and conference aren't run to a per-question clock.
+export interface MockSessionConfig {
+  questionCount: number;
+  secondsPerQuestion: number;
+  /** How many of the questions may come from the student's PIQ (interview only). */
+  maxPiqQuestions: number;
+  /** Always asked first when present, e.g. "Tell us about yourself". */
+  openingQuestionId?: string;
+}
+
+export const MOCK_SESSIONS: Record<"interview" | "conference", MockSessionConfig> = {
+  interview: { questionCount: 8, secondsPerQuestion: 120, maxPiqQuestions: 3, openingQuestionId: "int-1" },
+  conference: { questionCount: 4, secondsPerQuestion: 60, maxPiqQuestions: 0 },
+};

@@ -68,6 +68,23 @@ describe("5-Day SSB Journey API", () => {
     }
   });
 
+  it.each([
+    ["day-4", "personal-interview"],
+    ["day-5", "conference-questions"],
+  ] as const)("every %s/%s question has guidance, and the module has a self-review list", async (dayId, moduleId) => {
+    const { data } = await getSsbModuleDetail(dayId, moduleId);
+    expect(data?.selfReview?.length).toBeGreaterThan(0);
+    for (const item of data?.responseItems ?? []) {
+      expect(item.guidance?.assesses, item.id).toBeTruthy();
+      expect(item.guidance?.tips.length, item.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("Day 5's Mock Conference card links to the mock conference route", async () => {
+    const { data } = await getSsbModuleDetail("day-5", "mock-conference");
+    expect(data?.href).toBe("/student/practice/conference/mock");
+  });
+
   it("progress totals include practice banks only, never timed tests", async () => {
     const entries = getAllBankModuleItemIds();
     expect(entries.length).toBeGreaterThan(0);

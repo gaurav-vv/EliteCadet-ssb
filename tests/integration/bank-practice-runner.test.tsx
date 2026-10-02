@@ -2,7 +2,7 @@
 // store (lib/student/ssb-journey-progress.ts) — the practice loop a student
 // actually uses: answer → mark done → progress persists across a remount.
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BankPracticeRunner } from "@/components/practice/bank-practice-runner";
 import { isItemDone } from "@/lib/student/ssb-journey-progress";
@@ -86,6 +86,48 @@ describe("BankPracticeRunner (free-text)", () => {
     render(<BankPracticeRunner {...props} />);
     expect(await screen.findByText("1 of 2 done")).toBeInTheDocument();
     expect(screen.getByText("Marked done.")).toBeInTheDocument();
+  });
+
+  it("keeps a typed answer when moving to another question and back", async () => {
+    render(<BankPracticeRunner {...baseProps} moduleId="personal-interview" responseItems={RESPONSES} />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Your answer" }), "To serve the nation.");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("textbox", { name: "Your answer" })).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.getByRole("textbox", { name: "Your answer" })).toHaveValue("To serve the nation.");
+  });
+
+  it("restores a typed answer after a reload (remount)", async () => {
+    const props = { ...baseProps, moduleId: "personal-interview", responseItems: RESPONSES };
+    const { unmount } = render(<BankPracticeRunner {...props} />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Your answer" }), "Draft answer");
+    unmount();
+
+    render(<BankPracticeRunner {...props} />);
+    expect(await screen.findByDisplayValue("Draft answer")).toBeInTheDocument();
+  });
+
+  it("shows a question's guidance and saves self-review ticks with the answer", async () => {
+    const guided = [
+      { id: "g1", prompt: "Why the forces?", guidance: { assesses: "Genuine motivation.", tips: ["Give a personal reason."] } },
+      { id: "g2", prompt: "Your hobbies?" },
+    ];
+    const props = { ...baseProps, moduleId: "personal-interview", responseItems: guided, selfReview: ["Specific example", "Honest"] };
+    const { unmount } = render(<BankPracticeRunner {...props} />);
+    expect(screen.getByText("What assessors look for")).toBeInTheDocument();
+    expect(screen.getByText("Genuine motivation.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "Specific example" }));
+    expect(screen.getByText("Self-review (1 of 2)")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.queryByText("What assessors look for")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Specific example" })).not.toBeChecked();
+    unmount();
+
+    render(<BankPracticeRunner {...props} />);
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Specific example" })).toBeChecked());
+    expect(screen.getByRole("checkbox", { name: "Honest" })).not.toBeChecked();
   });
 
   it("renders nothing when a module has no items", () => {

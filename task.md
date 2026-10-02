@@ -390,6 +390,17 @@ persistence (same mock/localStorage pattern as the rest of Student, T014's known
 academy visibility into journey progress; AI feedback on journey submissions is blocked on B3, same
 as T034.
 
+## T039b — Interview & Conference practice depth — P1 — `[-]`
+**Why:** User request 2026-09-24: improve Day 4's Personal Interview and Day 5's Conference.
+**Spec:** `specs.md` §6.4b. **Depends on:** T039.
+**Requirements:** saved answers in every free-text practice bank · per-question guidance and a
+self-review checklist for interview/conference questions · PIQ form → template-generated interview
+questions · timed mock interview and mock conference with a review screen.
+**Acceptance:** as listed in `specs.md` §6.4b.
+**Tests:** unit (answer store, PIQ generator, mock question selection) · integration (runner restores
+and keeps answers, guidance and self-review, PIQ form validation, mock run to review) · e2e not
+possible for these logged-in routes until seeded test accounts exist (see T066).
+
 ---
 
 # Phase 4 — Mentor MVP

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCountdown } from "@/hooks/use-countdown";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { PracticeItem } from "@/types/practice";
 import type { CarouselTiming } from "@/lib/practice/config";
@@ -12,9 +13,11 @@ interface CarouselRunnerProps {
   items: PracticeItem[];
   timing: CarouselTiming;
   onDone: (responses: Record<string, string>) => void;
+  /** Mock interview/conference: lets the student move on before the timer runs out. Timed psychology tests leave this off. */
+  allowEarlyAdvance?: boolean;
 }
 
-export function CarouselRunner({ items, timing, onDone }: CarouselRunnerProps) {
+export function CarouselRunner({ items, timing, onDone, allowEarlyAdvance = false }: CarouselRunnerProps) {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>(timing.stimulusSeconds ? "view" : "respond");
   const [responses, setResponses] = useState<Record<string, string>>({});
@@ -57,6 +60,7 @@ export function CarouselRunner({ items, timing, onDone }: CarouselRunnerProps) {
       total={items.length}
       draft={draft}
       onDraftChange={setDraft}
+      onAdvance={allowEarlyAdvance && phase === "respond" ? commitAndAdvance : undefined}
     />
   );
 }
@@ -70,6 +74,7 @@ interface CarouselStepProps {
   total: number;
   draft: string;
   onDraftChange: (value: string) => void;
+  onAdvance?: () => void;
 }
 
 function CarouselStep({
@@ -81,6 +86,7 @@ function CarouselStep({
   total,
   draft,
   onDraftChange,
+  onAdvance,
 }: CarouselStepProps) {
   const secondsLeft = useCountdown(seconds, onExpire);
 
@@ -96,6 +102,7 @@ function CarouselStep({
       {phase === "respond" ? (
         <Textarea
           autoFocus
+          aria-label="Your response"
           placeholder="Type your response…"
           value={draft}
           onChange={(e) => onDraftChange(e.target.value)}
@@ -105,6 +112,11 @@ function CarouselStep({
         <p className="text-center text-sm text-ink-secondary">
           Read the scene. The writing window opens automatically.
         </p>
+      )}
+      {onAdvance && (
+        <Button type="button" size="sm" onClick={onAdvance} className="self-end">
+          {index + 1 >= total ? "Finish" : "Next question"}
+        </Button>
       )}
     </div>
   );
