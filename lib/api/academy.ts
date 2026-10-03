@@ -14,7 +14,8 @@ import {
   getMockDashboardData,
   getStudent,
 } from "@/lib/mock/academy";
-import type { AcademyBatch, AcademyDashboardData, AcademyMentor, AcademySettings, AcademyStudent } from "@/types/academy";
+import { getMockAnalytics } from "@/lib/mock/academy-analytics";
+import type { AcademyAnalytics, AcademyBatch, AcademyDashboardData, AcademyMentor, AcademySettings, AcademyStudent } from "@/types/academy";
 
 export interface ApiError {
   code: "validation_error" | "not_found";
@@ -29,6 +30,12 @@ export interface ApiResult<T> {
 
 export async function getDashboardData(): Promise<ApiResult<AcademyDashboardData>> {
   return { ok: true, data: getMockDashboardData() };
+}
+
+// Trend, skill and session analytics. Demo-backed until assessment and session
+// tables exist; the `source` field tells the UI to label it as demo data.
+export async function getAnalytics(): Promise<ApiResult<AcademyAnalytics>> {
+  return { ok: true, data: getMockAnalytics() };
 }
 
 export async function getStudents(): Promise<ApiResult<AcademyStudent[]>> {
