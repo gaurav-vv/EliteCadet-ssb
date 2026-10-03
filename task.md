@@ -390,6 +390,17 @@ persistence (same mock/localStorage pattern as the rest of Student, T014's known
 academy visibility into journey progress; AI feedback on journey submissions is blocked on B3, same
 as T034.
 
+## T039b — Interview & Conference practice depth — P1 — `[-]`
+**Why:** User request 2026-09-24: improve Day 4's Personal Interview and Day 5's Conference.
+**Spec:** `specs.md` §6.4b. **Depends on:** T039.
+**Requirements:** saved answers in every free-text practice bank · per-question guidance and a
+self-review checklist for interview/conference questions · PIQ form → template-generated interview
+questions · timed mock interview and mock conference with a review screen.
+**Acceptance:** as listed in `specs.md` §6.4b.
+**Tests:** unit (answer store, PIQ generator, mock question selection) · integration (runner restores
+and keeps answers, guidance and self-review, PIQ form validation, mock run to review) · e2e not
+possible for these logged-in routes until seeded test accounts exist (see T066).
+
 ---
 
 # Phase 4 — Mentor MVP
@@ -510,6 +521,32 @@ regression" also needs a branch-protection rule requiring the CI checks on `main
 ---
 
 # Phase 7 — MVP Polish
+
+## T073 — Academy shell + dashboard redesign — P1 — `[x]`
+**Why:** User request 2026-09-24: Academy admin needs a premium, reusable shell and an actionable dashboard (reference design supplied).
+**Requirements:** reusable navy sidebar with separate reusable footer · config-driven navigation · header · responsive (rail/drawer) · dashboard built from shared components on the existing data contract · no fabricated data.
+**Acceptance:** dashboard renders from `getDashboardData`/`getStudents`/`getMentors`; empty state works; no horizontal overflow at 390/820/1440px; lint, typecheck, tests, build pass.
+**Update 2026-10-03:** trend chart, assessment radar and upcoming sessions added on demo-flagged data (`getAnalytics()`); real data needs new assessment-score, skill-rubric and sessions tables. KPI month-over-month deltas still deferred (no history).
+**Tests:** unit — `tests/unit/lib/academy-dashboard-view.test.ts`.
+
+---
+
+## T074 — Academy Students management page — P1 — `[x]`
+**Why:** User request 2026-10-04: production-quality student list for the Academy Admin.
+**Acceptance:** search + filters + sort work together via URL params; pagination; add student via dialog with validation/loading/success/error; row actions limited to supported operations; empty, no-results and error states; responsive (table → cards); lint/typecheck/tests pass.
+**Open (needs data model):** real Supabase `students` table, email, created date, edit student, per-student mentor assignment.
+**Tests:** unit — `tests/unit/lib/academy-student-list.test.ts`.
+
+---
+
+## T075 — Academy Batches management (Supabase) — P1 — `[-]`
+**Why:** User request 2026-10-04: a real, end-to-end Batches MVP for the Academy Admin.
+**Acceptance:** list/search/filter/sort/paginate from Postgres; create + edit (name, mentor, start date); assign/change mentor; archive/restore; summary counts from the database; loading/empty/no-results/error states; admin-only writes enforced server-side and by RLS; no service-role key; lint/typecheck/tests pass.
+**Status:** code + unit tests done; blocked only on applying `0003_batches.sql` and live verification by a signed-in admin.
+**Deferred:** per-batch student counts (needs `students.batch_id`), batch detail page, delete.
+**Tests:** unit — `academy-batch-logic.test.ts`, `batches-supabase.test.ts`.
+
+---
 
 ## T070 — Design system consistency pass — P1 — `[ ]`
 **Updated 2026-09-19:** the design system itself changed (Glass Capsule → Apple-Inspired Glass UI v3,

@@ -26,6 +26,13 @@ import {
   ListTodo,
   Award,
   CalendarDays,
+  TrendingUp,
+  Activity,
+  Bell,
+  UserCog,
+  UserCheck,
+  Gauge,
+  TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +68,13 @@ export const navIcons = {
   conference: CalendarCheck,
   checklist: ListTodo,
   finalProgress: Award,
+  performance: TrendingUp,
+  activities: Activity,
+  notifications: Bell,
+  mentors: UserCog,
+  activeStudents: UserCheck,
+  readiness: Gauge,
+  attention: TriangleAlert,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof navIcons;

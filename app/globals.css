@@ -409,6 +409,119 @@
   }
 }
 
+/*
+ * Academy design language — "SSB Path Academy" (decision: status.md,
+ * 2026-09-24, approved scoped deviation from the Glass UI v3 material).
+ * Scoped to the .academy-app wrapper so Student/Mentor are untouched; it only
+ * re-points existing tokens (surface, radius, materials) and adds the navy
+ * sidebar + restrained gold tokens. Glass materials become solid white cards
+ * with a hairline border, so every shared component used inside Academy
+ * pages (cards, lists, inputs) matches without per-component changes.
+ * Promote to :root when Student/Mentor adopt it.
+ */
+.academy-app {
+  --surface-base: #f5f6fb;
+  --hairline: #e4e7f1;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --academy-navy: #0e1836;
+  --academy-navy-raised: #17244d;
+  --academy-navy-line: rgba(255, 255, 255, 0.1);
+  --academy-nav-fg: rgba(255, 255, 255, 0.72);
+  --academy-nav-fg-strong: #ffffff;
+  --academy-gold: #d4b15f;
+  /* Text-grade status colours: the base status colours fail 4.5:1 as text on white */
+  --academy-success-text: #167a35;
+  --academy-warning-text: #8f5600;
+  --academy-danger-text: #c0271b;
+  --academy-info: #3b82f6;
+  --academy-info-text: #1d5fd0;
+  /* Chart series — each also differs by dash pattern, never colour alone */
+  --academy-chart-overall: var(--brand-accent);
+  --academy-chart-tat: #22a45d;
+  --academy-chart-ppdt: #3b82f6;
+  background: var(--surface-base);
+}
+.academy-app .glass-thin,
+.academy-app .glass-regular,
+.academy-app .glass-thick {
+  background: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-soft);
+}
+.academy-app .glass-hover-lift:hover {
+  border-color: color-mix(in srgb, var(--brand-accent) 35%, var(--hairline));
+}
+.academy-app .row-hover-tint:hover {
+  background: rgba(74, 85, 232, 0.04);
+}
+
+.academy-tint {
+  background: rgba(74, 85, 232, 0.1);
+  color: var(--brand-accent);
+}
+.academy-tint[data-tone="success"] {
+  background: var(--status-success-bg);
+  color: var(--academy-success-text);
+}
+.academy-tint[data-tone="warning"] {
+  background: var(--status-warning-bg);
+  color: var(--academy-warning-text);
+}
+.academy-tint[data-tone="danger"] {
+  background: var(--status-danger-bg);
+  color: var(--academy-danger-text);
+}
+.academy-tint[data-tone="info"] {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--academy-info-text);
+}
+
+.academy-progress-fill {
+  background: var(--brand-accent);
+}
+.academy-progress-fill[data-tone="success"] {
+  background: var(--status-success);
+}
+.academy-progress-fill[data-tone="info"] {
+  background: var(--academy-info);
+}
+.academy-progress-fill[data-tone="warning"] {
+  background: var(--status-warning);
+}
+.academy-progress-fill[data-tone="danger"] {
+  background: var(--status-danger);
+}
+
+.academy-sidebar {
+  background: var(--academy-navy);
+  color: var(--academy-nav-fg);
+}
+.academy-nav-item {
+  transition:
+    background var(--motion-duration) var(--motion-easing),
+    color var(--motion-duration) var(--motion-easing);
+}
+.academy-nav-item[data-active="true"] {
+  background: var(--brand-accent);
+  color: var(--academy-nav-fg-strong);
+  box-shadow: var(--shadow-glow-accent);
+}
+.academy-nav-item[data-active="false"][data-disabled="false"]:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--academy-nav-fg-strong);
+}
+.academy-nav-item[data-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.academy-sidebar :focus-visible {
+  outline: 2px solid var(--academy-gold);
+  outline-offset: 2px;
+}
+
 /* Ambient background wash (§2 / §7.1) — one persistent instance in the root
    layout, never regenerated per route. */
 .ambient-wash {

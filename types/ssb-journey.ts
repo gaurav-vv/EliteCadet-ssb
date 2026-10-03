@@ -65,6 +65,18 @@ export interface McqItem {
   correctOptionId: string;
 }
 
+/** Preparation advice for one question — never a selection prediction (AGENTS.md §11). */
+export interface QuestionGuidance {
+  /** One line: what the assessor is actually checking with this question. */
+  assesses: string;
+  tips: string[];
+}
+
+/** A free-text bank item that may carry per-question guidance (interview/conference). */
+export interface GuidedPracticeItem extends PracticeItem {
+  guidance?: QuestionGuidance;
+}
+
 export interface SsbReadingContent {
   body: string;
   articles?: { title: string; body: string }[];
@@ -81,7 +93,9 @@ export interface SsbModuleDetail extends SsbModuleSummary {
   reading?: SsbReadingContent;
   info?: SsbInfoContent;
   mcqItems?: McqItem[];
-  responseItems?: PracticeItem[];
+  responseItems?: GuidedPracticeItem[];
+  /** Free-text practice banks only: checklist the student ticks after answering each question. */
+  selfReview?: string[];
   /** Only set for the one response-kind test module (PPDT) — every other response test reuses an existing dedicated route via `href` instead. */
   carouselTiming?: CarouselTiming;
   /** A short "why this matters" line shown above bank/checklist/summary content — the equivalent of reading/info's `overview` for module kinds that otherwise jump straight into the interactive UI. */

@@ -4,7 +4,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const LOCAL_KEYS = ["ssb-onboarding-draft", "ssb-onboarding-complete", "ssb-student-profile", "ssb-resources-read"];
+const LOCAL_KEYS = [
+  "ssb-onboarding-draft",
+  "ssb-onboarding-complete",
+  "ssb-student-profile",
+  "ssb-resources-read",
+  "ssb-practice-answers",
+  "ssb-interview-piq",
+  "ssb-mock-attempt-interview",
+  "ssb-mock-attempt-conference",
+];
 
 export function ResetLocalData() {
   const [message, setMessage] = useState<string | null>(null);

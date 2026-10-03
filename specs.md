@@ -303,6 +303,48 @@ length (never an invented figure matching the reference product's marketing numb
 - Progress percentages/counts always equal real completed-item counts over real content-array length.
 - Existing Psychology/Interview routes and their behavior from §6.4/§6.5 are unchanged.
 
+### 6.4b Interview & Conference practice depth (T039b — 2026-09-24)
+
+Requested by the user 2026-09-24 for both Day 4's Personal Interview and Day 5's Conference.
+
+```text
+Interview (Day 4)   Practice questions · My PIQ questions · Mock interview
+Conference (Day 5)  Conference Questions (practice) · Mock Conference
+```
+
+- **Saved answers.** Every free-text practice bank (not only interview/conference) keeps what the
+  student typed per question, restores it when they come back, and never clears it on Next/Previous.
+- **Guidance per question.** Interview and conference questions carry an optional "what assessors
+  look for" line plus 2–3 tips, and the bank shows a short self-review checklist the student ticks
+  after answering (stored with the answer). Guidance is preparation advice, never a selection
+  prediction (AGENTS.md §11).
+- **PIQ-based questions (interview only).** The student fills a short PIQ-style form (hometown,
+  education, favourite subject, sports, hobbies, activities, achievements, previous SSB attempts; all
+  optional, at least one required). Questions are generated from fixed templates, with no AI and no
+  network call, and practised like any other bank. The conference is about the week's performance, so
+  it has no PIQ questions.
+- **Mock mode.** A timed run, one question at a time with a per-question countdown and a manual
+  "Next question" button, followed by a review screen (question, answer, guidance, self-review).
+  Interview: 8 questions, 2 min each, starting with "Tell us about yourself", up to 3 of them from the
+  student's PIQ. Conference: 4 questions, 1 min each. These are **practice pacing values, not
+  official SSB timings**. The latest attempt per mock is kept for review. Leaving mid-mock warns
+  first.
+- **Storage.** Answers, PIQ and mock attempts are per-browser (localStorage) until the practice
+  backend exists, the same pattern and known gap as §6.4a progress.
+- **Progress totals.** Generated PIQ questions are not counted in the 5-day journey's progress
+  totals, because those totals come only from the fixed content banks.
+
+**Acceptance:**
+- Typing an answer, moving to another question, and coming back (or reloading) shows the same text.
+- Every interview and conference question shows its guidance; self-review ticks persist per answer.
+- Saving a PIQ with at least one field shows questions that quote what the student entered; saving
+  an empty PIQ shows a validation error instead.
+- A mock can be finished early question by question or by letting timers run out; either way the
+  review screen shows every question with its answer or "No answer".
+- Routes: `/student/practice/interview`, `/student/practice/interview/piq`,
+  `/student/practice/interview/mock`, `/student/practice/conference/mock`. Day 5's Mock Conference
+  card links to the latter.
+
 ### 6.5 Practice submission
 
 Requirements: response validation · submission state · duplicate-submission prevention · network

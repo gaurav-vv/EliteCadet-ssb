@@ -281,6 +281,14 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-20 | The 5-Day SSB Mission programme, deferred (P1) since 2026-09-16, is **un-deferred and built as T039 "5-Day SSB Practice Journey"** | Explicit user direction, referencing Target SSB (targetssb.in) as functional/structural inspiration (content and information architecture only — the existing Apple-Inspired Glass UI v3 design system governs the actual UI, per user instruction to fix visual consistency later). `specs.md` §3/§6.4a/§13 updated to record the reversal rather than silently ignoring the prior deferred status |
 | 2026-09-20 | T039's practice-mode banks track per-item completion under `(dayId, moduleId, itemId)` in a new `ssb-journey-progress` localStorage key; test-mode banks (single timed submission) are deliberately excluded from that tracking and from all progress totals | A test is pass/fail-once, not incrementally completable — including its items in a "done" count would permanently dilute the percentage with items that can never individually be marked done. Found and fixed during manual verification: an earlier version wrongly used "has an `href`" as the exclusion signal instead of "is test-mode", which incorrectly excluded Personal Interview (a practice-mode bank that happens to link to an existing route) from Day 4's progress entirely |
 | 2026-09-20 | Client components deriving from `ssb-journey-progress` (the progress ring, module badges, the final summary, the self-assessment checklist, the bank practice runner) all initialize state to the SSR-safe default and populate the real value in a post-mount `useEffect`, with a targeted `eslint-disable-next-line react-hooks/set-state-in-effect` on each — not a `useState` lazy initializer | A lazy initializer still re-runs during the client's hydration render, which happens *before* React finishes reconciling against the server HTML — so it reads real localStorage data at exactly the moment hydration is comparing text content, producing React error #418 the first time any progress exists. Confirmed via a full Playwright-driven signup-to-final-progress walkthrough in a production build; the bug reproduced consistently and was fixed by moving each read into `useEffect`, matching the pattern eslint's own rule description recommends ("subscribe for updates from external system, calling setState in a callback") |
+| 2026-09-21 | Merged `origin/main` (PR #1, T066 critical test suite) into `feat/5-day-ssb-practice-journey`. `status.md` conflicted in two places — the §1 state-summary table (`Tests`/`Next action` rows) and the §13a dated log (both branches appended an entry under the same `Date: 2026-09-20` line). Resolved by **union, not override**: both branches' facts are true simultaneously (T039 shipped *and* a real test suite now exists), so nothing was discarded. The log's two same-day entries were split into separate `Date:` blocks and ordered T039 → T066 → T039 follow-up (2026-09-21) to keep it chronological. `task.md` merged automatically with no conflict | Per `AGENTS.md` §0/§20: status.md is a reporting file, never a source of requirements, and must reflect exact current state — picking one branch's version would have silently deleted verified facts from the other. Recorded here per §0's instruction to log conflict resolutions in the Decisions Register |
+| 2026-09-21 | Landing page's role "Preview" links, removed 2026-09-19 when real auth shipped, were **restored in a different form**: `/dev-preview/[role]` (`app/dev-preview/[role]/route.ts`, `lib/auth/dev-preview.ts`) signs in as a seeded demo account per role via real Supabase auth, rather than bypassing auth. Hard-gated on `NODE_ENV !== "production"` (route 404s and the landing-page links don't render otherwise) | Real auth + middleware (T013/T014) turned the old no-login preview links into dead links (they'd just bounce to `/login`), which made repeated manual role-testing slow. A real seeded session (not a bypass) means every downstream authorization/RLS check still runs exactly as it does for a real user, so this cannot mask an authorization bug the way a client-side bypass would |
+| 2026-09-21 | Fixed `app/auth/callback/route.ts` to also handle Supabase's `token_hash`+`type` email-link format, not only the PKCE `code` format | Server-initiated email links (mentor invites, password resets) have no browser-held PKCE verifier to exchange, so Supabase issues them as `token_hash`+`type` instead of `code` — the callback only handled `code`, so every invite/reset link landed on "link invalid or expired" (first surfaced as bug S49, 2026-09-19). `redirectTo` was also pointed at the final destination directly, to match the `token_hash` email template variable. Affects `lib/actions/academy.ts` (mentor invite) and `lib/api/auth.ts` (password reset) |
+| 2026-09-22 | Merged `origin/main` (PR #2, `feat/5-day-ssb-practice-journey` — T039 content-depth follow-up, already covered above) into local `main`, alongside the two local-only commits above (dev-preview restore, auth-callback token_hash fix). No file overlap between the two sides, so `git merge` produced a clean merge with zero conflicts; `npm run build` verified clean afterward | Routine sync — local `main` and `origin/main` had diverged (2 local commits, 4 remote commits) since the previous merge on 2026-09-21 |
+| 2026-09-24 | **Academy section gets its own design language** (dark navy sidebar, white cards, indigo primary, restrained gold brand accent), scoped to a `.academy-app` wrapper in `app/globals.css`. Explicit, user-approved scoped deviation from the Glass UI v3 *material* in `AGENTS.md` §7 — `AGENTS.md` itself is unchanged. Student/Mentor keep Glass UI v3 and `components/layout/*`. Inside `.academy-app`, `.glass-*` classes resolve to solid white hairline-bordered cards (no backdrop blur), so existing shared components render consistently | Product still in early design phase; reference dashboard supplied as the primary visual direction. Scoping avoids a half-migrated app and leaves a single place to promote the tokens to `:root` when Student/Mentor adopt them |
+| 2026-09-24 | Academy dashboard keeps its existing data contract (`getDashboardData`/`getStudents`/`getMentors` in `lib/api/academy.ts`, backed by in-memory `lib/mock/academy.ts`). **Correction to the brief:** this data is the isolated pre-backend mock, not Supabase — only auth/profile/academy name come from Supabase. Widgets with no data source (performance trend line, assessment radar, upcoming sessions, KPI month-over-month deltas) were deliberately **not built** rather than fabricated (`AGENTS.md` §8) | The existing contract has no time series, assessment-category or session-schedule data. Adding them is an API-contract change that needs approval (§19) |
+| 2026-10-03 | Supersedes the 2026-09-24 "not built" note: at user request the dashboard now matches the reference layout, and the trend line, assessment radar and upcoming sessions **are built**, fed by `getAnalytics()` → isolated `lib/mock/academy-analytics.ts` with `source: "demo"`. Each such panel shows a visible "Demo data" badge. The reference's "Activity Completion" KPI is shown as the real "Active Students" share; "Avg. Performance" is the real average readiness % | `AGENTS.md` §8 allows isolated, clearly-labelled mock data shaped like the API response while the backend is missing. `source` lets the UI drop the badge automatically once real tables exist |
+| 2026-10-04 | **Batches are the first Academy domain on real Supabase.** New migration `supabase/migrations/0003_batches.sql` (table `batches`: academy_id, name, mentor_id → profiles, status enum active/archived, start_date, created_at; unique name per academy; RLS for the academy admin; `current_admin_academy_id()` / `mentor_in_academy()` helpers; a new `profiles_select_academy_admin` policy so admins can read their academy's mentors). Reads/writes use the admin's own session (anon key + RLS), never the service-role key. **No delete policy:** batches are archived, so future student→batch links can't be orphaned. The Batches page no longer shares data with the dashboard/Students/batch-detail pages, which still read the in-memory batches (`lib/mock/academy.ts`) until students move to Postgres | User chose "write the migration, then build on it". Student counts are intentionally not shown: there is no `students` table, and the in-memory students reference in-memory batch ids, so any count would be fake |
 
 ---
 
@@ -1262,6 +1270,93 @@ Blocker:
 
 Next task:
 - Push and verify CI; then decide on seeded e2e accounts.
+
+Date: 2026-09-24
+Task: T073 — Academy shell + dashboard redesign
+Status: Complete — awaiting user review (UNVERIFIED only for logged-in flow, see below)
+
+What changed:
+- New reusable Academy shell: `components/academy/layout/` (AcademyLayout, AcademyBrand, AcademyNavigation, AcademySidebarFooter, AcademyHeader, AcademyMobileNav); nav is config-driven (`lib/academy/navigation.ts`, unbuilt sections render disabled with a "Soon" tag). Desktop sidebar → icon rail on tablet → drawer on mobile
+- Shared Academy components: `components/academy/shared/` (MetricCard, SectionHeader, StatusBadge, ProgressBar, ChartCard, DataTable, ActivityItem, QuickAction); EmptyState/LoadingState/ErrorState reused from `components/ui`
+- Dashboard (`components/academy/dashboard/`) rebuilt over the existing data via `lib/academy/dashboard-view.ts`; Recharts added for the batch-readiness bar chart; `app/academy/loading.tsx` added
+- Scoped `.academy-app` tokens in `app/globals.css`; 7 icon keys added to `components/ui/nav-icons.tsx`
+- Verified: typecheck, eslint, 78 unit tests, `next build`; rendered in headless Chromium at 1440/820/390 px and 1440x640 — no horizontal overflow, no console errors, mobile drawer opens
+
+What remains:
+- Logged-in verification: `/dev-preview/academy_admin` needs `SUPABASE_SERVICE_ROLE_KEY` (not in `.env.local`), so the real `/academy` route was not exercised end to end; rendering was checked through a temporary harness route that was then deleted
+- Existing Academy sub-pages (students, batches, mentors, reports, settings) pick up the new shell and white-card materials but were not visually reviewed
+- Trend/radar/sessions widgets need data-contract approval first
+
+Blocker:
+- None
+
+Next task:
+- User review of the dashboard; no further Academy feature until approved
+
+Date: 2026-10-03
+Task: T073 — Academy dashboard rebuilt to match the reference layout
+Status: Complete — awaiting user review
+
+What changed:
+- Layout now follows the reference: greeting + hero banner, 5 KPI cards, [performance line chart | assessment radar | today's tasks], [recent activity | batch performance | upcoming sessions], 5 quick actions
+- Bar chart replaced by `StudentPerformanceChart` (Recharts line chart, 3 series with distinct dash patterns, 3/6-month range) and `AssessmentRadar` (academy average vs benchmark)
+- New typed contract `AcademyAnalytics` (types/academy.ts) + `getAnalytics()` (lib/api/academy.ts), demo-backed by `lib/mock/academy-analytics.ts`; panels show "Demo data" while `source === "demo"`
+- Today's Tasks now also derives "Sessions this week" and "Low performance alert" (<60% readiness) from existing data
+- New shared pieces: IconTile, DemoBadge; ChartCard/SectionHeader gained `headerExtra`/`badge` slots
+
+What remains:
+- Backend tables for real analytics: monthly assessment scores by test type, per-skill rubric averages + benchmark, a sessions schedule
+- Logged-in verification (still needs `SUPABASE_SERVICE_ROLE_KEY` for `/dev-preview`)
+
+Blocker:
+- None for the UI; real analytics blocked on the data model above
+
+Next task:
+- User review; no further Academy feature until approved
+
+Date: 2026-10-04
+Task: T074 — Academy Students management page
+Status: Complete — awaiting user review
+
+What changed:
+- `/academy/students` rebuilt: KPI row (also quick filters), search + status/batch/mentor/performance filters + sort, responsive table (cards on phones), paginated (20/page), row actions menu, Add Student dialog with validation + toast
+- Filtering is server-side and URL-driven (`?q=&status=&batch=&mentor=&performance=&sort=&page=`) via the pure `lib/academy/student-list.ts` (parse → join → filter → sort → paginate); the same params become WHERE/ORDER BY/range when students move to Postgres
+- Row actions limited to what the backend supports: view, change batch (mentor follows batch), mark active/inactive. "Edit student" and "Assign mentor" deliberately not shown (no update-name action; mentor is derived from the batch)
+- Removed the old inline `add-student-form.tsx` (replaced by the dialog)
+- Tests: `tests/unit/lib/academy-student-list.test.ts` (10 tests); typecheck, lint, 90 unit tests pass; browser-verified search, combined filters, clear, add (validation, duplicate, success), change batch, mark inactive, empty and no-results states, no overflow at 390/820/1100/1440
+
+What remains:
+- Students are NOT in Supabase (schema has only `academies` and `profiles`); data is the in-memory layer in `lib/mock/academy.ts`. A `students` table (+ email/created_at) is needed for real persistence, "Recently added" (currently insertion order) and Add-by-email
+- Logged-in verification of the real `/academy/students` route (needs `SUPABASE_SERVICE_ROLE_KEY` for `/dev-preview`); verified through a temporary harness page, since deleted
+
+Blocker:
+- None for the UI
+
+Next task:
+- User review; Batches MVP blocked on a data-model decision (see Decisions Register)
+
+Date: 2026-10-04
+Task: T075 — Academy Batches management (Supabase-backed)
+Status: Complete in code and tests — NOT yet run against a live database (migration must be applied first)
+
+What changed:
+- Migration `supabase/migrations/0003_batches.sql` (see Decisions Register)
+- `/academy/batches` rebuilt: summary cards (total / active / without mentor, from COUNT queries), search + mentor + status filters + sort, server-side pagination (20/page, range queries), responsive table → cards, row menu (edit, assign/change mentor, archive/restore with confirmation), Create Batch dialog (name, mentor, start date), loading skeleton, empty / no-results / error (with retry and "run the migration" guidance) states
+- Data layer: `lib/api/batches.ts` (reads, boundary-validated rows), `lib/actions/batches.ts` (create/update/mentor/status; admin check + server validation + RLS; success only after Postgres confirms), pure helpers `lib/academy/batch-validation.ts` and `batch-list.ts`
+- New shared pieces: `useUrlFilters` hook, SearchField, FilterSelect, Pagination, RetryErrorState (Students keeps its own copies; it can adopt these later)
+- Removed the old inline `create-batch-form.tsx`
+- Tests: 26 new unit tests (validation, URL params, and the server actions/queries against a mocked Supabase client asserting the exact filters, scoping and writes); UI verified in a browser through a temporary harness (no real session)
+
+What remains:
+- Apply 0003 in the Supabase SQL Editor, then test end to end as a real academy admin (see checklist in the hand-off)
+- Student counts per batch and student-based summary cards need a `students` table with `batch_id`
+- Batch detail page, delete (deliberately omitted), Students/Dashboard still on in-memory batches
+
+Blocker:
+- Needs the migration applied and a signed-in academy admin to verify against live data
+
+Next task:
+- User review
 
 ## 14. North Star
 

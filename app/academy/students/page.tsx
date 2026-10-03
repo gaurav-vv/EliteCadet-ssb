@@ -1,56 +1,94 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SearchX, Users } from "lucide-react";
+import { AddStudentDialog } from "@/components/academy/students/add-student-dialog";
+import { Pagination } from "@/components/academy/shared/pagination";
+import { StudentStats } from "@/components/academy/students/student-stats";
+import { StudentTable } from "@/components/academy/students/student-table";
+import { StudentToolbar } from "@/components/academy/students/student-toolbar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { AddStudentForm } from "@/components/academy/add-student-form";
-import { getBatchName, getBatches, getMentorName, getStudents } from "@/lib/api/academy";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { getBatches, getDashboardData, getMentors, getStudents } from "@/lib/api/academy";
+import { buildStudentListHref, buildStudentRows, parseStudentListParams, queryStudents, summarizeStudents } from "@/lib/academy/student-list";
 
 export const metadata: Metadata = { title: "Students" };
 
-const STATUS_LABEL: Record<string, string> = { active: "Active", inactive: "Inactive" };
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = parseStudentListParams(await searchParams);
 
-function formatDate(iso: string | null) {
-  if (!iso) return "No activity yet";
-  return `Active ${new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
-}
+  // Independent reads in parallel. The dashboard read supplies the existing
+  // "needs attention" rule so both pages agree on who is flagged.
+  const [studentsResult, batchesResult, mentorsResult, dashboardResult] = await Promise.all([
+    getStudents(),
+    getBatches(),
+    getMentors(),
+    getDashboardData(),
+  ]);
 
-export default async function StudentsPage() {
-  const [studentsResult, batchesResult] = await Promise.all([getStudents(), getBatches()]);
-  const students = studentsResult.data ?? [];
-  const batches = batchesResult.data ?? [];
+  if (!studentsResult.data || !batchesResult.data || !mentorsResult.data || !dashboardResult.data) {
+    return <ErrorState message="We couldn't load your students. Please refresh the page to try again." />;
+  }
+
+  const batches = batchesResult.data.map(({ id, name }) => ({ id, name }));
+  const mentors = mentorsResult.data.map((m) => ({ id: m.id, name: m.fullName }));
+
+  const allRows = buildStudentRows(studentsResult.data, batchesResult.data, mentorsResult.data, dashboardResult.data.attentionStudents);
+  const summary = summarizeStudents(allRows);
+  const result = queryStudents(allRows, params);
 
   return (
-    <div className="flex flex-col gap-6 pb-10">
-      <div>
-        <h1 className="text-[28px] font-bold text-ink">Students</h1>
-        <p className="text-sm text-ink-secondary">{students.length} students across your academy.</p>
-      </div>
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <PageHeader
+        title="Students"
+        subtitle="Manage students, batches, performance and activity."
+        primaryAction={<AddStudentDialog batches={batches} />}
+      />
 
-      <AddStudentForm batches={batches.map(({ id, name }) => ({ id, name }))} />
+      <StudentStats summary={summary} />
 
-      {students.length === 0 ? (
-        <EmptyState title="No students yet" description="Add your first student above." />
+      {allRows.length === 0 ? (
+        <div className="glass-regular rounded-card">
+          <EmptyState
+            icon={<Users aria-hidden="true" size={22} />}
+            title="No students yet"
+            description="Add your first student to start tracking their preparation."
+            action={<AddStudentDialog batches={batches} variant="inline" />}
+          />
+        </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {students.map((student) => (
-            <li key={student.id}>
-              <Link
-                href={`/academy/students/${student.id}`}
-                className="glass-regular flex flex-col gap-1 px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01] sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-sm font-medium text-ink">{student.fullName}</p>
-                  <p className="text-xs text-ink-secondary">
-                    {getBatchName(student.batchId)} · {getMentorName(student.mentorId)} · {formatDate(student.lastActivityAt)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-ink">{student.readiness ?? "—"}</span>
-                  <span className="text-xs text-ink-secondary">{STATUS_LABEL[student.status]}</span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <section aria-label="Student list" className="flex flex-col gap-4">
+          <StudentToolbar params={params} batches={batches} mentors={mentors} />
+
+          <div className="glass-regular rounded-card p-2 sm:p-4">
+            {result.total === 0 ? (
+              <EmptyState
+                icon={<SearchX aria-hidden="true" size={22} />}
+                title="No students match your filters"
+                description="Try a different search or clear the filters."
+                action={
+                  <Link href="/academy/students" className="text-[13px] font-medium text-brand-accent hover:underline">
+                    Clear filters
+                  </Link>
+                }
+              />
+            ) : (
+              <StudentTable rows={result.rows} batches={batches} />
+            )}
+            <Pagination
+              page={result.page}
+              pageCount={result.pageCount}
+              pageSize={result.pageSize}
+              total={result.total}
+              buildHref={(page) => buildStudentListHref({ ...params, page })}
+              noun={{ one: "student", many: "students" }}
+            />
+          </div>
+        </section>
       )}
     </div>
   );
