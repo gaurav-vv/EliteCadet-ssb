@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/layout/app-shell";
 import type { SidebarNavItem } from "@/components/layout/sidebar";
+import { StudentShell } from "@/components/student/student-shell";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
 
 const NAV_ITEMS: SidebarNavItem[] = [
@@ -14,14 +14,8 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const { profile } = await getCurrentUserAndProfile();
 
   return (
-    <AppShell
-      roleLabel="Student"
-      items={NAV_ITEMS}
-      searchPlaceholder="Search practice, resources…"
-      userName={profile?.fullName || "Student"}
-      profileHref="/student/profile"
-    >
+    <StudentShell items={NAV_ITEMS} userName={profile?.fullName || "Student"} profileHref="/student/profile">
       {children}
-    </AppShell>
+    </StudentShell>
   );
 }
