@@ -192,7 +192,7 @@ describe("getBatchList", () => {
 });
 
 describe("getBatchSummary", () => {
-  it("derives the three counts from three head-only count queries", async () => {
+  it("derives the three counts from three count queries (GET, so errors are not swallowed)", async () => {
     queue({ count: 7, error: null });
     queue({ count: 5, error: null });
     queue({ count: 2, error: null });

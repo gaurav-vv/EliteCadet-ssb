@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
+import { EditStudentDialog } from "@/components/academy/students/student-form-dialog";
 import { Toast } from "@/components/academy/shared/toast";
 import {
   DropdownMenu,
@@ -17,50 +18,54 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { assignStudentBatchAction, setStudentStatusAction } from "@/lib/actions/academy";
-import type { StudentRow } from "@/types/academy";
-
-interface StudentRowActionsProps {
-  student: StudentRow;
-  batches: { id: string; name: string }[];
-}
+import { setStudentBatchAction, setStudentStatusAction, type StudentActionResult } from "@/lib/actions/students";
+import type { StudentBatchOption, StudentRecord } from "@/types/academy";
 
 const TOAST_MS = 4000;
 
-// Only actions the backend supports today: open the student, change their
-// batch (their mentor follows the batch), and mark active/inactive.
+interface StudentRowActionsProps {
+  student: StudentRecord;
+  batches: StudentBatchOption[];
+}
+
+// Every item is wired to a real mutation: view, edit, change batch, set status.
+// (No delete: students are marked inactive so their history can never be orphaned.)
 export function StudentRowActions({ student, batches }: StudentRowActionsProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  function notify(message: string, tone: "success" | "error") {
+  function notify(message: string, tone: "success" | "error" = "success") {
     setToast({ message, tone });
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setToast(null), TOAST_MS);
   }
 
-  async function run(action: () => Promise<{ ok: boolean; error?: { message: string } }>, success: string) {
+  async function run(action: () => Promise<StudentActionResult>, success: string) {
     setPending(true);
+    let message: string | null = null;
     try {
       const result = await action();
-      if (!result.ok) {
-        notify(result.error?.message ?? "That didn't work. Please try again.", "error");
-        return;
-      }
-      notify(success, "success");
-      router.refresh();
+      if (!result.ok) message = result.error?.message ?? "That didn't work. Please try again.";
     } catch {
-      notify("We couldn't reach the server. Please try again.", "error");
+      message = "We couldn't reach the server. Please try again.";
     } finally {
       setPending(false);
     }
+    if (message) {
+      notify(message, "error");
+      return;
+    }
+    notify(success);
+    router.refresh();
   }
 
-  const markInactive = student.status !== "inactive";
+  const inactive = student.status === "inactive";
+  const assignable = batches.filter((b) => b.status === "active" || b.id === student.batchId);
 
   return (
     <>
@@ -79,6 +84,7 @@ export function StudentRowActions({ student, batches }: StudentRowActionsProps) 
           <DropdownMenuItem asChild>
             <Link href={`/academy/students/${student.id}`}>View student</Link>
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setEditOpen(true)}>Edit student</DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Change batch</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
@@ -87,13 +93,13 @@ export function StudentRowActions({ student, batches }: StudentRowActionsProps) 
                 onValueChange={(value) => {
                   const next = value === "none" ? null : value;
                   const label = next ? (batches.find((b) => b.id === next)?.name ?? "the batch") : "No batch";
-                  void run(() => assignStudentBatchAction(student.id, next), `${student.fullName} moved to ${label}.`);
+                  void run(() => setStudentBatchAction(student.id, next), `${student.fullName} moved to ${label}.`);
                 }}
               >
                 <DropdownMenuRadioItem value="none">No batch</DropdownMenuRadioItem>
-                {batches.map((batch) => (
-                  <DropdownMenuRadioItem key={batch.id} value={batch.id}>
-                    {batch.name}
+                {assignable.map((b) => (
+                  <DropdownMenuRadioItem key={b.id} value={b.id}>
+                    {b.status === "archived" ? `${b.name} (archived)` : b.name}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -103,15 +109,17 @@ export function StudentRowActions({ student, batches }: StudentRowActionsProps) 
           <DropdownMenuItem
             onSelect={() =>
               void run(
-                () => setStudentStatusAction(student.id, markInactive ? "inactive" : "active"),
-                `${student.fullName} marked ${markInactive ? "inactive" : "active"}.`,
+                () => setStudentStatusAction(student.id, inactive ? "active" : "inactive"),
+                `${student.fullName} marked ${inactive ? "active" : "inactive"}.`,
               )
             }
           >
-            {markInactive ? "Mark inactive" : "Mark active"}
+            {inactive ? "Mark active" : "Mark inactive"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <EditStudentDialog student={student} batches={batches} open={editOpen} onOpenChange={setEditOpen} onSaved={(m) => notify(m)} />
       {toast && <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />}
     </>
   );

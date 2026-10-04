@@ -16,12 +16,14 @@ interface AcademyDashboardProps {
   analytics: AcademyAnalytics;
   view: DashboardViewModel;
   adminFirstName: string;
+  // Real student total (academy_students); null when it could not be loaded.
+  studentCount: number | null;
 }
 
 // Layout only: every section is its own component and receives plain data, so
 // each can later be fed from a real query (or wrapped in Suspense) on its own.
-export function AcademyDashboard({ data, analytics, view, adminFirstName }: AcademyDashboardProps) {
-  const isEmpty = data.totalStudents === 0 && data.totalMentors === 0 && data.activeBatches === 0;
+export function AcademyDashboard({ data, analytics, view, adminFirstName, studentCount }: AcademyDashboardProps) {
+  const isEmpty = studentCount === 0 && data.totalMentors === 0 && data.activeBatches === 0;
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">

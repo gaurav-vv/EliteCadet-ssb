@@ -16,16 +16,25 @@ function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-function buildMetrics(data: AcademyDashboardData, students: AcademyStudent[], mentors: AcademyMentor[]): DashboardMetric[] {
-  const activeStudents = students.filter((s) => s.status === "active").length;
+// Real student counts from Postgres (academy_students); null when the read failed.
+export interface StudentCounts {
+  total: number;
+  active: number;
+}
+
+function buildMetrics(
+  data: AcademyDashboardData,
+  mentors: AcademyMentor[],
+  counts: StudentCounts | null,
+): DashboardMetric[] {
   const pendingInvites = mentors.filter((m) => m.status === "invited").length;
 
   return [
     {
       id: "students",
       label: "Total Students",
-      value: String(data.totalStudents),
-      detail: data.totalStudents === 0 ? "No students yet" : "Enrolled",
+      value: counts ? String(counts.total) : "—",
+      detail: !counts ? "Couldn't load" : counts.total === 0 ? "No students yet" : "Enrolled",
       icon: "students",
       tone: "indigo",
       href: "/academy/students",
@@ -59,8 +68,8 @@ function buildMetrics(data: AcademyDashboardData, students: AcademyStudent[], me
     {
       id: "active-students",
       label: "Active Students",
-      value: data.totalStudents === 0 ? "—" : `${Math.round((activeStudents / data.totalStudents) * 100)}%`,
-      detail: data.totalStudents === 0 ? "No students yet" : `${activeStudents} of ${data.totalStudents} active`,
+      value: !counts || counts.total === 0 ? "—" : `${Math.round((counts.active / counts.total) * 100)}%`,
+      detail: !counts ? "Couldn't load" : counts.total === 0 ? "No students yet" : `${counts.active} of ${counts.total} active`,
       icon: "activeStudents",
       tone: "success",
       href: "/academy/students",
@@ -171,9 +180,10 @@ export function buildDashboardViewModel(
   data: AcademyDashboardData,
   students: AcademyStudent[],
   mentors: AcademyMentor[],
+  studentCounts: StudentCounts | null,
 ): DashboardViewModel {
   return {
-    metrics: buildMetrics(data, students, mentors),
+    metrics: buildMetrics(data, mentors, studentCounts),
     tasks: buildTasks(data, students, mentors),
     activity: buildActivity(students),
   };

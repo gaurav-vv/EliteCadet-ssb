@@ -162,48 +162,42 @@ export interface AcademyAnalytics {
   upcomingSessions: UpcomingSession[];
 }
 
-// ---- Students list (lib/academy/student-list.ts) ----
+// ---- Academy students (Supabase: public.academy_students) ----
 
-// A student's displayed state, derived from real fields only:
-//  - "inactive":  status === "inactive"
-//  - "attention": active, but flagged by the existing attention rules
-//                 (no practice since joining, or no activity for 4+ days)
-//  - "active":    everything else
-export type StudentDisplayStatus = "active" | "inactive" | "attention";
-
-export interface StudentRow {
+// `StudentStatus` ("active" | "inactive") above is the existing convention and
+// matches the academy_student_status enum in the database.
+export interface StudentRecord {
   id: string;
   fullName: string;
-  initials: string;
+  status: StudentStatus;
   batchId: string | null;
+  // Joined from batches; null when the student has no batch.
   batchName: string | null;
-  mentorId: string | null;
-  mentorName: string | null;
-  // 0–100, or null when the student has not been assessed yet (never invented).
-  readiness: number | null;
-  lastActivityAt: string | null;
-  status: StudentDisplayStatus;
-  // Why the student needs attention (existing rule); null otherwise.
-  attentionReason: string | null;
+  createdAt: string;
 }
 
-export type StudentStatusFilter = StudentDisplayStatus | "all";
-export type StudentPerformanceFilter = "below60" | "60to79" | "80plus" | "unassessed" | "all";
-export type StudentSort = "name" | "recent" | "performance" | "activity";
+// A batch the admin can pick for a student (all of the academy's batches; only
+// active ones can receive students).
+export interface StudentBatchOption {
+  id: string;
+  name: string;
+  status: BatchStatus;
+}
+
+export type StudentStatusFilter = StudentStatus | "all";
+export type StudentSort = "name" | "newest" | "oldest";
 
 export interface StudentListParams {
   q: string;
   status: StudentStatusFilter;
-  // "all" = no filter, "none" = unassigned, otherwise an id.
+  // "all" = any batch, "none" = no batch, otherwise a batch id.
   batch: string;
-  mentor: string;
-  performance: StudentPerformanceFilter;
   sort: StudentSort;
   page: number;
 }
 
 export interface StudentListResult {
-  rows: StudentRow[];
+  rows: StudentRecord[];
   total: number;
   page: number;
   pageCount: number;
@@ -214,7 +208,13 @@ export interface StudentSummary {
   total: number;
   active: number;
   withoutBatch: number;
-  needingAttention: number;
+}
+
+// What the add/edit form submits (validated by lib/academy/student-validation.ts).
+export interface StudentFormInput {
+  fullName: string;
+  batchId: string | null;
+  status: StudentStatus;
 }
 
 // ---- Batches management (Supabase-backed: supabase/migrations/0003_batches.sql) ----

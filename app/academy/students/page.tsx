@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SearchX, Users } from "lucide-react";
-import { AddStudentDialog } from "@/components/academy/students/add-student-dialog";
 import { Pagination } from "@/components/academy/shared/pagination";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
+import { AddStudentDialog } from "@/components/academy/students/student-form-dialog";
 import { StudentStats } from "@/components/academy/students/student-stats";
 import { StudentTable } from "@/components/academy/students/student-table";
 import { StudentToolbar } from "@/components/academy/students/student-toolbar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
-import { getBatches, getDashboardData, getMentors, getStudents } from "@/lib/api/academy";
-import { buildStudentListHref, buildStudentRows, parseStudentListParams, queryStudents, summarizeStudents } from "@/lib/academy/student-list";
+import { getStudentBatchOptions, getStudentList, getStudentSummary } from "@/lib/api/students";
+import { buildStudentListHref, parseStudentListParams } from "@/lib/academy/student-list";
 
 export const metadata: Metadata = { title: "Students" };
+
+const SUBTITLE = "Manage students enrolled in your academy.";
 
 export default async function StudentsPage({
   searchParams,
@@ -21,48 +23,47 @@ export default async function StudentsPage({
 }) {
   const params = parseStudentListParams(await searchParams);
 
-  // Independent reads in parallel. The dashboard read supplies the existing
-  // "needs attention" rule so both pages agree on who is flagged.
-  const [studentsResult, batchesResult, mentorsResult, dashboardResult] = await Promise.all([
-    getStudents(),
-    getBatches(),
-    getMentors(),
-    getDashboardData(),
+  // Three independent reads (a page of students, whole-academy counts, batches),
+  // all real Postgres queries run in parallel.
+  const [listResult, summaryResult, batchesResult] = await Promise.all([
+    getStudentList(params),
+    getStudentSummary(),
+    getStudentBatchOptions(),
   ]);
 
-  if (!studentsResult.data || !batchesResult.data || !mentorsResult.data || !dashboardResult.data) {
-    return <ErrorState message="We couldn't load your students. Please refresh the page to try again." />;
+  // A failed read is shown as an error, never as an empty list.
+  const failure = [listResult, summaryResult, batchesResult].find((r) => !r.ok || !r.data)?.error;
+  if (failure || !listResult.data || !summaryResult.data || !batchesResult.data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="Students" subtitle={SUBTITLE} />
+        <RetryErrorState message={failure?.message ?? "We couldn't load your students. Please try again."} />
+      </div>
+    );
   }
 
-  const batches = batchesResult.data.map(({ id, name }) => ({ id, name }));
-  const mentors = mentorsResult.data.map((m) => ({ id: m.id, name: m.fullName }));
-
-  const allRows = buildStudentRows(studentsResult.data, batchesResult.data, mentorsResult.data, dashboardResult.data.attentionStudents);
-  const summary = summarizeStudents(allRows);
-  const result = queryStudents(allRows, params);
+  const result = listResult.data;
+  const summary = summaryResult.data;
+  const batches = batchesResult.data;
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <PageHeader
-        title="Students"
-        subtitle="Manage students, batches, performance and activity."
-        primaryAction={<AddStudentDialog batches={batches} />}
-      />
+      <PageHeader title="Students" subtitle={SUBTITLE} primaryAction={<AddStudentDialog batches={batches} />} />
 
       <StudentStats summary={summary} />
 
-      {allRows.length === 0 ? (
+      {summary.total === 0 ? (
         <div className="glass-regular rounded-card">
           <EmptyState
             icon={<Users aria-hidden="true" size={22} />}
-            title="No students yet"
+            title="Your academy has no students yet."
             description="Add your first student to start tracking their preparation."
             action={<AddStudentDialog batches={batches} variant="inline" />}
           />
         </div>
       ) : (
         <section aria-label="Student list" className="flex flex-col gap-4">
-          <StudentToolbar params={params} batches={batches} mentors={mentors} />
+          <StudentToolbar params={params} batches={batches} />
 
           <div className="glass-regular rounded-card p-2 sm:p-4">
             {result.total === 0 ? (

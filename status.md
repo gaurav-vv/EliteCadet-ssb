@@ -290,6 +290,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-03 | Supersedes the 2026-09-24 "not built" note: at user request the dashboard now matches the reference layout, and the trend line, assessment radar and upcoming sessions **are built**, fed by `getAnalytics()` → isolated `lib/mock/academy-analytics.ts` with `source: "demo"`. Each such panel shows a visible "Demo data" badge. The reference's "Activity Completion" KPI is shown as the real "Active Students" share; "Avg. Performance" is the real average readiness % | `AGENTS.md` §8 allows isolated, clearly-labelled mock data shaped like the API response while the backend is missing. `source` lets the UI drop the badge automatically once real tables exist |
 | 2026-10-04 | **Batches are the first Academy domain on real Supabase.** New migration `supabase/migrations/0003_batches.sql` (table `batches`: academy_id, name, mentor_id → profiles, status enum active/archived, start_date, created_at; unique name per academy; RLS for the academy admin; `current_admin_academy_id()` / `mentor_in_academy()` helpers; a new `profiles_select_academy_admin` policy so admins can read their academy's mentors). Reads/writes use the admin's own session (anon key + RLS), never the service-role key. **No delete policy:** batches are archived, so future student→batch links can't be orphaned. The Batches page no longer shares data with the dashboard/Students/batch-detail pages, which still read the in-memory batches (`lib/mock/academy.ts`) until students move to Postgres | User chose "write the migration, then build on it". Student counts are intentionally not shown: there is no `students` table, and the in-memory students reference in-memory batch ids, so any count would be fake |
 
+| 2026-10-06 | **Academy Students moves to real Supabase.** New migration `supabase/migrations/0004_academy_students.sql` (table `academy_students`: id, academy_id, batch_id, full_name, status, created_at, updated_at; **composite FK `(academy_id, batch_id)` -> `batches(academy_id, id)`** so a student can never point at another academy's batch; duplicate names allowed; no email/login; RLS for the academy admin only; column-level grants; no delete, students are marked inactive). The only touch to an existing table is a UNIQUE INDEX on `batches(academy_id, id)` (batches.id is already unique, so it cannot conflict). The old `supabase/proposed/0006_academy_students.sql` draft is superseded. Students list/detail/add/edit now read and write Postgres; the in-memory students remain only for the dashboard's non-count widgets, Reports and the old batch-detail page. Dashboard "Total/Active Students" now come from `academy_students` and show "—"/"Couldn't load" if the read fails | User's Phase 0 brief. Assistant has no SQL/DDL access to the shared project (no connection string, CLI or tool), so the migration is prepared and verified in code/tests but **must be applied by the user in the SQL Editor** |
 ---
 
 ## 9. Technical Debt
@@ -1357,6 +1358,29 @@ Blocker:
 
 Next task:
 - User review
+
+Date: 2026-10-06
+Task: T076 — Academy Students on real Supabase (Phase 0)
+Status: Code complete and unit-tested; BLOCKED on applying migration 0004 (user step), then live verification
+
+What changed:
+- Migration `0004_academy_students.sql` (prechecked, additive, transactional, rollback + verification SQL included) — NOT yet applied
+- `/academy/students` rebuilt on Postgres: summary counts, search, status and batch filters, sort (name/newest/oldest), server-side pagination, responsive table/cards; add/edit dialog (name, batch, status) with client + server validation; row actions (view, edit, change batch, mark active/inactive); real student detail page; loading/empty/error states
+- Data layer: `lib/api/students.ts` (reads), `lib/actions/students.ts` (writes; admin check, server validation, batch must be an active batch of the same academy, success only after Postgres confirms), `lib/academy/{admin-context,student-validation,student-list}.ts`; batches now reuse the shared admin-context helper
+- Bug fixed: count queries used `head: true`, which swallows PostgREST errors (a missing table looked like "0"); students and batches summaries now use a normal GET
+- Dashboard: Total/Active Students from `academy_students`; failure shows "—"/"Couldn't load"
+- Demo data: `supabase/seed/demo-academy-data.mjs` imports the old mock batches/students into the Preview Academy for integration testing (idempotent, `--dry-run`, `--remove --confirm`). 3 demo batches already seeded; students wait for the table
+- Verified: typecheck, lint, 149 unit tests (incl. mocked-Supabase tests of every action/query), production build; real-app browser check with the dev-preview session (error state, dashboard fallback, batches page, no overflow)
+
+What remains:
+- User applies `supabase/migrations/0004_academy_students.sql`, then `node supabase/seed/demo-academy-data.mjs`
+- Live verification: list/search/filter/create/edit/move/persist, RLS attempts, mobile with real rows
+
+Blocker:
+- Migration must be applied by the user (no DDL access from the assistant)
+
+Next task:
+- Live verification, then user commit/merge; Assessments after that
 
 ## 14. North Star
 

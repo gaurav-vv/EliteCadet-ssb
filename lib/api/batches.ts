@@ -4,7 +4,7 @@
 // key is never used. Mutations live in lib/actions/batches.ts.
 
 import { escapeLikePattern, BATCH_PAGE_SIZE } from "@/lib/academy/batch-list";
-import { getCurrentUserAndProfile } from "@/lib/auth/session";
+import { getAdminContext } from "@/lib/academy/admin-context";
 import { createClient } from "@/lib/supabase/server";
 import type {
   BatchListParams,
@@ -66,12 +66,6 @@ export function toBatchRecord(row: unknown): BatchRecord | null {
   };
 }
 
-async function getAdminContext(): Promise<{ academyId: string } | null> {
-  const { profile } = await getCurrentUserAndProfile();
-  if (!profile || profile.role !== "academy_admin" || !profile.academyId) return null;
-  return { academyId: profile.academyId };
-}
-
 const UNAUTHORIZED: BatchApiError = { code: "unauthorized", message: "You need to be signed in as an academy admin to view batches." };
 
 // Filtering, sorting and paging all happen in Postgres, so the page stays fast
@@ -118,14 +112,15 @@ export async function getBatchList(params: BatchListParams): Promise<BatchApiRes
   return { ok: true, data: { rows, total, page, pageCount, pageSize: BATCH_PAGE_SIZE } };
 }
 
-// Three COUNT queries (head-only: no rows transferred), always over the whole
-// academy regardless of the current filters.
+// Three COUNT queries, always over the whole academy regardless of the current
+// filters. Not `head: true`: a HEAD request swallows PostgREST errors, so a failed
+// count would be shown as zero.
 export async function getBatchSummary(): Promise<BatchApiResult<BatchSummary>> {
   const admin = await getAdminContext();
   if (!admin) return { ok: false, error: UNAUTHORIZED };
   const supabase = await createClient();
 
-  const base = () => supabase.from("batches").select("id", { count: "exact", head: true }).eq("academy_id", admin.academyId);
+  const base = () => supabase.from("batches").select("id", { count: "exact" }).eq("academy_id", admin.academyId).limit(1);
   const [all, active, noMentor] = await Promise.all([
     base(),
     base().eq("status", "active"),

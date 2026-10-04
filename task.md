@@ -548,6 +548,15 @@ regression" also needs a branch-protection rule requiring the CI checks on `main
 
 ---
 
+## T076 — Academy Students on real Supabase (Phase 0) — P0 — `[-]`
+**Why:** User request 2026-10-06: Academy Students must be real database records, not in-memory.
+**Acceptance:** `academy_students` exists with same-academy batch protection and RLS; Students list/search/filter/create/edit/batch-move work against Postgres and persist; loading/empty/error states; validation; responsive; dashboard counts real; lint/typecheck/tests pass; live verification passes.
+**Status:** code + tests done; migration `0004_academy_students.sql` prepared and awaiting the user to apply it; live verification pending.
+**Out of scope:** mentors, assessments, reports, student login/email.
+**Tests:** unit — `academy-student-list.test.ts`, `students-supabase.test.ts`, `academy-dashboard-view.test.ts`.
+
+---
+
 ## T070 — Design system consistency pass — P1 — `[ ]`
 **Updated 2026-09-19:** the design system itself changed (Glass Capsule → Apple-Inspired Glass UI v3,
 `AGENTS.md` §7, see `status.md` → Decisions). The core migration (tokens, shell, primary dashboards)
