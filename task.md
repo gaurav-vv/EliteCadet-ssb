@@ -607,10 +607,22 @@ role/status changes and history.
 `users-repository.test.ts`, `login-suspended.test.ts`, `middleware-role.test.ts`, `redirect.test.ts`;
 integration — `middleware-session.test.ts`; e2e — `/admin` logged-out redirects.
 
-## T081 — Phase 2: Academies + Academy Admin — P0 — `[ ]`
-Super Admin academy management (list, create, edit, status, logo/description/contact), academy
-admin assignment, and assigning a user to an academy (unblocks role changes to mentor/academy admin).
-Academy Admin sees and edits only their own academy.
+## T081 — Phase 2: Academies + Academy Admin — P0 — `[-]`
+**Spec:** `specs.md` §8a.3b. **Depends on:** T080. **Branch:** `feat/phase-2-academies` (stacked on
+T076/T080).
+**Requirements:** migration `0006_academies.sql` (academy profile + status, super-admin
+insert/update, academy-admin update of their own academy, status/owner guard trigger,
+`academy_member_counts` security-invoker view). `lib/server/academies` (validation, repository,
+service). Super Admin `/admin/academies` list and detail: create, edit, suspend/reactivate, members
+(add by email with role, remove students), history. "Change academy" on user detail. Academy Admin
+settings read and write the real academy. Members of a suspended academy are signed out and can't
+log in.
+**Acceptance:** `specs.md` §8a.3b (Phase 2 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0006 and a
+live check with real accounts.
+**Tests:** unit — `academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts`,
+`users-validation.test.ts` (`checkAcademyChange`), `rbac.test.ts`, `login-suspended.test.ts`;
+integration — `middleware-session.test.ts` (academy suspension).
 
 ## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[ ]`
 `batch_students`, `batch_mentors`; a real `students` model replacing `lib/mock/academy.ts`; add/remove

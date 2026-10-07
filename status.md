@@ -294,6 +294,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-07 | **Platform re-architected around four roles** from the user's brief (`specs.md` §8a): `super_admin` added to `user_role` (migration `0004_super_admin_role.sql`, run alone because a new enum value can't be used in the same transaction); `profiles` extended into the central users table (email, phone, status, last_login_at, updated_at) with 1:1 `student/mentor/academy_admin/super_admin_profiles` and an append-only `audit_log` (`0005_users_rbac.sql`). User Management is kept separate from Content Management. Backend modules live in this app under `lib/server/<module>/`, with Postgres RLS as the second line of defence. Delivered as ten phases (T080–T089), one branch and PR each. The short-lived "per-area grants" design (an `admin_grants` table, never applied to any database) was dropped before merge | The user's brief makes Super Admin a real role: mentors own their content in `/mentor`, academies manage their own data in `/academy`, and `/admin` is the platform workspace. The user chose to extend `profiles` rather than rename it, keep backend modules in the Next.js app on Supabase, and ship one PR per phase |
 | 2026-10-07 | **Two security holes on `main` closed in Phase 1.** (1) The `profiles_update_own` RLS policy let any user rewrite every column of their own row, including `role` and `academy_id`. A `before update` trigger now rejects privileged-column changes from anyone except an active super admin (never on their own role/status) and trusted server contexts. (2) The signup trigger trusted `role`/`academy_id` from browser-supplied user metadata, so anyone could self-register as a mentor of any academy. Now: self-signup creates only student or academy_admin; mentor only with `auth.users.invited_at` set (a real invite); any role only from service-role-only `app_metadata`; `super_admin` never from signup | `AGENTS.md` §10: never trust a role supplied by the browser. Fixed before `super_admin` exists, because with that role, hole (1) would have been a one-request path to platform takeover |
 | 2026-10-07 | **One navy workspace shell for every role** (T076). The Academy shell (2026-09-24) was generalised into `components/layout/workspace/` and is now used by Student, Mentor and Academy, with Super Admin to follow in PR #8. The scoped CSS classes were renamed `.academy-*` → `.workspace-*`; the `--academy-*` colour tokens keep their names. `AGENTS.md` §7.3 records the decision | The user approved applying their reference image's dark navy sidebar to every workspace. One shell keeps the roles visually identical apart from their navigation and role label (`specs.md` §8a.1), instead of the glass shell for Student/Mentor next to a navy shell for Academy |
+| 2026-10-08 | **Academies become a managed domain** (T081, migration `0006_academies.sql`). Academy profile fields + `active/suspended` status. Super admins create, edit, suspend and manage members; academy admins edit only their own academy's details, never its status (RLS + guard trigger). Membership stays only in `profiles.academy_id`. A suspended academy signs out all its non-super-admin members (middleware + login, via the shared pure `lib/auth/blocked.ts`). Mentors/academy admins can't be removed from an academy without a role change first. Academy settings no longer write the in-memory `SETTINGS` mock: `getSettings`, `updateSettingsAction` and the client-side `updateAcademyName` were removed in favour of the server-side `updateMyAcademyAction` | Brief Phase 2 (`specs.md` §8a.3b). One membership column avoids two sources of truth. Server-side scoping (the academy id comes from the session, never the request) is the academy-isolation boundary (`AGENTS.md` §10) |
 
 ---
 
@@ -1406,6 +1407,30 @@ Blocker:
 
 Next task:
 - T081 — Phase 2: Academies + Academy Admin
+
+Date: 2026-10-08
+Task: T081 — Phase 2: Academies + Academy Admin
+Status: Complete in code and tests. NOT yet run against a live database (migration 0006 must be applied)
+
+What changed:
+- Migration `0006_academies.sql` (see Decisions Register)
+- `lib/server/academies/{validation,repository,service}.ts`, `lib/actions/academies.ts`; `checkAcademyChange` rule in `lib/server/users/validation.ts`; new permissions `academies.manage`, `academy.update_own`
+- Super Admin: `/admin/academies` (search, status filter, sort, pagination, member counts, create dialog) and `/admin/academies/[id]` (details, edit, suspend/reactivate, add member by email with role, remove student, history); "Academies" nav item live; "Change academy" on user detail
+- Academy Admin: `/academy/settings` reads and writes the real academy (name, description, contact email/phone, logo link) plus their own name
+- Suspension: `lib/auth/blocked.ts` shared by middleware and login; `academy_suspended` login message
+- Shared `ConfirmActionDialog` (takes a bound Server Action)
+- Tests: 261 Vitest tests pass (new: academies validation/service, blocked reason, academy-change rule, middleware and login academy-suspension cases)
+- UI reviewed locally with sample data through a temporary harness (deleted); screenshots in `docs/screenshots/phase-2/`
+
+What remains:
+- Apply 0006 after 0004/0005; live check: create academy → add an admin, mentor, student → academy admin edits settings → suspend → members signed out → reactivate
+- Logo upload (needs storage, B5); academy-level dashboards move to real data in later phases
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T082 — Phase 3: Batches + Students + Mentor assignment
 
 ## 14. North Star
 

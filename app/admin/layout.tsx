@@ -3,12 +3,11 @@ import { requireRole } from "@/lib/server/auth/guard";
 import type { WorkspaceNavItem } from "@/lib/navigation/workspace";
 
 // Super Admin workspace (specs.md §8a). "soon" items are later phases:
-// Academies (T081), Content (T083) and Analytics (T089) — flip to
-// "available" when their pages ship.
+// Content (T083) and Analytics (T089) — flip to "available" when they ship.
 const NAV_ITEMS: WorkspaceNavItem[] = [
   { href: "/admin", label: "Dashboard", icon: "dashboard", availability: "available" },
   { href: "/admin/users", label: "User Management", icon: "users", availability: "available" },
-  { href: "/admin/academies", label: "Academies", icon: "academy", availability: "soon" },
+  { href: "/admin/academies", label: "Academies", icon: "academy", availability: "available" },
   { href: "/admin/content", label: "Content", icon: "resources", availability: "soon" },
   { href: "/admin/analytics", label: "Analytics", icon: "reports", availability: "soon" },
 ];
