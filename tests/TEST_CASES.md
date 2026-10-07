@@ -181,6 +181,18 @@ implicit.
 | FDB-02 | One feedback per attempt; reviewed is locked (idempotent submit) | P0 | `VERIFIED` (`assessments-service.test.ts`: upsert on `attempt_id`, locked after review) + trigger | Submit twice | One reviewed feedback; second refused |
 | FDB-03 | Students see feedback only once reviewed; never another student's attempt | P0 | MANUAL (needs 0011) | As student B, open A's attempt/feedback ids via the API | Nothing returned |
 
+### 2g. Progress tracking (T087 Phase 8)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| PRG-01 | Progress shows no invented values; empty data reads as "no data yet" | P0 | `VERIFIED` (`progress-compute.test.ts`, `progress-service.test.ts`) | Student with no reviews/attendance | Averages and attendance are null, shown as "—" with an empty state |
+| PRG-02 | Each view refuses the wrong role before reading data | P0 | `VERIFIED` (`progress-service.test.ts`) | Call student/mentor/academy progress as another role | `unauthorized`, no database call |
+| PRG-03 | A mentor sees progress only for students in their batches | P0 | `VERIFIED` (`progress-service.test.ts`) + RLS | Open another batch's student progress | Not found |
+| PRG-04 | Attendance: only the session's mentor, only after it starts, only participants | P0 | `VERIFIED` (`progress-service.test.ts`) + trigger/RLS | Mark before start; mark a non-participant | Refused / dropped |
+| PRG-05 | Needs-attention flags carry their reason | P1 | `VERIFIED` (`progress-compute.test.ts`, `progress-service.test.ts`) | Low average, no recent submission, low attendance | Flagged with the matching reason; on-track students aren't |
+| PRG-06 | A student marks only content they can read as done; counts update | P1 | MANUAL (needs 0012) | Mark a Library item done, then an unassigned content id via the API | First counts in Library read; second refused by RLS |
+| PRG-07 | Academy Performance is scoped to the admin's academy | P0 | `VERIFIED` (`progress-service.test.ts`: `academy_id` filter) + RLS; MANUAL live check | Admin of academy A views Performance | Only academy A's batches and students |
+
 ---
 
 ## 3. Academy isolation / IDOR

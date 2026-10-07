@@ -8,6 +8,7 @@ import { StudentToolbar } from "@/components/academy/students/student-toolbar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { getMyMentees } from "@/lib/server/academy-people/service";
+import { getMenteeSummaries } from "@/lib/server/progress/service";
 import { buildStudentQuery, hasActiveStudentFilters, parseStudentParams } from "@/lib/server/academy-people/validation";
 
 export const metadata: Metadata = { title: "Mentees" };
@@ -28,6 +29,7 @@ export default async function MenteesPage({ searchParams }: { searchParams: Prom
   }
 
   const { list, batches } = result.data;
+  const progress = await getMenteeSummaries(list.rows.map((r) => r.id));
   const subtitle =
     batches.length === 0 ? "Students in the batches you're assigned to." : `Your batches: ${batches.map((b) => b.name).join(", ")}.`;
 
@@ -55,7 +57,7 @@ export default async function MenteesPage({ searchParams }: { searchParams: Prom
                 action={<Link href="/mentor/mentees" className="text-[13px] font-medium text-brand-accent hover:underline">Clear filters</Link>}
               />
             ) : (
-              <StudentTable rows={list.rows} batches={batches} hrefBase="/mentor/mentees" showActions={false} />
+              <StudentTable rows={list.rows} batches={batches} hrefBase="/mentor/mentees" showActions={false} progress={progress} />
             )}
             <Pagination page={list.page} pageCount={list.pageCount} pageSize={list.pageSize} total={list.total} buildHref={(page) => `/mentor/mentees${buildStudentQuery({ ...params, page })}`} noun={{ one: "mentee", many: "mentees" }} />
           </div>

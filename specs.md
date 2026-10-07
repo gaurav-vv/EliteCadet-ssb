@@ -772,6 +772,50 @@ words, MCQs), so that's a separate, specified task.
 - The student's assessment page shows the score, strengths, improvement areas and comments with
   the evaluator's name and date.
 
+### 8a.4d Progress tracking (Phase 8)
+
+One set of real progress data, shown per role. Nothing is invented: every figure states what it's
+based on, and a figure with no data says so instead of showing 0 or a guess.
+
+- **Sources:**
+  - Reviewed assessment scores (Phase 7), as a percentage of each assessment's maximum.
+  - Session attendance: a mentor marks each participant Present, Absent or Excused once the
+    session has started.
+  - Library items a student marks as done.
+  - Mentor feedback text (strengths and areas to improve).
+  - Practice-runner activity (TAT, WAT, journey) is **not** counted: it's browser-only until T083b.
+- **Derived per student:**
+  - **Average score**: the mean of reviewed assessment percentages, labelled "based on N reviewed
+    assessments".
+  - **Score trend**: one point per reviewed assessment, over time.
+  - **Category strengths/weak areas**: average percentage per content category with at least one
+    review. The highest is a strength and the lowest a weak area, shown only when there are two or
+    more categories.
+  - **Attendance rate**: present ÷ marked sessions, labelled with counts. Excused sessions don't
+    count against it.
+  - **Library completed** count.
+  - **Recommended next actions** (rule-based and explainable, never AI): open assessments not yet
+    submitted, the next upcoming session, and unread Library items in the weakest category. Each
+    recommendation states its reason.
+- **Views:**
+  - **Student, "My Progress":** all of the above for themselves.
+  - **Mentor, "My Assigned Students":** Mentees shows each student's average score, attendance
+    and reviewed count; the mentee page shows that student's full progress.
+  - **Academy, "Performance":** per batch: students, average score, attendance rate, and
+    **students needing attention** with the reason ("average below 50%", or "no submission in 14
+    days while assessments were open").
+  - **Super Admin:** platform analytics come in Phase 10.
+- Visibility follows the existing scopes (own student data, the mentor's batches, the admin's
+  academy), enforced by RLS on the underlying tables.
+
+**Acceptance (Phase 8):**
+- Every progress number is derived from database rows and states its basis. "Not enough data
+  yet" appears when there are none.
+- A mentor can mark attendance only for their own sessions, and only for that session's
+  participants.
+- A student can mark only their own Library completion, and only for content they can see.
+- "Needs attention" always shows its reason.
+
 ### 8a.5 Domain model
 
 ```text

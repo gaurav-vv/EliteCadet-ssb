@@ -11,6 +11,8 @@ import { ListPanel, ListRow } from "@/components/ui/list-panel";
 import { getMenteeHistory } from "@/lib/server/assessments/service";
 import { evaluationStatusOf } from "@/types/assessments";
 import { formatDay } from "@/lib/utils/format-date";
+import { ProgressBody, ProgressStats } from "@/components/progress/progress-views";
+import { getMenteeProgress } from "@/lib/server/progress/service";
 
 export const metadata: Metadata = { title: "Mentee" };
 
@@ -27,7 +29,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 // batch, another academy, or nonexistent — is the same "not found" (specs §7.4).
 export default async function MenteeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [result, history] = await Promise.all([getMyMentee(id), getMenteeHistory(id)]);
+  const [result, history, progress] = await Promise.all([getMyMentee(id), getMenteeHistory(id), getMenteeProgress(id)]);
   if (!result.ok && result.error?.code === "not_found") notFound();
 
   if (!result.ok || !result.data) {
@@ -55,6 +57,18 @@ export default async function MenteeDetailPage({ params }: { params: Promise<{ i
         <InfoCard label="Batch">{student.batchName ?? "—"}</InfoCard>
         <InfoCard label="Mentors on this batch">{mentors.map((m) => m.name).join(", ") || "—"}</InfoCard>
         <InfoCard label="Last login">{formatDay(student.lastLoginAt) ?? <span className="text-ink-secondary">Never</span>}</InfoCard>
+      </section>
+
+      <section aria-labelledby="progress-heading" className="flex flex-col gap-4">
+        <h2 id="progress-heading" className="text-[18px] font-semibold text-ink">Progress</h2>
+        {progress.ok && progress.data ? (
+          <>
+            <ProgressStats summary={progress.data.summary} />
+            <ProgressBody progress={progress.data} emptyHint="Their trend starts once you review a submitted assessment." />
+          </>
+        ) : (
+          <RetryErrorState message={progress.error?.message ?? "We couldn't load this student's progress. Please try again."} />
+        )}
       </section>
 
       <section aria-labelledby="activity-heading" className="flex flex-col gap-3">

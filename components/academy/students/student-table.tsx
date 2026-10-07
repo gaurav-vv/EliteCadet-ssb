@@ -3,6 +3,7 @@ import { StatusBadge } from "@/components/academy/shared/status-badge";
 import { StudentRowActions } from "@/components/academy/students/student-row-actions";
 import { formatDay } from "@/lib/utils/format-date";
 import type { AcademyStudentRecord } from "@/types/academy-people";
+import type { ProgressSummary } from "@/types/progress";
 
 const muted = (text: string) => <span className="text-ink-secondary">{text}</span>;
 
@@ -13,7 +14,7 @@ function initials(name: string): string {
 }
 
 // Only columns backed by real data. Phones: DataTable renders one card per student.
-export function StudentTable({ rows, batches, hrefBase = "/academy/students", showActions = true }: { rows: AcademyStudentRecord[]; batches: { id: string; name: string }[]; hrefBase?: string; showActions?: boolean }) {
+export function StudentTable({ rows, batches, hrefBase = "/academy/students", showActions = true, progress }: { rows: AcademyStudentRecord[]; batches: { id: string; name: string }[]; hrefBase?: string; showActions?: boolean; progress?: Map<string, ProgressSummary> }) {
   return (
     <DataTable
       caption="Students"
@@ -39,7 +40,12 @@ export function StudentTable({ rows, batches, hrefBase = "/academy/students", sh
         { key: "batch", header: "Batch", cell: (s) => s.batchName ?? muted("No batch") },
         { key: "status", header: "Account", cell: (s) => <StatusBadge label={s.status === "active" ? "Active" : "Suspended"} tone={s.status === "active" ? "success" : "danger"} /> },
         { key: "login", header: "Last Login", cell: (s) => formatDay(s.lastLoginAt) ?? muted("Never") },
-        { key: "joined", header: "Joined", cell: (s) => formatDay(s.createdAt) },
+        ...(progress
+          ? [
+              { key: "score", header: "Avg Score", cell: (s: AcademyStudentRecord) => { const v = progress.get(s.id)?.avgScorePct; return v == null ? muted("No reviews") : `${v}%`; } },
+              { key: "attendance", header: "Attendance", cell: (s: AcademyStudentRecord) => { const v = progress.get(s.id)?.attendancePct; return v == null ? muted("Not marked") : `${v}%`; } },
+            ]
+          : [{ key: "joined", header: "Joined", cell: (s: AcademyStudentRecord) => formatDay(s.createdAt) }]),
         ...(showActions ? [{ key: "actions", header: "Actions", align: "right" as const, cell: (s: AcademyStudentRecord) => <StudentRowActions student={s} batches={batches} /> }] : []),
       ]}
     />

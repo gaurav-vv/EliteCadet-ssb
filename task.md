@@ -724,9 +724,27 @@ live check.
 live check.
 **Tests:** unit — `assessments-validation.test.ts`, `assessments-service.test.ts`.
 
-## T087 — Phase 8: Progress tracking — P1 — `[ ]`
-`student_progress`: completion, attempts, scores, attendance, feedback, trends, strengths/weaknesses,
-recommended next actions.
+## T087 — Phase 8: Progress tracking — P1 — `[-]`
+**Spec:** `specs.md` §8a.4d. **Depends on:** T086. **Branch:** `feat/phase-8-progress` (stacked on
+T086).
+**Requirements:**
+- Migration `0012_progress.sql`: `session_attendance` (marked by the session's mentor, only once
+  the session has started, only for its participants) and `content_progress` (a student marks
+  Library items done, only content they can read). Security-invoker views `student_scores` (one
+  row per reviewed attempt) and `student_progress` (per-student summary).
+- `lib/server/progress` (pure `compute.ts`, `service.ts`), `lib/actions/progress.ts`.
+- Student: My Progress (average score, reviewed count, attendance, Library read, score trend chart
+  with a table view, averages by area, strength/weak area, recent feedback, rule-based next steps
+  with reasons). "Mark as done" on Library items.
+- Mentor: average score and attendance columns on Mentees, a progress section on the mentee page,
+  attendance marking on started sessions.
+- Academy: Performance (academy totals, needs-attention with the reason, per-batch averages; nav
+  now live).
+- Removed the sample-data progress API and mock.
+**Acceptance:** `specs.md` §8a.4d. Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0012 and a
+live check.
+**Tests:** unit — `progress-compute.test.ts`, `progress-service.test.ts`.
 
 ## T088 — Phase 9: Role-specific dashboards — P1 — `[ ]`
 Same progress data presented per role, replacing mock dashboard data.

@@ -64,7 +64,7 @@ export async function LibraryList({ basePath, rawParams, subtitle }: { basePath:
   );
 }
 
-export async function LibraryItem({ basePath, id }: { basePath: string; id: string }) {
+export async function LibraryItem({ basePath, id, footer }: { basePath: string; id: string; footer?: React.ReactNode }) {
   const result = await getLibraryItem(id);
   if (!result.ok && result.error?.code === "not_found") notFound();
 
@@ -96,6 +96,7 @@ export async function LibraryItem({ basePath, id }: { basePath: string; id: stri
           )}
           {/* Plain text only (never HTML): content can't inject markup. */}
           {result.data.body && <div className="glass-regular rounded-card px-6 py-5 text-[15px] leading-relaxed whitespace-pre-wrap text-ink">{result.data.body}</div>}
+          {footer}
         </article>
       )}
     </div>

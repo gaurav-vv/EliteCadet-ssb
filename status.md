@@ -179,8 +179,8 @@ Authentication `VERIFIED` (real Supabase, T013/T014) · Onboarding `VERIFIED` (m
 persistence) · Dashboard `VERIFIED` (mock data) · Practice Zone `VERIFIED` (Psychology TAT/WAT/SRT/SDT,
 standard SSB timing per B4; Interview is an explicit stub — no activities are specced for it yet) ·
 Practice submission `VERIFIED` (idempotency-keyed mock submission, retry-safe) · AI feedback `BLOCKED`
-(B3 — AI provider not yet decided) · AI failure handling `BLOCKED` (same) · Progress `VERIFIED` (mock
-data, zero/populated states) · Resources `VERIFIED` (mock content, list/detail/read-state) · Day 2
+(B3 — AI provider not yet decided) · AI failure handling `BLOCKED` (same) · Progress `UNVERIFIED` live (real
+data since T087 — reviewed scores, attendance, Library completion; unit-tested, needs 0012 applied) · Resources `VERIFIED` (mock content, list/detail/read-state) · Day 2
 Resources `VERIFIED` — curated, human-verified external resource library (TAT/WAT/SRT/SDT/Full Day 2;
 `lib/mock/day2-resources.ts`, sourced from `docs/day2-final-curated-resources.md`) restructured 2026-
 09-22 into a hub-and-spoke IA: `/student/resources/day-2` is orientation-only (hero, TAT→WAT→SRT→SDT→
@@ -300,6 +300,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Mentor content, starter templates and paid content requests** (T084, `0009_mentor_content.sql`), per the user's 2026-10-08 direction. Mentor content shares the `contents` table (`owner_type = 'mentor'`); a trigger pins it to assigned-only/students, and RLS limits sharing to batches the mentor teaches. Mentors never modify platform content. Starter templates: platform content flagged `is_template`, copied into the mentor's own draft (`template_source_id`). Content requests: `requested → quoted → accepted → in_progress → delivered` (+ declined/cancelled). Mentor transitions go through SECURITY DEFINER functions; staff transitions are super-admin-only. Delivery copies a platform item into the mentor's My Content. The accepted fee is recorded as owed and settled outside the app, then marked settled; there's no automated billing (AGENTS.md, B6) | User chose: templates are copied then edited; fees are tracked and settled manually; only mentors can request. One content table keeps a single reader rule (`can_read_content`) for platform and mentor content alike |
 | 2026-10-08 | **Session scheduling** (T085, `0010_sessions.sql`). One batch and one mentor (who must teach it) per session; whole batch or selected students of that batch; online needs an https link, offline a location; cancel needs a reason. **No double-booking** via a btree_gist exclusion constraint on `(mentor_id, tstzrange)` for scheduled sessions, mapped to a clear message. `can_see_session()` is the single visibility rule. Times are stored in UTC and entered and shown in **IST** ("IST"-labelled) | Brief Phase 6 (`specs.md` §8a.4b). The audience is Indian SSB candidates, so IST avoids hydration-unsafe client time-zone formatting; per-user time zones can come later. A DB constraint, not just an app check, means two concurrent requests can't double-book |
 | 2026-10-08 | **Assessments, attempts and mentor feedback** (T086, `0011_assessments.sql`). Mentor-created per batch; questions are locked once opened. One attempt per student, submitted once then locked, accepted only while open and not overdue. One feedback per attempt (upsert on `attempt_id`, so a double submit is idempotent): `in_review` is a recoverable staff-only draft, `reviewed` is final, locked, needs score + strengths + improvement areas, and only then reaches the student with the evaluator and date. Triggers enforce the lifecycle in the database, not only in the app. Mentor feedback is never presented as an SSB outcome; AI feedback stays blocked (B3) | Brief Phase 7 + `specs.md` §7.5 (draft recoverable, idempotent submit, evaluator + timestamp on the student record) |
+| 2026-10-08 | **Progress is derived, not stored** (T087, `0012_progress.sql`). Only two new source tables: `session_attendance` (mentor-marked, only after the session starts, only participants; excused counts neither way) and `content_progress` (student-marked Library completion). Scores come from mentor-reviewed feedback only; practice runners are not counted (they have no reviewed score). Summaries are security-invoker views (`student_scores`, `student_progress`), so every reader's RLS applies and there is one source of truth. No value is invented: with no data the UI says so. Needs-attention and recommendations are plain rules, each shown with its reason (average below 50%, no submission in 14 days while assessments are open, attendance below 50%) | Brief Phase 8 + `AGENTS.md` §8 (no fabricated data) + `specs.md` §8a.4d |
 
 ---
 
@@ -1548,6 +1549,29 @@ Blocker:
 
 Next task:
 - T087 — Phase 8: Progress tracking
+
+Date: 2026-10-08
+Task: T087 — Phase 8: Progress tracking
+Status: Complete in code and tests. NOT yet run against a live database (migration 0012 must be applied)
+
+What changed:
+- Migration `0012_progress.sql` (see Decisions Register)
+- `lib/server/progress/{compute,service}.ts`, `lib/actions/progress.ts`, `components/progress/*`
+- Student: `/student/progress` on real data (stats, score trend chart + table view, averages by area, strength/weak area, recent feedback, next steps with reasons); "Mark as done" on `/student/library/[id]`
+- Mentor: Avg Score and Attendance columns on `/mentor/mentees`, progress section on the mentee page, attendance marking on `/mentor/sessions/[id]` once a session has started
+- Academy: `/academy/performance` (totals, needs attention with reasons, per batch); nav item now live
+- Removed `lib/api/progress.ts` and `lib/mock/progress.ts`
+- Tests: 362 Vitest tests pass; screenshots in `docs/screenshots/phase-8/`
+
+What remains:
+- Apply 0012 after 0004–0011; live check: mentor marks attendance after a session starts (refused before), reviews an assessment → student trend, mentee columns and academy Performance update; a student marks a Library item done
+- Dashboards still show sample widgets until Phase 9 (T088)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T088 — Phase 9: Role-specific dashboards
 
 ## 14. North Star
 

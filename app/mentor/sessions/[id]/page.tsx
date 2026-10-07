@@ -9,6 +9,8 @@ import { SessionAgenda } from "@/components/sessions/session-agenda";
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { completeSessionAction } from "@/lib/actions/sessions";
+import { AttendanceForm } from "@/components/progress/attendance-form";
+import { getAttendanceSheet } from "@/lib/server/progress/service";
 import { getMySessionView, getScheduleFormData } from "@/lib/server/sessions/service";
 import { utcIsoToIst } from "@/lib/server/sessions/validation";
 
@@ -18,7 +20,7 @@ export const metadata: Metadata = { title: "Session" };
 export default async function MentorSessionPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ scheduled?: string; outside?: string }> }) {
   const { id } = await params;
   const flags = await searchParams;
-  const [result, form] = await Promise.all([getMySessionView(id), getScheduleFormData()]);
+  const [result, form, attendance] = await Promise.all([getMySessionView(id), getScheduleFormData(), getAttendanceSheet(id)]);
   if (!result.ok && result.error?.code === "not_found") notFound();
   if (!result.ok || !result.data) {
     return (
@@ -53,6 +55,16 @@ export default async function MentorSessionPage({ params, searchParams }: { para
         )}
       </div>
       <SessionAgenda sessions={[s]} show={{ batch: true, link: true }} empty={{ title: "", description: "" }} />
+      {attendance.ok && attendance.data?.canMark && (
+        <section aria-labelledby="attendance-heading" className="flex flex-col gap-3">
+          <h2 id="attendance-heading" className="text-[18px] font-bold text-ink">Attendance</h2>
+          {attendance.data.rows.length === 0 ? (
+            <p className="text-[13px] text-ink-secondary">No students are on this session.</p>
+          ) : (
+            <AttendanceForm sessionId={s.id} rows={attendance.data.rows} />
+          )}
+        </section>
+      )}
       {s.status === "scheduled" && form.ok && form.data && (
         <section aria-labelledby="edit-heading" className="flex flex-col gap-3">
           <h2 id="edit-heading" className="text-[18px] font-bold text-ink">Edit</h2>
