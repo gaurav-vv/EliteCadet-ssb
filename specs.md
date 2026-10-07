@@ -483,8 +483,9 @@ Profile · editable fields · settings.
 Dashboard · Students · Batches · Mentors · Reports · Settings
 ```
 
-Deferred: courses, attendance, assessments, admin-side practice authoring, announcements, messages,
-advanced insights.
+Deferred: courses, attendance, assessments, announcements, messages, advanced insights.
+Admin-side practice authoring, previously listed here, was un-deferred 2026-10-07 as platform-level
+content administration. See §8a.
 
 ### 8.2 Academy dashboard
 
@@ -532,6 +533,55 @@ misleading chart.
 ### 8.7 Academy profile / settings
 
 Academy information · admin profile · basic settings.
+
+---
+
+## 8a. Content Administration (T080–T083 — requested 2026-10-07)
+
+**Decision:** requested by the user 2026-10-07. It un-defers "admin-side practice authoring" from §8.1's
+deferred list and broadens it, so platform staff can add and maintain the material each role uses
+instead of editing code.
+Access is given only to the people who need it.
+
+### 8a.1 Access model — super admin plus delegated editors
+
+```text
+super            → every content area + manages who has access
+student_content  → practice banks, 5-day journey modules, resources, Day 2 resources
+mentor_content   → evaluation rubrics, session templates, mentor guidance
+academy_content  → students, batches, mentors, settings
+```
+
+- Content access is **independent of the user's role** (`STUDENT`/`MENTOR`/`ACADEMY_ADMIN`). It is
+  granted per area to a specific existing account. A person may hold several areas.
+- Only a super admin can grant or remove access. Nobody can grant access to themselves.
+- The first super admin is created by hand in the database, never through the app.
+- A super admin cannot remove their own super-admin access, so the platform can't be locked out.
+- Authorization is enforced server-side and in the database for every page, action and query.
+  A hidden link is UX only (`AGENTS.md` §10).
+- Content admin lives at `/admin`. Its navigation shows only the areas the signed-in person can open.
+
+### 8a.2 Screens
+
+| Screen | Who | Content |
+|---|---|---|
+| `/admin` | anyone with at least one area | The areas they can open, with a one-line description of each |
+| `/admin/access` | super admin | Grant access (account email + area) · list of who has which area · remove access |
+| `/admin/student-content` | `student_content` | Editor for student material (T081) |
+| `/admin/mentor-content` | `mentor_content` | Editor for mentor material (T082) |
+| `/admin/academy-content` | `academy_content` | Editor for academy records (T083) |
+
+**Acceptance (access foundation, T080):**
+- A signed-out visitor to any `/admin` route is sent to login. A signed-in user without the needed
+  grant gets the forbidden state, regardless of their role.
+- An area editor can open only their own areas and can never reach `/admin/access`.
+- Granting access to an email with no account produces a clear "they need to sign up first" message,
+  and a duplicate grant is explained, not silently ignored.
+- Removing access takes effect on the person's next request.
+
+**Acceptance (each content area, T081–T083):** defined in that task before it is built. Material
+written through these editors replaces the corresponding `lib/mock/*` source rather than living
+beside it (`AGENTS.md` §8, "never mix mock and real data silently").
 
 ---
 

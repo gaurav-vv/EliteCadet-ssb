@@ -2,6 +2,8 @@
 
 **Type:** Current project state. Reporting only — never a source of requirements.
 **Question this file answers:** *If I open this project today, what is the exact state?*
+**Last updated:** 2026-10-07 (T080 admin access foundation for the content-admin panels, on
+`feat/admin-access-foundation`; see §13a)
 **Last updated:** 2026-09-24 (test suite split into unit / integration / e2e layers, new tests
 added, CI workflow added on `chore/test-structure-audit`; see §13a)
 **Last updated:** 2026-09-23 (Day 2 Resources visual/text refinement, round 3; includes the latest `origin/main` changes merged into this branch)
@@ -291,6 +293,8 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-04 | **Batches are the first Academy domain on real Supabase.** New migration `supabase/migrations/0003_batches.sql` (table `batches`: academy_id, name, mentor_id → profiles, status enum active/archived, start_date, created_at; unique name per academy; RLS for the academy admin; `current_admin_academy_id()` / `mentor_in_academy()` helpers; a new `profiles_select_academy_admin` policy so admins can read their academy's mentors). Reads/writes use the admin's own session (anon key + RLS), never the service-role key. **No delete policy:** batches are archived, so future student→batch links can't be orphaned. The Batches page no longer shares data with the dashboard/Students/batch-detail pages, which still read the in-memory batches (`lib/mock/academy.ts`) until students move to Postgres | User chose "write the migration, then build on it". Student counts are intentionally not shown: there is no `students` table, and the in-memory students reference in-memory batch ids, so any count would be fake |
 
 ---
+
+| 2026-10-07 | **Content administration gets its own access model, independent of `profiles.role`.** New migration `supabase/migrations/0004_admin_access.sql`: table `admin_grants (user_id, area)` with area enum `super`/`student_content`/`mentor_content`/`academy_content`; RLS so users read only their own grants and only a super admin can insert or delete; `is_super_admin()`/`has_admin_area()` helpers for future content-table policies; super-admin-only SECURITY DEFINER functions `admin_find_user_by_email()` and `admin_list_grants()`, so the service-role key is never used. The first super admin is bootstrapped by hand in SQL. A super admin can't revoke their own `super` grant (enforced in the action and in the RLS delete policy). `/admin` is guarded in middleware by grants, not by role, and every page and action re-checks on the server. `specs.md` §8a added; "admin-side practice authoring" un-deferred from §8.1 | User chose "super-admin plus delegated editors" (2026-10-07). Keeping grants orthogonal to the role enum leaves every existing role guard, RLS policy and signup trigger untouched, avoids Postgres's "unsafe use of new enum value" in the same migration, and lets one person edit several areas. Built first, on its own branch, so the three panel branches (T081–T083) share one access model instead of each inventing one |
 
 ## 9. Technical Debt
 
@@ -1357,6 +1361,35 @@ Blocker:
 
 Next task:
 - User review
+
+Date: 2026-10-07
+Task: T080 — Admin access foundation (content administration, Phase 8)
+Status: Complete in code and tests. NOT yet run against a live database (migration must be applied first)
+
+What changed:
+- Migration `supabase/migrations/0004_admin_access.sql` (see Decisions Register)
+- Pure rules in `lib/admin/access.ts`: route → requirement map anchored on `/admin` (unmapped `/admin/*` paths require `super`), `canAccess`, `parseGrantInput`
+- `lib/supabase/middleware.ts`: `/admin` paths are gated by `admin_grants` (not `profiles.role`); signed out → `/login`, no grant → `/forbidden`; existing role routes are unchanged
+- `lib/auth/admin.ts` (`getAdminGrants`, `requireAdminArea`) re-checks on the server in the layout, every page and both actions
+- `lib/api/admin-access.ts` (grant list via RPC, boundary-validated) and `lib/actions/admin-access.ts` (grant by email, revoke; super-only, server validation, RLS as the final gate, anti-lockout)
+- UI: `/admin` (overview of the areas you can open), `/admin/access` (grant form, who-has-access list, remove), guarded placeholder pages for `/admin/{student,mentor,academy}-content`; nav shows only permitted areas
+- Tests: `tests/unit/lib/admin-access.test.ts`, `admin-access-actions.test.ts`, `admin-auth-guard.test.ts`, `admin-access-api.test.ts`, seven `/admin` cases in `tests/integration/middleware-session.test.ts`, and `/admin` + `/admin/access` added to the e2e auth-guard list (e2e not run locally: needs a reachable Supabase project)
+- Reviewed before PR by a multi-agent review (SQL security, app security, correctness, design/a11y, tests/governance; each finding checked by three skeptics). Fixes applied: revoke uses the shared Dialog instead of `window.confirm`; 44px touch targets; grant/revoke recover from a thrown action instead of sticking in "loading"; outcome announced in a live region with focus moved to the list heading; area shown as a neutral tag, not a status colour; retryable error state and a `loading.tsx` for `/admin/access`; two font weights per screen; the header "Profile" link goes to the person's own role profile; `/forbidden` copy no longer blames the role. Refuted findings (e.g. case-variant UUID self-revoke, already stopped by the RLS delete policy) were not changed
+- `app/globals.css`: new `.row-action` modifier (destructive icon button: danger only on hover, shared accent focus ring), per AGENTS.md §7.12
+- `app/forbidden/page.tsx`: copy changed from role-specific to permission-generic, since `/admin` denials are about grants, not role
+- Verified: `npm run lint`, `npm run typecheck`, `npm run build` clean; all Vitest suites pass under Node 22 semantics (see note)
+- Note: locally on Node 25, 40 pre-existing tests in 6 files fail with `window.localStorage.clear is not a function` (Node 25's built-in Web Storage shadows jsdom's). They fail identically on `main` and all pass with `NODE_OPTIONS=--no-experimental-webstorage`; CI pins Node 22 and is unaffected. Tracked as a separate fix, not part of this change
+
+What remains:
+- Apply 0004 in the Supabase SQL Editor and bootstrap the first super admin (SQL in the migration header)
+- Live check: super admin grants an area to a second account → that account sees only that area → access removed → the next request is forbidden
+- T081 / T083 content editors; T082 needs its spec first
+
+Blocker:
+- Needs the migration applied and two signed-in accounts to verify against live data
+
+Next task:
+- User review, then T081 on `feat/admin-student-content` (rebased onto this once merged)
 
 ## 14. North Star
 

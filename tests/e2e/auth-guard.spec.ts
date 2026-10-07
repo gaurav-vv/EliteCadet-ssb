@@ -6,7 +6,7 @@ import { test, expect } from "@playwright/test";
 // tests/TEST_CASES.md "Automated suite" for setup notes — but never sign in,
 // so they don't touch or depend on any specific account existing.
 test.describe("Route guard redirects an unauthenticated visitor (AGENTS.md §10)", () => {
-  const protectedPaths = ["/student", "/mentor", "/academy", "/onboarding"];
+  const protectedPaths = ["/student", "/mentor", "/academy", "/onboarding", "/admin", "/admin/access"];
 
   for (const path of protectedPaths) {
     test(`${path} redirects to /login when logged out`, async ({ page }) => {

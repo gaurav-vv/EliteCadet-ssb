@@ -257,6 +257,22 @@
   background: rgba(74, 85, 232, 0.06);
 }
 
+/* Destructive row-action icon button (§7.5): ink-secondary at rest, danger
+   red only on hover; shared accent focus ring (§7.10) */
+.row-action {
+  transition: color var(--motion-duration) var(--motion-easing), background var(--motion-duration) var(--motion-easing);
+}
+@media (hover: hover) {
+  .row-action:hover {
+    color: var(--status-danger);
+    background: var(--status-danger-bg);
+  }
+}
+.row-action:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+
 /* Filter chip active state (§7.5) — accent-outlined, never filled */
 .filter-chip[data-active="true"] {
   border-color: var(--brand-accent);
