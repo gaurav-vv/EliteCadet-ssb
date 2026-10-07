@@ -176,7 +176,7 @@ Nothing is `VERIFIED`. Everything below is `UNVERIFIED` unless marked `BLOCKED` 
 
 ### Student
 Authentication `VERIFIED` (real Supabase, T013/T014) · Onboarding `VERIFIED` (mock/local-only
-persistence) · Dashboard `VERIFIED` (mock data) · Practice Zone `VERIFIED` (Psychology TAT/WAT/SRT/SDT,
+persistence) · Dashboard `UNVERIFIED` live (real data since T088; unit-tested, needs 0004–0012 applied) · Practice Zone `VERIFIED` (Psychology TAT/WAT/SRT/SDT,
 standard SSB timing per B4; Interview is an explicit stub — no activities are specced for it yet) ·
 Practice submission `VERIFIED` (idempotency-keyed mock submission, retry-safe) · AI feedback `BLOCKED`
 (B3 — AI provider not yet decided) · AI failure handling `BLOCKED` (same) · Progress `UNVERIFIED` live (real
@@ -193,17 +193,17 @@ group filter (`components/student/day2/`, `lib/day2/categories.ts`); real auth-g
 errors; mock content, localStorage progress tracking, same pattern as Resources)
 
 ### Mentor
-Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `VERIFIED` (mock data) · Mentees
+Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `UNVERIFIED` live (real data since T088) · Mentees
 `VERIFIED` (mock data, no real assignment scoping yet) · Mentee detail `VERIFIED` (404 on unknown id;
 no real ownership check without auth) · Evaluations `VERIFIED` (Server Action, idempotent, draft
 recoverable) · Basic sessions `VERIFIED` (create/cancel via Server Action) · Profile `VERIFIED`
 (localStorage-persisted)
 
 ### Academy Admin
-Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `VERIFIED` (mock data, alerts,
-attention list) · Students `VERIFIED` (add, status, batch reassignment via Server Actions) · Batches
+Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `UNVERIFIED` live (real data since
+T088: tasks, needs attention, trend, by area, batches, sessions) · Students `VERIFIED` (add, status, batch reassignment via Server Actions) · Batches
 `VERIFIED` (create, member add/remove, mentor assignment) · Mentors `VERIFIED` (invite, invited vs.
-active distinction) · Reports `VERIFIED` (readiness distribution, batch performance, activity, mentor
+active distinction) · Reports `UNVERIFIED` live (real data since T088: score bands, by area, mentor
 workload) · Settings `VERIFIED` (Server Action, server-side mock persistence)
 
 ---
@@ -301,6 +301,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Session scheduling** (T085, `0010_sessions.sql`). One batch and one mentor (who must teach it) per session; whole batch or selected students of that batch; online needs an https link, offline a location; cancel needs a reason. **No double-booking** via a btree_gist exclusion constraint on `(mentor_id, tstzrange)` for scheduled sessions, mapped to a clear message. `can_see_session()` is the single visibility rule. Times are stored in UTC and entered and shown in **IST** ("IST"-labelled) | Brief Phase 6 (`specs.md` §8a.4b). The audience is Indian SSB candidates, so IST avoids hydration-unsafe client time-zone formatting; per-user time zones can come later. A DB constraint, not just an app check, means two concurrent requests can't double-book |
 | 2026-10-08 | **Assessments, attempts and mentor feedback** (T086, `0011_assessments.sql`). Mentor-created per batch; questions are locked once opened. One attempt per student, submitted once then locked, accepted only while open and not overdue. One feedback per attempt (upsert on `attempt_id`, so a double submit is idempotent): `in_review` is a recoverable staff-only draft, `reviewed` is final, locked, needs score + strengths + improvement areas, and only then reaches the student with the evaluator and date. Triggers enforce the lifecycle in the database, not only in the app. Mentor feedback is never presented as an SSB outcome; AI feedback stays blocked (B3) | Brief Phase 7 + `specs.md` §7.5 (draft recoverable, idempotent submit, evaluator + timestamp on the student record) |
 | 2026-10-08 | **Progress is derived, not stored** (T087, `0012_progress.sql`). Only two new source tables: `session_attendance` (mentor-marked, only after the session starts, only participants; excused counts neither way) and `content_progress` (student-marked Library completion). Scores come from mentor-reviewed feedback only; practice runners are not counted (they have no reviewed score). Summaries are security-invoker views (`student_scores`, `student_progress`), so every reader's RLS applies and there is one source of truth. No value is invented: with no data the UI says so. Needs-attention and recommendations are plain rules, each shown with its reason (average below 50%, no submission in 14 days while assessments are open, attendance below 50%) | Brief Phase 8 + `AGENTS.md` §8 (no fabricated data) + `specs.md` §8a.4d |
+| 2026-10-08 | **Dashboards are read-only summaries over real data** (T088, no migration). One server function per role (`lib/server/dashboards`) reuses the progress, sessions, assessments and people services, so every figure matches the page it links to. **No readiness score**: "average reviewed score" replaces it until a readiness formula is defined. **Today's Mission and the practice streak are hidden** until practice is stored (T083b). The sample-data dashboards, the `getAnalytics` "Demo data" panels and the "Load/Clear demo data" controls are removed; this supersedes the 2026-09-19 demo-data and 2026-10-03 analytics decisions above | User-approved 2026-10-08 (both recommendations) + `AGENTS.md` §8 (no fabricated data) |
 
 ---
 
@@ -1572,6 +1573,29 @@ Blocker:
 
 Next task:
 - T088 — Phase 9: Role-specific dashboards
+
+Date: 2026-10-08
+Task: T088 — Phase 9: Role-specific dashboards
+Status: Complete in code and tests. NOT yet run against a live database (needs 0004–0012 applied)
+
+What changed:
+- `lib/server/dashboards/{compute,service}.ts`, `types/dashboards.ts`
+- Student dashboard: stats, Do next (with reasons), next session, recent submissions/feedback
+- Mentor dashboard: stats, reviews waiting, today's sessions (IST), needs attention, mentees by score
+- Academy dashboard: KPIs and tasks from real counts, average score by month, scores by area, recent submissions, batch averages, upcoming sessions; Reports: score bands, by area, mentor workload
+- `getAcademyPerformance` now also returns its per-student rows and score points so the dashboard reuses them
+- Removed: `lib/mock/{student,mentor,academy,academy-analytics}.ts`, `lib/api/{mentor,academy}.ts`, the student `getDashboardData`, `lib/actions/{mentor,academy}.ts`, `components/shared/demo-data-controls.tsx`, `components/academy/shared/demo-badge.tsx`, `components/academy/dashboard/assessment-radar.tsx`, `lib/academy/readiness.ts`, `types/mentor.ts`, the dead sample-data types in `types/{academy,student}.ts`, and `academy-isolation.test.ts` (its "known gap" is closed; isolation is covered by the service tests)
+- Tests: 369 Vitest tests pass; screenshots in `docs/screenshots/phase-9/`
+
+What remains:
+- Apply 0004–0012; live check: each dashboard's figures match Performance, Evaluations, Sessions and Mentees for the same account; another role is refused
+- Practice runners, Resources and the SSB journey still use local sample content (T083b)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T089 — Phase 10: Analytics + Notifications
 
 ## 14. North Star
 

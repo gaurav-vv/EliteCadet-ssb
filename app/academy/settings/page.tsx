@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { SettingsForm } from "@/components/academy/settings-form";
-import { DemoDataControls } from "@/components/shared/demo-data-controls";
-import { loadDemoDataAction, clearDemoDataAction } from "@/lib/actions/academy";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
 import { getMyAcademy } from "@/lib/server/academies/service";
 
@@ -22,11 +20,6 @@ export default async function SettingsPage() {
       ) : (
         <SettingsForm academy={academy.data} adminName={profile?.fullName ?? ""} />
       )}
-      <DemoDataControls
-        loadAction={loadDemoDataAction}
-        clearAction={clearDemoDataAction}
-        description="Resets the sample students, batches and mentors used to preview the academy dashboard."
-      />
     </div>
   );
 }

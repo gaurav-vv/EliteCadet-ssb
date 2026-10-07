@@ -24,7 +24,7 @@ export function CategoryBars({ categories }: { categories: CategoryAverage[] }) 
   return (
     <ul className="flex flex-col gap-3">
       {categories.map((c) => (
-        <li key={c.category} className="grid grid-cols-[120px_1fr_48px] items-center gap-3 text-[13px] sm:grid-cols-[160px_1fr_48px]">
+        <li key={c.category} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_48px] items-center gap-3 text-[13px]">
           <span className="truncate text-ink">{CONTENT_CATEGORIES[c.category]}</span>
           <span className="h-2 overflow-hidden rounded-full bg-[var(--hairline)]" aria-hidden="true">
             <span className="block h-full rounded-full bg-[var(--academy-chart-overall)]" style={{ width: `${Math.max(c.avgPct, 2)}%` }} />

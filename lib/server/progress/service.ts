@@ -200,7 +200,16 @@ export async function markAttendance(sessionId: string, entries: { studentId: st
 
 // ---- Academy: Performance --------------------------------------------------------
 
-export async function getAcademyPerformance(nowIso: string): Promise<ServiceResult<{ batches: BatchPerformance[]; attention: AttentionStudent[]; academy: ProgressSummary }>> {
+export interface AcademyPerformance {
+  batches: BatchPerformance[];
+  attention: AttentionStudent[];
+  academy: ProgressSummary;
+  // For the dashboard and Reports (Phase 9): the same rows, not a second query.
+  students: { studentId: string; name: string; batchName: string | null; summary: ProgressSummary }[];
+  points: ScorePoint[];
+}
+
+export async function getAcademyPerformance(nowIso: string): Promise<ServiceResult<AcademyPerformance>> {
   const me = await getActor();
   if (!me || me.profile.role !== "academy_admin" || !me.profile.academyId) return fail("unauthorized", "Only an academy admin can view performance.");
   const academyId = me.profile.academyId;
@@ -236,9 +245,11 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
   });
 
   const attention: AttentionStudent[] = [];
+  const studentRows: AcademyPerformance["students"] = [];
   for (const st of (students.data ?? []) as Record<string, unknown>[]) {
     const entry = summaryBy.get(st.id as string);
     if (!entry) continue;
+    studentRows.push({ studentId: st.id as string, name: (st.full_name as string) || (st.email as string) || "Student", batchName: (st.batch_name as string) ?? null, summary: entry.summary });
     const reason = attentionReason(entry.summary, { nowIso, batchHadOpenAssessment: Boolean(entry.batchId && openBatches.has(entry.batchId)) });
     if (reason) attention.push({ studentId: st.id as string, name: (st.full_name as string) || (st.email as string) || "Student", batchName: (st.batch_name as string) ?? null, reason });
   }
@@ -254,5 +265,5 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
     contentCompleted: all.reduce((s, m) => s + m.summary.contentCompleted, 0),
     lastSubmissionAt: null,
   };
-  return { ok: true, data: { batches: perBatch, attention: sortAttention(attention), academy } };
+  return { ok: true, data: { batches: perBatch, attention: sortAttention(attention), academy, students: studentRows, points: allPoints } };
 }

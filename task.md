@@ -746,8 +746,29 @@ T086).
 live check.
 **Tests:** unit — `progress-compute.test.ts`, `progress-service.test.ts`.
 
-## T088 — Phase 9: Role-specific dashboards — P1 — `[ ]`
-Same progress data presented per role, replacing mock dashboard data.
+## T088 — Phase 9: Role-specific dashboards — P1 — `[-]`
+**Spec:** `specs.md` §8a.4e. **Depends on:** T087. **Branch:** `feat/phase-9-dashboards` (stacked on
+T087).
+**Requirements:**
+- `lib/server/dashboards` (pure `compute.ts`, `service.ts`): one function per role. Each checks the
+  role first, scopes to the caller, and reuses the progress, sessions, assessments and people
+  services.
+- Student, Mentor and Academy dashboards and Academy Reports on real data. Every widget has an
+  empty state, and every list links to where the user acts on it.
+- No readiness score (use average reviewed score); hide Today's Mission and the streak until T083b.
+- Removed:
+  - the sample data: `lib/mock/{student,mentor,academy,academy-analytics}.ts` and
+    `lib/api/{mentor,academy}.ts`
+  - the student dashboard's `getDashboardData`
+  - the demo-data actions and controls
+  - the "Demo data" badge and the assessment radar
+  - the dead sample-data types
+  - the obsolete "known gap" isolation test (isolation is covered by the service tests)
+**Acceptance:** `specs.md` §8a.4e. Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying
+0004–0012 and a live check.
+**Tests:** unit — `dashboards-compute.test.ts`, `dashboards-service.test.ts`,
+`academy-dashboard-view.test.ts` (rewritten).
 
 ## T089 — Phase 10: Analytics + Notifications — P2 — `[ ]`
 Platform analytics for Super Admin; in-app notifications.

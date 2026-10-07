@@ -816,6 +816,51 @@ based on, and a figure with no data says so instead of showing 0 or a guess.
 - A student can mark only their own Library completion, and only for content they can see.
 - "Needs attention" always shows its reason.
 
+### 8a.4e Role dashboards (Phase 9)
+
+Each dashboard is a read-only summary of data the earlier phases store, scoped to the signed-in
+user. It reuses the same services as the pages it links to, so its figures always match them. Every
+list links to where the user acts on it.
+
+- **Student:**
+  - stats: average score, reviewed count, attendance, Library read
+  - "Do next", with reasons: open assessments, the next session, reading in the weakest area
+  - the next session
+  - recent activity: their submissions and the feedback on them
+- **Mentor** (their batches only):
+  - stats: mentees, sessions in the next 7 days, reviews waiting, average score
+  - submissions waiting for review
+  - today's sessions (IST)
+  - "Needs attention", with reasons (the same rules as Academy Performance)
+  - mentees, lowest average first, with the latest score and its direction
+- **Academy** (own academy only):
+  - stats: students, active batches, mentors, average score, attendance
+  - average score by month
+  - scores by area
+  - "Today's tasks": flagged students, reviews waiting, batches without a mentor, students not in a
+    batch, pending invites, sessions this week
+  - recent submissions
+  - per-batch average score
+  - upcoming sessions
+- **Reports:** the same data, laid out for review:
+  - students by average-score band
+  - scores by area
+  - mentor workload: batches, sessions in the next 7 days, reviews waiting
+
+**Decisions (2026-10-08):**
+- There is **no readiness score**. "Average reviewed score" replaces it until a readiness formula is
+  defined.
+- **Today's Mission and the practice streak are hidden** until practice is stored (T083b).
+- The sample-data dashboards and the "Load/Clear demo data" controls are removed.
+
+**Acceptance:**
+- No dashboard shows a sample or invented figure. With no data, each widget shows the shared empty
+  state.
+- Each dashboard refuses other roles server-side.
+- The mentor dashboard reads only the mentor's own batches.
+- The academy dashboard reads only the admin's own academy.
+- Figures match the linked pages: Performance, Evaluations, Sessions, Mentees.
+
 ### 8a.5 Domain model
 
 ```text

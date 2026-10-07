@@ -58,7 +58,8 @@ all green as of this update):
 - `tests/unit/lib/mentor-content-service.test.ts`, `content-requests-service.test.ts`, `content-requests-validation.test.ts` — mentor ownership and batch sharing, templates, request lifecycle and fees (T084)
 - `tests/unit/lib/sessions-validation.test.ts`, `sessions-service.test.ts` — IST conversion, session rules, availability, mentor scope, double-booking (T085)
 - `tests/unit/lib/assessments-validation.test.ts`, `assessments-service.test.ts` — assessment/answer/feedback rules, submit-once, idempotent review, mentor scope (T086)
-- `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
+- `tests/unit/lib/progress-compute.test.ts`, `progress-service.test.ts` — progress derivations, attention rules, attendance, role and academy scope (T087)
+- `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
@@ -193,6 +194,17 @@ implicit.
 | PRG-06 | A student marks only content they can read as done; counts update | P1 | MANUAL (needs 0012) | Mark a Library item done, then an unassigned content id via the API | First counts in Library read; second refused by RLS |
 | PRG-07 | Academy Performance is scoped to the admin's academy | P0 | `VERIFIED` (`progress-service.test.ts`: `academy_id` filter) + RLS; MANUAL live check | Admin of academy A views Performance | Only academy A's batches and students |
 
+
+### 2h. Role dashboards (T088 Phase 9)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| DSH-01 | Each dashboard refuses other roles server-side | P0 | `VERIFIED` (`dashboards-service.test.ts`) | Call another role's dashboard function | `unauthorized`, no data read |
+| DSH-02 | Mentor dashboard reads only students in the mentor's batches | P0 | `VERIFIED` (`dashboards-service.test.ts`: `batch_id in` own batches) + RLS | Mentor with batch A views dashboard | Only batch A students in mentees/attention |
+| DSH-03 | Academy dashboard and Reports read only the admin's academy | P0 | `VERIFIED` (`dashboards-service.test.ts`) + RLS; MANUAL live | Two academies with data | Each sees only its own figures |
+| DSH-04 | No invented values: empty data shows "—" or the empty state | P0 | `VERIFIED` (`academy-dashboard-view.test.ts`, `dashboards-service.test.ts`) | New academy / mentor without batches | Dashes and empty states, no sample numbers |
+| DSH-05 | Dashboard figures match the linked pages | P1 | MANUAL (needs 0004–0012) | Compare reviews waiting vs Evaluations, attention vs Performance, sessions vs Sessions | Same numbers |
+| DSH-06 | "Today" and session times use IST | P1 | `VERIFIED` (`dashboards-compute.test.ts`) | Session at 23:30 IST vs 00:30 IST next day | Only the first counts as today |
 ---
 
 ## 3. Academy isolation / IDOR
@@ -201,9 +213,8 @@ Per `AGENTS.md` §7/§10, academy isolation is a **security boundary**, not a UI
 `status.md` → Technical Debt, this is **currently a `GAP`, not a passing/failing test target**:
 `lib/mock/academy.ts` holds one shared `STUDENTS`/`BATCHES`/`MENTORS` array, with no `academyId`
 field at all, read and written by every academy_admin session on the server. The cases below are
-written against the *intended* behavior so they're ready to enable the moment the backend migration
-(real Postgres tables with `academy_id` + RLS) lands — see `.todo` entries in
-`tests/unit/lib/academy-isolation.test.ts`.
+written against the *intended* behavior. Academy data is now real Postgres with `academy_id` + RLS;
+the service tests named in each row cover the scoping in code.
 
 | ID | Case | Priority | Status | Steps | Expected result |
 |---|---|---|---|---|---|
@@ -212,7 +223,7 @@ written against the *intended* behavior so they're ready to enable the moment th
 | ISO-03 | Same as ISO-02 for a batch ID | P0 | `VERIFIED` in code (`batches-supabase.test.ts`: academy-scoped lookups) + RLS; MANUAL live | Visit `/academy/batches/<other-academy-batch-id>` | 403/404 server-side |
 | ISO-04 | A mentor can only be assigned students within their own academy | P0 | `VERIFIED` in code (`batches-supabase.test.ts`) + DB trigger `check_batch_member`; MANUAL live | Attempt to assign Academy B's mentor to Academy A's batch (via direct action call, not just UI) | Rejected — Server Action validates the mentor and batch share an `academy_id` |
 | ISO-05 | A mentor only sees mentees from their own academy in `/mentor/mentees` | P0 | `VERIFIED` in code (`academy-people-service.test.ts`: own batches only, other ids not found) + RLS; MANUAL live | Log in as a mentor, inspect the mentee list | No cross-academy mentee ever appears, even if the mock array contains one |
-| ISO-06 | Reports (`/academy/reports`) never aggregate another academy's numbers into this academy's totals | P0 | `GAP` | Compare two academies' report pages | Numbers are computed from that academy's own students/batches only |
+| ISO-06 | Reports (`/academy/reports`) never aggregate another academy's numbers into this academy's totals | P0 | `VERIFIED` in code (`dashboards-service.test.ts`: academy id from the session, `academy_id` filters) + RLS; MANUAL live | Compare two academies' report pages | Numbers are computed from that academy's own students/batches only |
 | ISO-07 | `inviteMentorAction` scopes the invited mentor to the inviting admin's `academy_id` | P1 | MANUAL (partially real today — see note) | Invite a mentor as Academy A admin | The created Supabase user's `academy_id` metadata matches Academy A; **note:** the mock `MENTORS` array push in `lib/actions/academy.ts` is *not* academy-scoped yet, so the mentor currently also appears in every other admin's mock mentor list — this half of the bridge is the open part of ISO-01 |
 | ISO-08 | Deleting/removing a student from a batch never deletes another academy's data as a side effect | P1 | `GAP` | Remove a student from a batch | Only that student/batch pair is affected |
 
@@ -257,8 +268,8 @@ suite (visible, not silently missing) and `GAP` here, with a clear trigger for w
 | MEN-11 | Inviting a mentor sends a real Supabase invite and reflects "invited" status until accepted | P0 | MANUAL (real email + real Supabase account creation — needs a disposable test inbox) | Invite a mentor, check their status before/after accepting | Shows "invited" beforehand; flips to "active" the first time the mentor's own dashboard loads |
 | MEN-12 | Inviting a mentor with a duplicate email is rejected | P1 | MANUAL | Invite the same email twice | Second attempt: "A mentor with this email already exists." |
 | MEN-13 | Academy settings form validates and saves | P1 | MANUAL | Submit `/academy/settings` with an empty academy name, then valid data | Blocked on empty name; valid save persists and confirms |
-| MEN-14 | "Load demo data" / "Clear demo data" only ever affect this academy's mock arrays, never break real auth state | P2 | MANUAL | Use both controls from `/academy/settings` | Mock students/batches/mentors reset or empty; the signed-in admin's own session/profile is untouched |
-| MEN-15 | Academy reports state "insufficient data" rather than fabricating a chart when data is sparse | P1 | MANUAL | View `/academy/reports` with 0–1 students | Explicit "not enough data yet" message, no invented chart |
+| MEN-14 | ~~"Load demo data" / "Clear demo data"~~ — removed in T088 (dashboards read real data) | — | `DEFERRED` (feature removed) | — | — |
+| MEN-15 | Academy reports show the empty state rather than fabricating a chart when data is sparse | P1 | `VERIFIED` (`academy-dashboard-view.test.ts`, `dashboards-compute.test.ts`: null/empty with no data) | View `/academy/reports` with no reviewed scores | Empty state "Not enough data yet", no invented chart |
 
 ---
 
