@@ -647,14 +647,36 @@ batches, content or analytics.
 
 "Student content" means **platform learning content that students consume**, not managing students.
 
-- **Global content** (Super Admin): Psychology, GTO, Interview, Communication, Current Affairs,
-  practice exercises, assessments, session templates, study material, videos, documents, mock SSB
-  activities. Fields: title, description, category, type, difficulty, target role, visibility,
-  status (`draft · published · archived`), created_by, updated_by, created_at, updated_at. Published
-  content becomes available according to assignment, academy, batch or permission rules.
-- **Mentor content** (Mentor): teaching material, session templates, practice exercises, documents,
-  videos, assessments where permitted. Edited and archived only by its owner, published to assigned
-  batches/students. Kept separate from global content; a mentor can never modify global content.
+**Global content (Super Admin, Phase 4):** `/admin/content`.
+- **Fields:** title, description, category (Psychology · GTO · Interview · Communication · Current
+  Affairs · General), type (study material · video · document · article · practice exercise ·
+  assessment · session template · mock SSB activity), difficulty (easy · medium · hard), target role
+  (students · mentors · both), visibility (everyone · assigned only), status
+  (`draft · published · archived`), body text and/or an https link, created_by, updated_by,
+  created_at, updated_at, published_at.
+- Content is never deleted; it's archived. Only published content is ever visible to readers.
+- **Assignment:** content with "assigned only" visibility reaches only the academies or batches it's
+  assigned to.
+- **Readers:** a student sees published content targeted at students that is visible to everyone,
+  or assigned to their academy or their batch. A mentor sees the same for mentors, through their
+  academy or their assigned batches. Academy admins see what reaches their academy. This is
+  enforced by RLS, not only in the UI.
+
+**Acceptance (Phase 4):**
+- A Super Admin creates content as a draft, publishes it, and it appears in the right readers'
+  Library. Archiving removes it from readers.
+- Assigned-only content never appears for an academy or batch it isn't assigned to, even by id.
+- Every field is validated on the server; links must be https.
+- No content figure or list is hard-coded.
+
+**Follow-up (T083b):** move the existing practice banks, 5-day journey modules and resources (still
+`lib/mock/*`) onto this content model. Their runners need structured item formats (TAT images, WAT
+words, MCQs), so that's a separate, specified task.
+
+**Mentor content (Phase 5):** mentors create teaching material, session templates, practice
+exercises, documents, videos and assessments where permitted. They edit and archive only their
+own, and publish to their assigned batches/students. It's kept separate from global content; a
+mentor can never modify global content.
 
 ### 8a.5 Domain model
 

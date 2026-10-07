@@ -296,6 +296,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-07 | **One navy workspace shell for every role** (T076). The Academy shell (2026-09-24) was generalised into `components/layout/workspace/` and is now used by Student, Mentor and Academy, with Super Admin to follow in PR #8. The scoped CSS classes were renamed `.academy-*` → `.workspace-*`; the `--academy-*` colour tokens keep their names. `AGENTS.md` §7.3 records the decision | The user approved applying their reference image's dark navy sidebar to every workspace. One shell keeps the roles visually identical apart from their navigation and role label (`specs.md` §8a.1), instead of the glass shell for Student/Mentor next to a navy shell for Academy |
 | 2026-10-08 | **Academies become a managed domain** (T081, migration `0006_academies.sql`). Academy profile fields + `active/suspended` status. Super admins create, edit, suspend and manage members; academy admins edit only their own academy's details, never its status (RLS + guard trigger). Membership stays only in `profiles.academy_id`. A suspended academy signs out all its non-super-admin members (middleware + login, via the shared pure `lib/auth/blocked.ts`). Mentors/academy admins can't be removed from an academy without a role change first. Academy settings no longer write the in-memory `SETTINGS` mock: `getSettings`, `updateSettingsAction` and the client-side `updateAcademyName` were removed in favour of the server-side `updateMyAcademyAction` | Brief Phase 2 (`specs.md` §8a.3b). One membership column avoids two sources of truth. Server-side scoping (the academy id comes from the session, never the request) is the academy-isolation boundary (`AGENTS.md` §10) |
 | 2026-10-08 | **Batch membership is first-class** (T082, `0007_batch_membership.sql`). `batch_students` (unique per student) and `batch_mentors` (many per batch) replace `batches.mentor_id`, which is dropped after copying. A trigger enforces role + same academy. Mentors read only their batches, those students and co-mentors (`is_batch_mentor` / `is_batch_peer`). Academy admins add or remove academy students only through SECURITY DEFINER functions that set a transaction-local `app.trusted_change` flag, the one sanctioned bypass of the 0005 profile guard; `set_config` isn't reachable through the API. New students can be invited (service role used only to send the email). The Academy Students, student detail, batch detail and Mentors pages, and the Mentor's Mentees, now read Postgres. Their mock components, actions and the `student-list` helper were removed | Brief Phase 3 (`specs.md` §8a.3c): "Academy → Batch → Students → Assigned Mentors". Membership in one place per relation avoids two sources of truth. Session-derived scope plus RLS closes the IDOR class for students and mentees (ISO-01–05) |
+| 2026-10-08 | **Global learning content** (T083, `0008_contents.sql`). `contents` carries every field in the brief plus body/link. Status moves draft → published → archived, never deleted. `owner_type`/`owner_id` already leave room for mentor content (Phase 5) in the same table. `content_assignments` targets one academy or one batch. Readers are governed only by `can_read_content()` in RLS (published, for their role, visible to everyone or assigned to their academy/batch); the service doesn't re-implement it. Bodies render as plain text, never HTML. Moving the existing practice/journey/resource mocks onto it is a separate task (T083b) because their runners need a structured item model | Brief Phase 4 (`specs.md` §8a.4). One reading rule in the database means the Library can't leak by a UI bug. Deferring T083b avoids breaking working practice flows with an unspecified item format |
 
 ---
 
@@ -1456,6 +1457,27 @@ Blocker:
 
 Next task:
 - T083 — Phase 4: Global content management
+
+Date: 2026-10-08
+Task: T083 — Phase 4: Global content management
+Status: Complete in code and tests. NOT yet run against a live database (migration 0008 must be applied)
+
+What changed:
+- Migration `0008_contents.sql` (see Decisions Register)
+- `lib/server/content/{validation,repository,service}.ts`, `lib/actions/content.ts`; permission `content.manage`
+- Super Admin: `/admin/content` (category tabs with counts, search, type/difficulty/status filters, pagination), `/admin/content/new`, `/admin/content/[id]` (edit, publish/unpublish/archive/restore with confirmation, assignments); nav "Content Library" live
+- Readers: `/student/library`, `/mentor/library`, `/academy/library` (+ item pages) via the shared `components/content/library-view.tsx`; nav items added
+- Tests: 292 Vitest tests pass; screenshots in `docs/screenshots/phase-4/`
+
+What remains:
+- Apply 0008 after 0004–0007; live check: create → publish → appears in a student's Library; assigned-only content shows only for the assigned academy/batch; archive removes it
+- T083b: move practice banks / journey modules / resources onto content (needs an item model)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T084 — Phase 5: Mentor content management
 
 ## 14. North Star
 

@@ -54,6 +54,7 @@ all green as of this update):
 - `tests/unit/lib/login-suspended.test.ts` — suspended accounts are signed straight back out at login (T080)
 - `tests/unit/lib/academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts` — academy management rules, authorization, own-academy scoping, suspension (T081)
 - `tests/unit/lib/academy-people-validation.test.ts`, `academy-people-service.test.ts` — academy students/mentors scoped to the session's academy, add-by-email/invite rules, mentors limited to their own batches (T082)
+- `tests/unit/lib/content-validation.test.ts`, `content-service.test.ts` — content rules, status transitions, super-admin-only management, readers limited to published content (T083)
 - `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
@@ -124,6 +125,18 @@ implicit.
 | ACA-05 | Academy admin edits only their own academy, never its status | P0 | `VERIFIED` (`academies-service.test.ts`) + DB trigger/RLS (MANUAL live) | Submit settings with another academy's id / a status field; PATCH `academies` directly | Own academy updated; id/status ignored or refused (`42501`) |
 | ACA-06 | Members of a suspended academy are signed out and can't log in | P0 | `VERIFIED` (`blocked.test.ts`, `middleware-session.test.ts`, `login-suspended.test.ts`) + MANUAL live | Suspend an academy; members navigate / log in | `/login?reason=academy_suspended`; super admins unaffected |
 | ACA-07 | Member counts come from the database | P1 | MANUAL (live) | Add/remove members, compare list counts | Counts match `profiles` |
+
+---
+### 2c. Content (T083 Phase 4)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| CON-01 | Content management is super-admin only | P0 | `VERIFIED` (`content-service.test.ts`) + RLS | Call create/status/assign as another role | `unauthorized`; nothing written |
+| CON-02 | Content form validated on the server; links must be https | P1 | `VERIFIED` (`content-validation.test.ts`) | Submit a 2-char title, unknown enums, `javascript:`/`http:` link, no body or link | Field errors |
+| CON-03 | Status rules: draft ⇄ published, → archived, archived → draft only | P1 | `VERIFIED` (`content-validation.test.ts`, `content-service.test.ts`) | Try archived → published | Refused |
+| CON-04 | Readers see only published content | P0 | `VERIFIED` (`content-service.test.ts`) + RLS | Open a draft's id as a student | Not found |
+| CON-05 | Assigned-only content reaches only its academies/batches | P0 | MANUAL (needs 0008 applied) | Assign to Academy A; open as Academy B student (list + direct id) | Not listed; not found |
+| CON-06 | Body renders as text, never HTML | P1 | MANUAL | Save `<script>` in a body; open it | Shown literally |
 
 ---
 

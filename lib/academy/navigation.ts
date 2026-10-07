@@ -14,6 +14,7 @@ export const ACADEMY_NAVIGATION: AcademyNavItem[] = [
   { label: "Sessions", href: "/academy/sessions", icon: "sessions", availability: "soon" },
   { label: "Activities", href: "/academy/activities", icon: "activities", availability: "soon" },
   { label: "Reports", href: "/academy/reports", icon: "reports", availability: "available" },
+  { label: "Library", href: "/academy/library", icon: "content", availability: "available" },
   { label: "Notifications", href: "/academy/notifications", icon: "notifications", availability: "soon" },
   { label: "Settings", href: "/academy/settings", icon: "settings", availability: "available" },
 ];

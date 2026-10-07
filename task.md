@@ -643,9 +643,26 @@ live check.
 **Tests:** unit — `academy-people-validation.test.ts`, `academy-people-service.test.ts`,
 `batches-supabase.test.ts` (membership actions), `academy-batch-logic.test.ts`.
 
-## T083 — Phase 4: Global content management — P1 — `[ ]`
-`contents`, `content_assignments`; Super Admin content library (categories, filters, draft/
-published/archived) replacing the matching `lib/mock/*` sources.
+## T083 — Phase 4: Global content management — P1 — `[-]`
+**Spec:** `specs.md` §8a.4. **Depends on:** T082. **Branch:** `feat/phase-4-content` (stacked on T082).
+**Requirements:**
+- Migration `0008_contents.sql`: `contents` (all brief fields, draft/published/archived, never
+  deleted, https-only links) and `content_assignments` (one academy or one batch each).
+  `can_read_content()` is the single reader rule, enforced by RLS.
+- `lib/server/content`, plus the Super Admin Content Library: category tabs with counts, filters,
+  create/edit, publish/unpublish/archive/restore, academy/batch assignments.
+- A Library for students, mentors and academy admins showing only what RLS allows.
+**Acceptance:** `specs.md` §8a.4 (Phase 4 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0008 and a
+live check.
+**Tests:** unit — `content-validation.test.ts`, `content-service.test.ts`, `rbac.test.ts`.
+
+## T083b — Move practice banks, journey modules and resources onto `contents` — P1 — `[ ]`
+**Depends on:** T083. **Why:** `lib/mock/{practice,ssb-journey,resources,day2-resources}.ts` are still
+hard-coded. Their runners need structured items (TAT images, WAT words, MCQ options and answers,
+interview questions with guidance), so this needs a specified item model, e.g. a `content_items`
+table with a typed JSON payload validated per content type, before the runners can read from
+Postgres. Spec that model in `specs.md` first.
 
 ## T084 — Phase 5: Mentor content management — P1 — `[ ]`
 Mentor-owned content, publishable to assigned batches/students; never edits global content.

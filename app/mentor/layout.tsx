@@ -7,6 +7,7 @@ const NAV_ITEMS: WorkspaceNavItem[] = [
   { href: "/mentor/mentees", label: "Mentees", icon: "mentees", availability: "available" },
   { href: "/mentor/evaluations", label: "Evaluations", icon: "evaluations", availability: "available" },
   { href: "/mentor/sessions", label: "Sessions", icon: "sessions", availability: "available" },
+  { href: "/mentor/library", label: "Library", icon: "content", availability: "available" },
   { href: "/mentor/profile", label: "Profile", icon: "profile", availability: "available" },
 ];
 

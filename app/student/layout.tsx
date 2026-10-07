@@ -7,6 +7,7 @@ const NAV_ITEMS: WorkspaceNavItem[] = [
   { href: "/student/practice", label: "Practice", icon: "practice", availability: "available" },
   { href: "/student/progress", label: "Progress", icon: "progress", availability: "available" },
   { href: "/student/resources", label: "Resources", icon: "resources", availability: "available" },
+  { href: "/student/library", label: "Library", icon: "content", availability: "available" },
   { href: "/student/profile", label: "Profile", icon: "profile", availability: "available" },
 ];
 
