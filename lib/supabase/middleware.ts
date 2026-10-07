@@ -1,12 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-type Role = "student" | "mentor" | "academy_admin";
+import type { Role } from "@/types/auth";
 
 // Exported for unit testing (tests/unit/lib/middleware-role.test.ts) — the
 // route→role mapping is the entire authorization surface of the middleware,
 // so it's tested directly rather than only indirectly through updateSession.
 export function roleForPath(pathname: string): Role | null {
+  // Anchored, unlike the older prefixes below (see the KNOWN GAP test).
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return "super_admin";
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/") || pathname.startsWith("/student")) {
     return "student";
   }
@@ -52,8 +53,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).single();
   const actualRole = profile?.role as Role | undefined;
+
+  // A suspended account is signed out on its next request, whatever the route.
+  if (profile?.status === "suspended") {
+    await supabase.auth.signOut();
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    redirectUrl.search = "";
+    redirectUrl.searchParams.set("reason", "account_suspended");
+    const redirect = NextResponse.redirect(redirectUrl);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  }
 
   if (!actualRole || actualRole !== requiredRole) {
     const redirectUrl = request.nextUrl.clone();
