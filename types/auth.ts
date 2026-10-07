@@ -1,10 +1,20 @@
-export type Role = "student" | "mentor" | "academy_admin";
+export type Role = "student" | "mentor" | "academy_admin" | "super_admin";
+
+export type UserStatus = "active" | "suspended";
+
+export const ROLE_LABELS: Record<Role, string> = {
+  student: "Student",
+  mentor: "Mentor",
+  academy_admin: "Academy Admin",
+  super_admin: "Super Admin",
+};
 
 export interface Profile {
   id: string;
   role: Role;
   fullName: string;
   academyId: string | null;
+  status: UserStatus;
 }
 
 export interface SignupInput {
@@ -25,6 +35,7 @@ export type AuthErrorCode =
   | "email_in_use"
   | "validation_error"
   | "network_error"
+  | "account_suspended"
   | "unknown_error";
 
 export interface AuthResult<T> {

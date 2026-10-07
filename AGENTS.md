@@ -38,11 +38,13 @@ and record the resolution in `status.md` → *Decisions*.
 
 ## 1. Project Overview
 
-SSB Academy is a web platform for **Services Selection Board (SSB) preparation**, serving three roles:
+SSB Academy is a web platform for **Services Selection Board (SSB) preparation**, serving three academy roles plus a platform Super Admin:
 
 - **Student** — practises, receives AI-assisted feedback, learns, tracks readiness.
 - **Mentor** — reviews mentees, evaluates performance, runs sessions, gives feedback.
 - **Academy Admin** — manages students, batches and mentors; monitors academy-level performance.
+- **Super Admin** — manages the whole platform: users, academies, global content, permissions,
+  analytics (added 2026-10-07, `specs.md` §8a).
 
 ### Core loops
 
@@ -420,7 +422,7 @@ not found · server error · timeout · network failure.
 
 ## 10. Authentication, Authorization, Isolation
 
-Roles: `STUDENT`, `MENTOR`, `ACADEMY_ADMIN`.
+Roles: `STUDENT`, `MENTOR`, `ACADEMY_ADMIN`, `SUPER_ADMIN` (platform-level, `/admin`; `specs.md` §8a).
 
 - Authentication and authorization are separate concerns.
 - **Authorization is enforced server-side.** Hiding a route in the client is UX, not security.

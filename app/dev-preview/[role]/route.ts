@@ -30,9 +30,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ role
     email_confirm: true,
     user_metadata: {
       full_name: account.fullName,
-      role,
       academy_name: account.academyName ?? null,
     },
+    // app_metadata is service-role-only, so the signup trigger trusts the role
+    // from here (supabase/migrations/0005_users_rbac.sql), never from user_metadata.
+    app_metadata: { role },
   });
 
   const alreadyExists =

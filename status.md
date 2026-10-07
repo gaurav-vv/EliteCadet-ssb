@@ -2,8 +2,8 @@
 
 **Type:** Current project state. Reporting only — never a source of requirements.
 **Question this file answers:** *If I open this project today, what is the exact state?*
-**Last updated:** 2026-10-07 (T080 admin access foundation for the content-admin panels, on
-`feat/admin-access-foundation`; see §13a)
+**Last updated:** 2026-10-07 (T080 Phase 1: auth, users, roles, RBAC and the Super Admin workspace,
+on `feat/admin-access-foundation`; see §13a)
 **Last updated:** 2026-09-24 (test suite split into unit / integration / e2e layers, new tests
 added, CI workflow added on `chore/test-structure-audit`; see §13a)
 **Last updated:** 2026-09-23 (Day 2 Resources visual/text refinement, round 3; includes the latest `origin/main` changes merged into this branch)
@@ -294,7 +294,8 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 
 ---
 
-| 2026-10-07 | **Content administration gets its own access model, independent of `profiles.role`.** New migration `supabase/migrations/0004_admin_access.sql`: table `admin_grants (user_id, area)` with area enum `super`/`student_content`/`mentor_content`/`academy_content`; RLS so users read only their own grants and only a super admin can insert or delete; `is_super_admin()`/`has_admin_area()` helpers for future content-table policies; super-admin-only SECURITY DEFINER functions `admin_find_user_by_email()` and `admin_list_grants()`, so the service-role key is never used. The first super admin is bootstrapped by hand in SQL. A super admin can't revoke their own `super` grant (enforced in the action and in the RLS delete policy). `/admin` is guarded in middleware by grants, not by role, and every page and action re-checks on the server. `specs.md` §8a added; "admin-side practice authoring" un-deferred from §8.1 | User chose "super-admin plus delegated editors" (2026-10-07). Keeping grants orthogonal to the role enum leaves every existing role guard, RLS policy and signup trigger untouched, avoids Postgres's "unsafe use of new enum value" in the same migration, and lets one person edit several areas. Built first, on its own branch, so the three panel branches (T081–T083) share one access model instead of each inventing one |
+| 2026-10-07 | **Platform re-architected around four roles** from the user's brief (`specs.md` §8a): `super_admin` added to `user_role` (migration `0004_super_admin_role.sql`, run alone because a new enum value can't be used in the same transaction); `profiles` extended into the central users table (email, phone, status, last_login_at, updated_at) with 1:1 `student/mentor/academy_admin/super_admin_profiles` and an append-only `audit_log` (`0005_users_rbac.sql`). User Management is kept separate from Content Management. Backend modules live in this app under `lib/server/<module>/`, with Postgres RLS as the second line of defence. Delivered as ten phases (T080–T089), one branch and PR each. The short-lived "per-area grants" design (an `admin_grants` table, never applied to any database) was dropped before merge | The user's brief makes Super Admin a real role: mentors own their content in `/mentor`, academies manage their own data in `/academy`, and `/admin` is the platform workspace. The user chose to extend `profiles` rather than rename it, keep backend modules in the Next.js app on Supabase, and ship one PR per phase |
+| 2026-10-07 | **Two security holes on `main` closed in Phase 1.** (1) The `profiles_update_own` RLS policy let any user rewrite every column of their own row, including `role` and `academy_id`. A `before update` trigger now rejects privileged-column changes from anyone except an active super admin (never on their own role/status) and trusted server contexts. (2) The signup trigger trusted `role`/`academy_id` from browser-supplied user metadata, so anyone could self-register as a mentor of any academy. Now: self-signup creates only student or academy_admin; mentor only with `auth.users.invited_at` set (a real invite); any role only from service-role-only `app_metadata`; `super_admin` never from signup | `AGENTS.md` §10: never trust a role supplied by the browser. Fixed before `super_admin` exists, because with that role, hole (1) would have been a one-request path to platform takeover |
 
 ## 9. Technical Debt
 
@@ -1363,33 +1364,29 @@ Next task:
 - User review
 
 Date: 2026-10-07
-Task: T080 — Admin access foundation (content administration, Phase 8)
-Status: Complete in code and tests. NOT yet run against a live database (migration must be applied first)
+Task: T080 — Phase 1: Authentication + Users + Roles + RBAC (platform brief, specs.md §8a)
+Status: Complete in code and tests. NOT yet run against a live database (migrations must be applied first)
 
 What changed:
-- Migration `supabase/migrations/0004_admin_access.sql` (see Decisions Register)
-- Pure rules in `lib/admin/access.ts`: route → requirement map anchored on `/admin` (unmapped `/admin/*` paths require `super`), `canAccess`, `parseGrantInput`
-- `lib/supabase/middleware.ts`: `/admin` paths are gated by `admin_grants` (not `profiles.role`); signed out → `/login`, no grant → `/forbidden`; existing role routes are unchanged
-- `lib/auth/admin.ts` (`getAdminGrants`, `requireAdminArea`) re-checks on the server in the layout, every page and both actions
-- `lib/api/admin-access.ts` (grant list via RPC, boundary-validated) and `lib/actions/admin-access.ts` (grant by email, revoke; super-only, server validation, RLS as the final gate, anti-lockout)
-- UI: `/admin` (overview of the areas you can open), `/admin/access` (grant form, who-has-access list, remove), guarded placeholder pages for `/admin/{student,mentor,academy}-content`; nav shows only permitted areas
-- Tests: `tests/unit/lib/admin-access.test.ts`, `admin-access-actions.test.ts`, `admin-auth-guard.test.ts`, `admin-access-api.test.ts`, seven `/admin` cases in `tests/integration/middleware-session.test.ts`, and `/admin` + `/admin/access` added to the e2e auth-guard list (e2e not run locally: needs a reachable Supabase project)
-- Reviewed before PR by a multi-agent review (SQL security, app security, correctness, design/a11y, tests/governance; each finding checked by three skeptics). Fixes applied: revoke uses the shared Dialog instead of `window.confirm`; 44px touch targets; grant/revoke recover from a thrown action instead of sticking in "loading"; outcome announced in a live region with focus moved to the list heading; area shown as a neutral tag, not a status colour; retryable error state and a `loading.tsx` for `/admin/access`; two font weights per screen; the header "Profile" link goes to the person's own role profile; `/forbidden` copy no longer blames the role. Refuted findings (e.g. case-variant UUID self-revoke, already stopped by the RLS delete policy) were not changed
-- `app/globals.css`: new `.row-action` modifier (destructive icon button: danger only on hover, shared accent focus ring), per AGENTS.md §7.12
-- `app/forbidden/page.tsx`: copy changed from role-specific to permission-generic, since `/admin` denials are about grants, not role
-- Verified: `npm run lint`, `npm run typecheck`, `npm run build` clean; all Vitest suites pass under Node 22 semantics (see note)
-- Note: locally on Node 25, 40 pre-existing tests in 6 files fail with `window.localStorage.clear is not a function` (Node 25's built-in Web Storage shadows jsdom's). They fail identically on `main` and all pass with `NODE_OPTIONS=--no-experimental-webstorage`; CI pins Node 22 and is unaffected. Tracked as a separate fix, not part of this change
+- Migrations `0004_super_admin_role.sql` and `0005_users_rbac.sql` (see Decisions Register, including the two security fixes)
+- `types/auth.ts`: `super_admin` role, `UserStatus`, `ROLE_LABELS`; `lib/auth/redirect.ts`: super admin → `/admin`
+- `lib/supabase/middleware.ts`: anchored `/admin` → `super_admin`; a suspended account is signed out on its next protected request (`/login?reason=account_suspended`); `lib/api/auth.ts` refuses a suspended login
+- Backend modules: `lib/server/permissions/rbac.ts` (role → permission rules, workspaces), `lib/server/auth/guard.ts` (`requireRole` for pages, `authorize` for actions), `lib/server/users/{validation,repository,service}.ts` (list/search/filter/paginate, detail, role change, suspend/reactivate, audit), `lib/actions/users.ts`
+- UI (`/admin`, "Super Admin" role label in sidebar and header): Dashboard (real totals and newest accounts), User Management (search, role/status filters, sort, pagination, responsive table → cards), user detail (account info, change role and suspend/reactivate behind confirmation dialogs, account history); loading, empty and error states
+- Dev preview gains a Super Admin account; its role is now passed via `app_metadata`
+- Removed: the earlier per-area grant implementation (never merged, never applied)
+- Verified: lint, typecheck, build clean; 221 Vitest tests pass (Node 22 semantics); running dev server — public pages 200, every workspace incl. `/admin` → `/login` when signed out, `/administration` not caught by the guard, suspended-login message renders; UI reviewed in a browser through a temporary sample-data harness (deleted, not committed), with no console errors from the new code
 
 What remains:
-- Apply 0004 in the Supabase SQL Editor and bootstrap the first super admin (SQL in the migration header)
-- Live check: super admin grants an area to a second account → that account sees only that area → access removed → the next request is forbidden
-- T081 / T083 content editors; T082 needs its spec first
+- Run 0004, then 0005, in the Supabase SQL Editor; bootstrap the first super admin (SQL in the 0005 header)
+- Live check with real accounts: role change, suspend → signed out → can't log in, reactivate, audit entries, non-super user refused by RLS when calling the API directly
+- Decide whether the reference image's dark navy sidebar applies to every workspace (design-system change, needs approval)
 
 Blocker:
-- Needs the migration applied and two signed-in accounts to verify against live data
+- Needs the migrations applied to verify against live data
 
 Next task:
-- User review, then T081 on `feat/admin-student-content` (rebased onto this once merged)
+- T081 — Phase 2: Academies + Academy Admin
 
 ## 14. North Star
 

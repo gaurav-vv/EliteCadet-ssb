@@ -1,13 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { adminRequirementForPath, canAccess, isAdminArea } from "@/lib/admin/access";
-
-type Role = "student" | "mentor" | "academy_admin";
+import type { Role } from "@/types/auth";
 
 // Exported for unit testing (tests/unit/lib/middleware-role.test.ts) — the
 // route→role mapping is the entire authorization surface of the middleware,
 // so it's tested directly rather than only indirectly through updateSession.
 export function roleForPath(pathname: string): Role | null {
+  // Anchored, unlike the older prefixes below (see the KNOWN GAP test).
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return "super_admin";
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/") || pathname.startsWith("/student")) {
     return "student";
   }
@@ -41,8 +41,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const requiredRole = roleForPath(request.nextUrl.pathname);
-  const adminRequirement = adminRequirementForPath(request.nextUrl.pathname);
-  if (!requiredRole && !adminRequirement) {
+  if (!requiredRole) {
     return response;
   }
 
@@ -54,22 +53,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // /admin is gated by admin_grants (supabase/migrations/0004_admin_access.sql),
-  // not by profiles.role — content access is independent of the user's role.
-  if (adminRequirement) {
-    const { data: rows } = await supabase.from("admin_grants").select("area").eq("user_id", user.id);
-    const grants = (rows ?? []).map((r) => r.area).filter(isAdminArea);
-    if (!canAccess(grants, adminRequirement)) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/forbidden";
-      redirectUrl.search = "";
-      return NextResponse.redirect(redirectUrl);
-    }
-    return response;
-  }
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).single();
   const actualRole = profile?.role as Role | undefined;
+
+  // A suspended account is signed out on its next request, whatever the route.
+  if (profile?.status === "suspended") {
+    await supabase.auth.signOut();
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    redirectUrl.search = "";
+    redirectUrl.searchParams.set("reason", "account_suspended");
+    const redirect = NextResponse.redirect(redirectUrl);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  }
 
   if (!actualRole || actualRole !== requiredRole) {
     const redirectUrl = request.nextUrl.clone();

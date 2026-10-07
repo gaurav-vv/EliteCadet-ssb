@@ -12,19 +12,17 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: vi.fn() }));
 
 const mockedCreateClient = vi.mocked(createServerClient);
 
-function fakeSupabase(user: { id: string } | null, profileRole: string | null, grantAreas: string[] = []) {
-  const single = vi.fn().mockResolvedValue({ data: profileRole ? { role: profileRole } : null });
+function fakeSupabase(user: { id: string } | null, profileRole: string | null, status = "active") {
+  const single = vi.fn().mockResolvedValue({ data: profileRole ? { role: profileRole, status } : null });
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
-  // admin_grants is read without .single(): eq() resolves to the rows directly.
-  const grantsEq = vi.fn().mockResolvedValue({ data: grantAreas.map((area) => ({ area })) });
-  const grantsSelect = vi.fn(() => ({ eq: grantsEq }));
-  const from = vi.fn((table: string) => (table === "admin_grants" ? { select: grantsSelect } : { select }));
+  const from = vi.fn(() => ({ select }));
+  const signOut = vi.fn().mockResolvedValue({ error: null });
   mockedCreateClient.mockReturnValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }), signOut },
     from,
   } as unknown as ReturnType<typeof createServerClient>);
-  return { from, eq, grantsEq };
+  return { from, eq, signOut };
 }
 
 function request(path: string) {
@@ -93,55 +91,44 @@ describe("updateSession", () => {
   });
 });
 
-describe("updateSession — /admin (admin_grants, independent of profiles.role)", () => {
+describe("updateSession — /admin (super_admin workspace) and account status", () => {
   it("redirects a logged-out visitor to /login", async () => {
     fakeSupabase(null, null);
-    const res = await updateSession(request("/admin/access"));
+    const res = await updateSession(request("/admin/users"));
     const target = redirectTarget(res);
     expect(target?.pathname).toBe("/login");
-    expect(target?.searchParams.get("next")).toBe("/admin/access");
+    expect(target?.searchParams.get("next")).toBe("/admin/users");
   });
 
-  it("sends a signed-in user with no grants to /forbidden, whatever their role", async () => {
-    fakeSupabase({ id: "u1" }, "academy_admin", []);
+  it.each(["student", "mentor", "academy_admin"])("sends a %s who opens /admin to /forbidden", async (role) => {
+    fakeSupabase({ id: "u1" }, role);
     const res = await updateSession(request("/admin"));
     expect(redirectTarget(res)?.pathname).toBe("/forbidden");
   });
 
-  it("lets any grant holder into the /admin overview", async () => {
-    const { grantsEq } = fakeSupabase({ id: "u1" }, "student", ["mentor_content"]);
-    const res = await updateSession(request("/admin"));
-    expect(redirectTarget(res)).toBeNull();
-    expect(grantsEq).toHaveBeenCalledWith("user_id", "u1");
-  });
-
-  it("lets an area editor into their own area only", async () => {
-    fakeSupabase({ id: "u1" }, "student", ["student_content"]);
-    expect(redirectTarget(await updateSession(request("/admin/student-content")))).toBeNull();
-
-    fakeSupabase({ id: "u1" }, "student", ["student_content"]);
-    expect(redirectTarget(await updateSession(request("/admin/mentor-content")))?.pathname).toBe("/forbidden");
-
-    fakeSupabase({ id: "u1" }, "student", ["student_content"]);
-    expect(redirectTarget(await updateSession(request("/admin/academy-content/batches")))?.pathname).toBe("/forbidden");
-  });
-
-  it("keeps /admin/access (grant management) away from area editors", async () => {
-    fakeSupabase({ id: "u1" }, "student", ["student_content", "mentor_content", "academy_content"]);
-    const res = await updateSession(request("/admin/access"));
-    expect(redirectTarget(res)?.pathname).toBe("/forbidden");
-  });
-
-  it("lets a super admin into every area and the access page", async () => {
-    for (const path of ["/admin", "/admin/access", "/admin/student-content", "/admin/mentor-content", "/admin/academy-content"]) {
-      fakeSupabase({ id: "u1" }, "student", ["super"]);
+  it("lets a super admin into /admin and nested pages", async () => {
+    for (const path of ["/admin", "/admin/users", "/admin/users/123"]) {
+      fakeSupabase({ id: "u1" }, "super_admin");
       expect(redirectTarget(await updateSession(request(path)))).toBeNull();
     }
   });
 
-  it("does not consult profiles.role for /admin", async () => {
-    const { eq } = fakeSupabase({ id: "u1" }, null, ["super"]);
-    await updateSession(request("/admin"));
-    expect(eq).not.toHaveBeenCalled();
+  it.each(["/student", "/mentor", "/academy"])("keeps a super admin out of another role's workspace (%s)", async (path) => {
+    fakeSupabase({ id: "u1" }, "super_admin");
+    expect(redirectTarget(await updateSession(request(path)))?.pathname).toBe("/forbidden");
+  });
+
+  it("signs out a suspended account and sends it to login with a reason", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, "student", "suspended");
+    const res = await updateSession(request("/student"));
+    const target = redirectTarget(res);
+    expect(signOut).toHaveBeenCalled();
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("reason")).toBe("account_suspended");
+  });
+
+  it("suspends a super admin too", async () => {
+    fakeSupabase({ id: "u1" }, "super_admin", "suspended");
+    expect(redirectTarget(await updateSession(request("/admin")))?.searchParams.get("reason")).toBe("account_suspended");
   });
 });

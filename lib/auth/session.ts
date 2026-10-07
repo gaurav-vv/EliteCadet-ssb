@@ -13,14 +13,14 @@ export async function getCurrentUserAndProfile(): Promise<{ user: { id: string; 
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, full_name, academy_id")
+    .select("id, role, full_name, academy_id, status")
     .eq("id", user.id)
     .single();
 
   return {
     user: { id: user.id, email: user.email ?? null },
     profile: profile
-      ? { id: profile.id, role: profile.role, fullName: profile.full_name, academyId: profile.academy_id }
+      ? { id: profile.id, role: profile.role, fullName: profile.full_name, academyId: profile.academy_id, status: profile.status ?? "active" }
       : null,
   };
 }

@@ -44,8 +44,8 @@ Academy experience) are complete on mock data — see `status.md` for the verifi
 complete as of 2026-09-19 — see `status.md` §11. T039 (5-Day SSB Practice Journey, previously deferred)
 complete as of 2026-09-20. Remaining: T034/T035 (AI feedback, blocked on B3), and Phase 6 quality/security
 audits, which still need to account for the mock-data gap documented in status.md → Technical Debt.
-Phase 8 (Content Administration, T080–T083) was added 2026-10-07. T080, the shared access
-foundation, comes first.
+Phase 8 (role-based platform, T080–T089, `specs.md` §8a) was added 2026-10-07 from the user's
+platform brief. T080 (auth, users, roles, RBAC) comes first.
 
 ---
 
@@ -572,47 +572,60 @@ responsive reviewed, no debug logs, no mock data in production paths, public met
 
 ---
 
-# Phase 8 — Content Administration
+# Phase 8 — Role-based platform (brief 2026-10-07)
 
-One branch per panel: `feat/admin-student-content` (T081), `feat/admin-mentor-content` (T082),
-`feat/admin-academy-content` (T083). Each is rebased onto T080 after it merges. Each change ships as
-its own PR into `main`.
+Spec: `specs.md` §8a. One branch and one PR per phase into `gaurav-vv/EliteCadet-ssb` `main`,
+merged in order. Every phase connects frontend and backend against the real database.
 
-## T080 — Admin access foundation — P1 — `[-]`
-**Why:** User request 2026-10-07: separate admin panels for adding student, mentor and academy
-material, with access given only to the people who need it.
-**Spec:** `specs.md` §8a.1–§8a.2.
-**Requirements:** `admin_grants` table and RLS (`supabase/migrations/0004_admin_access.sql`).
-Super-admin-only SQL functions for the email lookup and the grant list, so no service-role key is
-used. A `/admin` middleware guard that is independent of `profiles.role`. Every `/admin` page and
-action re-checks on the server. `/admin` overview, `/admin/access` (grant/remove), and a guarded
-placeholder page for each area.
-**Acceptance:** as listed in `specs.md` §8a.2 (T080 block). Lint, typecheck, unit and integration
-tests, and the build all pass.
-**Status:** code and tests done. Waiting on applying `0004_admin_access.sql`, bootstrapping the first
-super admin (SQL in the migration header), and live verification by a signed-in super admin and an
-area editor.
-**Tests:** unit — `admin-access.test.ts` (route → requirement map, `canAccess`, input parsing),
-`admin-access-actions.test.ts` (grant/revoke authorization, validation, anti-lockout); integration —
-`middleware-session.test.ts` (`/admin` cases).
+## T080 — Phase 1: Authentication + Users + Roles + RBAC — P0 — `[-]`
+**Why:** the brief's foundation; every later phase depends on it. Also closes two security holes on
+`main`: users could rewrite their own `profiles.role`, and signup trusted a browser-sent role.
+**Branch:** `feat/admin-access-foundation` (PR #8, reworked from the earlier grant model).
+**Requirements:** migrations `0004_super_admin_role.sql` (enum value, run alone) and
+`0005_users_rbac.sql` (profiles as central users table, role-profile tables, hardened signup trigger,
+privileged-column guard, super-admin RLS, audit log). Middleware maps `/admin` → `super_admin` and
+signs out suspended accounts. `lib/server/{permissions,auth,users}` (RBAC rules, guards,
+validation, repository, service). `/admin` dashboard, User Management list, and user detail with
+role/status changes and history.
+**Acceptance:** `specs.md` §8a.3 (Phase 1 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0004 then
+0005, bootstrapping the first super admin, and a live check with real accounts.
+**Tests:** unit — `rbac.test.ts`, `users-validation.test.ts`, `users-service.test.ts`,
+`users-repository.test.ts`, `login-suspended.test.ts`, `middleware-role.test.ts`, `redirect.test.ts`;
+integration — `middleware-session.test.ts`; e2e — `/admin` logged-out redirects.
 
-## T081 — Student content panel — P1 — `[ ]`
-**Depends on:** T080. **Spec:** `specs.md` §8a (acceptance to be written before building).
-**Scope:** practice banks (TAT/WAT/SRT/SDT items), 5-Day Journey modules and banks, resources,
-Day 2 resources. Postgres tables and RLS keyed on `has_admin_area('student_content')` replace the
-matching `lib/mock/*` modules. Student-facing pages read the same `lib/api/*` contract, so student
-UI is unchanged.
+## T081 — Phase 2: Academies + Academy Admin — P0 — `[ ]`
+Super Admin academy management (list, create, edit, status, logo/description/contact), academy
+admin assignment, and assigning a user to an academy (unblocks role changes to mentor/academy admin).
+Academy Admin sees and edits only their own academy.
 
-## T082 — Mentor content panel — P1 — `[!]`
-**Depends on:** T080. **Needs decision:** evaluation rubrics, session templates and mentor guidance
-are not specced anywhere yet (`specs.md` §7.5 only allows evaluation criteria "approved in this
-specification"). Write their spec in `specs.md` first.
+## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[ ]`
+`batch_students`, `batch_mentors`; a real `students` model replacing `lib/mock/academy.ts`; add/remove
+students; assign/remove mentors; mentors see only assigned batches and students. Builds on T075.
 
-## T083 — Academy content panel — P1 — `[ ]`
-**Depends on:** T080. **Spec:** `specs.md` §8a.
-**Scope:** students, batches, mentors and settings at platform level. It must respect academy
-isolation (`AGENTS.md` §10), so every record stays scoped to one academy. Batches already live in
-Postgres (T075); students do not yet (T074's open item).
+## T083 — Phase 4: Global content management — P1 — `[ ]`
+`contents`, `content_assignments`; Super Admin content library (categories, filters, draft/
+published/archived) replacing the matching `lib/mock/*` sources.
+
+## T084 — Phase 5: Mentor content management — P1 — `[ ]`
+Mentor-owned content, publishable to assigned batches/students; never edits global content.
+
+## T085 — Phase 6: Session scheduling — P1 — `[ ]`
+Mentor availability and sessions (batch/students, date, time, online/offline, link) feeding mentor,
+batch and student calendars plus notifications.
+
+## T086 — Phase 7: Assessments + Feedback — P1 — `[ ]`
+`assessments`, `assessment_attempts`, `feedback`; mentor evaluation of assigned students only.
+
+## T087 — Phase 8: Progress tracking — P1 — `[ ]`
+`student_progress`: completion, attempts, scores, attendance, feedback, trends, strengths/weaknesses,
+recommended next actions.
+
+## T088 — Phase 9: Role-specific dashboards — P1 — `[ ]`
+Same progress data presented per role, replacing mock dashboard data.
+
+## T089 — Phase 10: Analytics + Notifications — P2 — `[ ]`
+Platform analytics for Super Admin; in-app notifications.
 
 ---
 

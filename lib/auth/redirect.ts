@@ -6,6 +6,8 @@ export function dashboardPathForRole(role: string): string {
       return "/mentor";
     case "academy_admin":
       return "/academy";
+    case "super_admin":
+      return "/admin";
     case "student":
     default:
       return "/student";

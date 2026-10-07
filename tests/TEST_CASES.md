@@ -2,7 +2,7 @@
 
 **Type:** Manual test plan + index of the automated suite.
 **Answers:** T066 (Critical testing) in `task.md`, and the "Testing" section of `AGENTS.md` §17.
-**Last updated:** 2026-10-07 (§2a content administration, T080).
+**Last updated:** 2026-10-07 (§2a Super Admin + RBAC, T080 Phase 1).
 
 This file is reporting/planning material, same tier as `status.md` — it does not change what the
 product must do (`specs.md`) or how it's built (`AGENTS.md`). Update it whenever a case is added,
@@ -47,16 +47,17 @@ all green as of this update):
 - `tests/unit/lib/auth-validation.test.ts` — email/password/signup/login field validation (`lib/api/auth.ts`)
 - `tests/unit/lib/redirect.test.ts` — `dashboardPathForRole`
 - `tests/unit/lib/middleware-role.test.ts` — the route→role authorization mapping (`roleForPath`), including a documented latent gap (unanchored `startsWith` prefix matching)
-- `tests/unit/lib/admin-access.test.ts` — the `/admin` route → requirement map (anchored, deny-by-default for unmapped paths), `canAccess`, grant-input parsing (T080)
-- `tests/unit/lib/admin-access-actions.test.ts` — grant/revoke Server Actions against a mocked Supabase client: non-super callers refused before any DB call, server-side validation, unknown email, duplicate grant, anti-lockout (T080)
-- `tests/unit/lib/admin-auth-guard.test.ts` — `getAdminGrants`/`requireAdminArea`: signed out → `/login`, missing grant → `/forbidden`, only the caller's own grants read, unknown area values dropped (T080)
-- `tests/unit/lib/admin-access-api.test.ts` — grant-list boundary validation, error mapping (missing migration / non-super / other), `listAdminGrants` (T080)
+- `tests/unit/lib/rbac.test.ts` — role → permission rules (super admin only for user management), the four roles, workspaces, academy-required roles (T080)
+- `tests/unit/lib/users-validation.test.ts` — user-list URL parsing (hostile values fall back), query building, search sanitising (ILIKE wildcards + PostgREST filter syntax), role/status change rules incl. no self-change (T080)
+- `tests/unit/lib/users-service.test.ts` — users service with mocked guard + repository: unauthorized before any data access, page clamping, setup guidance, audit on success only, RLS refusal mapped, no raw error leaks (T080)
+- `tests/unit/lib/users-repository.test.ts` — user row boundary validation (T080)
+- `tests/unit/lib/login-suspended.test.ts` — suspended accounts are signed straight back out at login (T080)
 - `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
 - `tests/unit/hooks/use-countdown.test.tsx` — countdown ticks, `onExpire` fires exactly once, latest callback used
-- `tests/integration/middleware-session.test.ts` — `updateSession()` with a faked Supabase client: logged-out → `/login`, every wrong-role combination and a missing profile → `/forbidden`, correct role allowed, browser-supplied `?role=` ignored (AGENTS.md §10); `/admin` gated by `admin_grants` independent of role (T080)
+- `tests/integration/middleware-session.test.ts` — `updateSession()` with a faked Supabase client: logged-out → `/login`, every wrong-role combination and a missing profile → `/forbidden`, correct role allowed, browser-supplied `?role=` ignored (AGENTS.md §10); `/admin` → super_admin only, super admin kept out of other workspaces, suspended accounts signed out (T080)
 - `tests/integration/practice-api.test.ts` — `lib/api/practice.ts` against real content: advertised item counts equal real counts (AGENTS.md §8), unknown activity, empty submit, idempotent submit
 - `tests/integration/ssb-journey-api.test.ts` — every 5-Day Journey day/module resolves and has content, unique ids, valid MCQ answers, progress totals exclude timed tests, idempotent test submit
 - `tests/integration/bank-practice-runner.test.tsx` — practice runner + real progress store: MCQ check/feedback text, navigation, mark done persists across remount
@@ -94,23 +95,20 @@ implicit.
 
 ---
 
-### 2a. Content administration (`/admin`, T080)
-
-Access comes from `admin_grants`, not from `profiles.role`
-(`supabase/migrations/0004_admin_access.sql`, `specs.md` §8a).
+### 2a. Super Admin + RBAC (`/admin`, T080 Phase 1)
 
 | ID | Case | Priority | Status | Steps | Expected result |
 |---|---|---|---|---|---|
-| ADM-01 | Signed-out visitor to any `/admin` route is sent to login | P0 | `VERIFIED` (`middleware-session.test.ts`) | Visit `/admin/access` while logged out | 307 → `/login?next=/admin/access&reason=login_required` |
-| ADM-02 | A signed-in user with no grant is forbidden, whatever their role | P0 | `VERIFIED` (`middleware-session.test.ts`) | Academy admin with no grant opens `/admin` | `/forbidden` |
-| ADM-03 | An area editor reaches only their own area, never another area or `/admin/access` | P0 | `VERIFIED` (`middleware-session.test.ts`, `admin-access.test.ts`) | `student_content` editor opens each `/admin/*` route | Own area allowed; other areas and `/admin/access` → `/forbidden` |
-| ADM-04 | A super admin reaches every area and `/admin/access` | P0 | `VERIFIED` (`middleware-session.test.ts`) | Super admin opens each `/admin/*` route | All allowed |
-| ADM-05 | Unmapped `/admin/*` paths require super, and `/administration` is not caught by the guard | P1 | `VERIFIED` (`admin-access.test.ts`) | n/a (regression guard) | New pages are closed until deliberately mapped |
-| ADM-06 | Grant/revoke actions refuse non-super callers before touching the database | P0 | `VERIFIED` (`admin-access-actions.test.ts`) | Call the actions as an area editor / with no grant / signed out | `unauthorized`; no RPC, insert or delete issued |
-| ADM-07 | A super admin can't remove their own super access | P0 | `VERIFIED` (`admin-access-actions.test.ts`) + DB policy | Revoke own `super` grant | Refused; grant remains |
-| ADM-08 | Granting to an unknown email, or granting a duplicate, gives a clear message | P1 | `VERIFIED` (`admin-access-actions.test.ts`) | Grant to a non-existent email; grant the same area twice | "They need to sign up first" / "They already have that access" |
-| ADM-09 | RLS: an area editor can't insert a grant or read others' grants via the anon key | P0 | MANUAL (needs the migration applied and a real editor session) | As an editor, call PostgREST `insert` on `admin_grants` and `rpc/admin_list_grants` directly | Insert rejected by RLS; RPC raises `42501` |
-| ADM-10 | Removed access takes effect on the next request | P0 | MANUAL (needs two live accounts) | Super admin removes an editor's area while the editor has it open, then the editor navigates | Editor gets `/forbidden` |
+| ADM-01 | Signed-out visitor to any `/admin` route is sent to login | P0 | `VERIFIED` (`middleware-session.test.ts`, `auth-guard.spec.ts`) | Visit `/admin/users` while logged out | 307 → `/login?next=/admin/users&reason=login_required` |
+| ADM-02 | Student, mentor and academy admin are forbidden from `/admin` | P0 | `VERIFIED` (`middleware-session.test.ts`) | Open `/admin` as each role | `/forbidden` |
+| ADM-03 | A super admin can't open other roles' workspaces | P1 | `VERIFIED` (`middleware-session.test.ts`) | Super admin opens `/student`, `/mentor`, `/academy` | `/forbidden` |
+| ADM-04 | A suspended account is signed out and can't log in | P0 | `VERIFIED` (`middleware-session.test.ts`, `login-suspended.test.ts`) + MANUAL live | Suspend a user; they navigate / log in | Signed out → `/login?reason=account_suspended` with a clear message |
+| ADM-05 | User management actions refuse non-super-admins before any data access | P0 | `VERIFIED` (`users-service.test.ts`) | Call list/detail/role/status as another role | `unauthorized`; repository never called |
+| ADM-06 | No self role/status change; mentor/academy admin need an academy | P0 | `VERIFIED` (`users-validation.test.ts`, `users-service.test.ts`) + DB trigger | Try to change own role; promote a user without an academy to mentor | Refused with a clear message; nothing written |
+| ADM-07 | Every role/status change is audited | P1 | `VERIFIED` (`users-service.test.ts`) + MANUAL live | Change a role, suspend, reactivate | Entries appear in the user's Account history |
+| ADM-08 | A user can't rewrite their own role via the API (closed hole) | P0 | MANUAL (needs 0005 applied + a real session) | As a student, `PATCH /rest/v1/profiles?id=eq.<self>` with `{"role":"super_admin"}` | Rejected (`42501`); role unchanged |
+| ADM-09 | Signup can't self-assign mentor or super admin (closed hole) | P0 | MANUAL (needs 0005 applied) | `supabase.auth.signUp` with `data: { role: "mentor", academy_id: <any> }` or `role: "super_admin"` | Account is created as a student with no academy |
+| ADM-10 | Dashboard totals and user list come from the database | P0 | MANUAL (live) | Compare `/admin` totals with `profiles`/`academies` counts | Numbers match; nothing hard-coded |
 
 ---
 
