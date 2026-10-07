@@ -292,6 +292,8 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 
 ---
 
+| 2026-10-07 | **One navy workspace shell for every role** (T076). The Academy shell (2026-09-24) was generalised into `components/layout/workspace/` and is now used by Student, Mentor and Academy, with Super Admin to follow in PR #8. The scoped CSS classes were renamed `.academy-*` → `.workspace-*`; the `--academy-*` colour tokens keep their names. `AGENTS.md` §7.3 records the decision | The user approved applying their reference image's dark navy sidebar to every workspace. One shell keeps the roles visually identical apart from their navigation and role label (`specs.md` §8a.1), instead of the glass shell for Student/Mentor next to a navy shell for Academy |
+
 ## 9. Technical Debt
 
 | Introduced | Debt | Removed by |
@@ -1357,6 +1359,26 @@ Blocker:
 
 Next task:
 - User review
+
+Date: 2026-10-07
+Task: T076 — One workspace shell for every role
+Status: Complete (verified locally)
+
+What changed:
+- `components/academy/layout/academy-{brand,navigation,mobile-nav,sidebar-footer,header}.tsx` moved to `components/layout/workspace/workspace-*.tsx` with generic props (workspace label, role label, display/context names, search and profile labels); new `WorkspaceLayout`; `lib/navigation/workspace.ts` holds the nav item type and active-link rule
+- `AcademyLayout` is now a thin configuration of `WorkspaceLayout`; `app/student/layout.tsx` and `app/mentor/layout.tsx` switched from the glass `AppShell` to it
+- `app/globals.css`: `.academy-app/.academy-sidebar/.academy-nav-item` → `.workspace-*`, comment updated; `AGENTS.md` §7.3 decision note
+- Verified: lint, typecheck, tests (171) and build clean. The real Student, Mentor and Academy layouts and dashboards were rendered through a temporary harness (deleted): navy sidebar with the role in the wordmark, role label in the header, mobile drawer opens with the right links, no horizontal overflow at 375px, no server errors
+
+What remains:
+- Super Admin `/admin` adopts `WorkspaceLayout` in PR #8; then delete the old glass `AppShell`/`Sidebar`/`TopHeader`/`MobileTabBar`
+- Student/Mentor dashboards still greet with mock names ("Aditya", "Kavita") from `lib/mock/*`. Pre-existing; removed when those dashboards move to real data (T088)
+
+Blocker:
+- None
+
+Next task:
+- T081 — Phase 2: Academies + Academy Admin
 
 ## 14. North Star
 

@@ -410,16 +410,17 @@
 }
 
 /*
- * Academy design language — "SSB Path Academy" (decision: status.md,
- * 2026-09-24, approved scoped deviation from the Glass UI v3 material).
- * Scoped to the .academy-app wrapper so Student/Mentor are untouched; it only
- * re-points existing tokens (surface, radius, materials) and adds the navy
- * sidebar + restrained gold tokens. Glass materials become solid white cards
- * with a hairline border, so every shared component used inside Academy
- * pages (cards, lists, inputs) matches without per-component changes.
- * Promote to :root when Student/Mentor adopt it.
+ * Workspace design language: navy sidebar, white cards, indigo primary,
+ * restrained gold. Introduced for Academy on 2026-09-24 and extended to every
+ * signed-in workspace (Student, Mentor, Academy, Super Admin) on 2026-10-07 at
+ * the user's request, matching their reference image (status.md, Decisions).
+ * Scoped to the .workspace-app wrapper that WorkspaceLayout renders, so the
+ * public site and auth pages keep the Glass UI v3 material. It re-points
+ * existing tokens (surface, radius, materials): glass materials become solid
+ * white hairline-bordered cards, so shared components match without
+ * per-component changes. The --academy-* token names are historical.
  */
-.academy-app {
+.workspace-app {
   --surface-base: #f5f6fb;
   --hairline: #e4e7f1;
   --radius-card: 16px;
@@ -442,19 +443,19 @@
   --academy-chart-ppdt: #3b82f6;
   background: var(--surface-base);
 }
-.academy-app .glass-thin,
-.academy-app .glass-regular,
-.academy-app .glass-thick {
+.workspace-app .glass-thin,
+.workspace-app .glass-regular,
+.workspace-app .glass-thick {
   background: #ffffff;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow-soft);
 }
-.academy-app .glass-hover-lift:hover {
+.workspace-app .glass-hover-lift:hover {
   border-color: color-mix(in srgb, var(--brand-accent) 35%, var(--hairline));
 }
-.academy-app .row-hover-tint:hover {
+.workspace-app .row-hover-tint:hover {
   background: rgba(74, 85, 232, 0.04);
 }
 
@@ -495,29 +496,29 @@
   background: var(--status-danger);
 }
 
-.academy-sidebar {
+.workspace-sidebar {
   background: var(--academy-navy);
   color: var(--academy-nav-fg);
 }
-.academy-nav-item {
+.workspace-nav-item {
   transition:
     background var(--motion-duration) var(--motion-easing),
     color var(--motion-duration) var(--motion-easing);
 }
-.academy-nav-item[data-active="true"] {
+.workspace-nav-item[data-active="true"] {
   background: var(--brand-accent);
   color: var(--academy-nav-fg-strong);
   box-shadow: var(--shadow-glow-accent);
 }
-.academy-nav-item[data-active="false"][data-disabled="false"]:hover {
+.workspace-nav-item[data-active="false"][data-disabled="false"]:hover {
   background: rgba(255, 255, 255, 0.07);
   color: var(--academy-nav-fg-strong);
 }
-.academy-nav-item[data-disabled="true"] {
+.workspace-nav-item[data-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.academy-sidebar :focus-visible {
+.workspace-sidebar :focus-visible {
   outline: 2px solid var(--academy-gold);
   outline-offset: 2px;
 }

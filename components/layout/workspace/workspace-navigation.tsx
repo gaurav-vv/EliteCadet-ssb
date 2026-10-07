@@ -3,29 +3,32 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navIcons } from "@/components/ui/nav-icons";
-import { isAcademyNavActive, type AcademyNavItem } from "@/lib/academy/navigation";
+import { isWorkspaceNavActive, type WorkspaceNavItem } from "@/lib/navigation/workspace";
 import { cn } from "cn";
 
-interface AcademyNavigationProps {
-  items: AcademyNavItem[];
+interface WorkspaceNavigationProps {
+  items: WorkspaceNavItem[];
+  // Accessible name of the nav landmark, e.g. "Student".
+  label: string;
   // "rail" collapses to icons between md and lg; "full" always shows labels
   // (desktop ≥lg is rendered with "rail" too, the drawer uses "full").
   variant?: "rail" | "full";
   onNavigate?: () => void;
 }
 
-export function AcademyNavigation({ items, variant = "full", onNavigate }: AcademyNavigationProps) {
+export function WorkspaceNavigation({ items, label, variant = "full", onNavigate }: WorkspaceNavigationProps) {
   const pathname = usePathname();
   const isRail = variant === "rail";
+  const rootHref = items[0]?.href ?? "/";
 
   return (
-    <nav aria-label="Academy" className="flex flex-col gap-1 [@media(max-height:820px)]:gap-0.5">
+    <nav aria-label={label} className="flex flex-col gap-1 [@media(max-height:820px)]:gap-0.5">
       {items.map((item) => {
         const Icon = navIcons[item.icon];
         const disabled = item.availability === "soon";
-        const active = !disabled && isAcademyNavActive(pathname, item.href);
+        const active = !disabled && isWorkspaceNavActive(pathname, item.href, rootHref);
         const itemClass = cn(
-          "academy-nav-item flex items-center gap-3 rounded-button px-3 py-2.5 text-sm [@media(max-height:820px)]:py-1.5 font-medium text-(--academy-nav-fg) no-underline",
+          "workspace-nav-item flex items-center gap-3 rounded-button px-3 py-2.5 text-sm [@media(max-height:820px)]:py-1.5 font-medium text-(--academy-nav-fg) no-underline",
           isRail && "max-lg:justify-center max-lg:px-0",
         );
         const content = (

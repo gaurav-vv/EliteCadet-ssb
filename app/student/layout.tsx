@@ -1,27 +1,33 @@
-import { AppShell } from "@/components/layout/app-shell";
-import type { SidebarNavItem } from "@/components/layout/sidebar";
+import { WorkspaceLayout } from "@/components/layout/workspace/workspace-layout";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
+import type { WorkspaceNavItem } from "@/lib/navigation/workspace";
 
-const NAV_ITEMS: SidebarNavItem[] = [
-  { href: "/student", label: "Dashboard", icon: "dashboard" },
-  { href: "/student/practice", label: "Practice", icon: "practice" },
-  { href: "/student/progress", label: "Progress", icon: "progress" },
-  { href: "/student/resources", label: "Resources", icon: "resources" },
-  { href: "/student/profile", label: "Profile", icon: "profile" },
+const NAV_ITEMS: WorkspaceNavItem[] = [
+  { href: "/student", label: "Dashboard", icon: "dashboard", availability: "available" },
+  { href: "/student/practice", label: "Practice", icon: "practice", availability: "available" },
+  { href: "/student/progress", label: "Progress", icon: "progress", availability: "available" },
+  { href: "/student/resources", label: "Resources", icon: "resources", availability: "available" },
+  { href: "/student/profile", label: "Profile", icon: "profile", availability: "available" },
 ];
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await getCurrentUserAndProfile();
+  const name = profile?.fullName || "Student";
 
   return (
-    <AppShell
+    <WorkspaceLayout
+      workspaceLabel="Student"
       roleLabel="Student"
       items={NAV_ITEMS}
+      userName={name}
+      displayName={name}
+      contextName="Student"
       searchPlaceholder="Search practice, resources…"
-      userName={profile?.fullName || "Student"}
+      searchLabel="Search practice and resources"
       profileHref="/student/profile"
+      profileLabel="Profile"
     >
       {children}
-    </AppShell>
+    </WorkspaceLayout>
   );
 }

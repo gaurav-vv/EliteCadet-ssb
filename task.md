@@ -548,6 +548,20 @@ regression" also needs a branch-protection rule requiring the CI checks on `main
 
 ---
 
+## T076 — One workspace shell for every role — P1 — `[x]`
+**Why:** User request 2026-10-07: every role should get the reference image's dark navy sidebar,
+not only Academy.
+**Requirements:** generalise the Academy shell into `components/layout/workspace/` (brand,
+navigation, mobile drawer, header, sidebar footer, `WorkspaceLayout`). Student, Mentor and Academy
+use it now; Super Admin adopts it when T080 (PR #8) is updated. Rename the scoped CSS classes
+`.academy-app/-sidebar/-nav-item` to `.workspace-*`.
+**Acceptance:** each workspace shows the navy sidebar with its role in the wordmark and the role
+label in the header. The mobile drawer works, there is no horizontal overflow at 375px, and Academy
+is visually unchanged. Lint, typecheck, tests and build pass.
+**Follow-up:** delete `components/layout/{app-shell,sidebar,top-header,mobile-tab-bar}.tsx` once PR
+#8's `/admin` layout moves to `WorkspaceLayout`. They are kept until then so neither PR breaks the
+other's build.
+
 ## T070 — Design system consistency pass — P1 — `[ ]`
 **Updated 2026-09-19:** the design system itself changed (Glass Capsule → Apple-Inspired Glass UI v3,
 `AGENTS.md` §7, see `status.md` → Decisions). The core migration (tokens, shell, primary dashboards)
