@@ -295,6 +295,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-07 | **Two security holes on `main` closed in Phase 1.** (1) The `profiles_update_own` RLS policy let any user rewrite every column of their own row, including `role` and `academy_id`. A `before update` trigger now rejects privileged-column changes from anyone except an active super admin (never on their own role/status) and trusted server contexts. (2) The signup trigger trusted `role`/`academy_id` from browser-supplied user metadata, so anyone could self-register as a mentor of any academy. Now: self-signup creates only student or academy_admin; mentor only with `auth.users.invited_at` set (a real invite); any role only from service-role-only `app_metadata`; `super_admin` never from signup | `AGENTS.md` §10: never trust a role supplied by the browser. Fixed before `super_admin` exists, because with that role, hole (1) would have been a one-request path to platform takeover |
 | 2026-10-07 | **One navy workspace shell for every role** (T076). The Academy shell (2026-09-24) was generalised into `components/layout/workspace/` and is now used by Student, Mentor and Academy, with Super Admin to follow in PR #8. The scoped CSS classes were renamed `.academy-*` → `.workspace-*`; the `--academy-*` colour tokens keep their names. `AGENTS.md` §7.3 records the decision | The user approved applying their reference image's dark navy sidebar to every workspace. One shell keeps the roles visually identical apart from their navigation and role label (`specs.md` §8a.1), instead of the glass shell for Student/Mentor next to a navy shell for Academy |
 | 2026-10-08 | **Academies become a managed domain** (T081, migration `0006_academies.sql`). Academy profile fields + `active/suspended` status. Super admins create, edit, suspend and manage members; academy admins edit only their own academy's details, never its status (RLS + guard trigger). Membership stays only in `profiles.academy_id`. A suspended academy signs out all its non-super-admin members (middleware + login, via the shared pure `lib/auth/blocked.ts`). Mentors/academy admins can't be removed from an academy without a role change first. Academy settings no longer write the in-memory `SETTINGS` mock: `getSettings`, `updateSettingsAction` and the client-side `updateAcademyName` were removed in favour of the server-side `updateMyAcademyAction` | Brief Phase 2 (`specs.md` §8a.3b). One membership column avoids two sources of truth. Server-side scoping (the academy id comes from the session, never the request) is the academy-isolation boundary (`AGENTS.md` §10) |
+| 2026-10-08 | **Batch membership is first-class** (T082, `0007_batch_membership.sql`). `batch_students` (unique per student) and `batch_mentors` (many per batch) replace `batches.mentor_id`, which is dropped after copying. A trigger enforces role + same academy. Mentors read only their batches, those students and co-mentors (`is_batch_mentor` / `is_batch_peer`). Academy admins add or remove academy students only through SECURITY DEFINER functions that set a transaction-local `app.trusted_change` flag, the one sanctioned bypass of the 0005 profile guard; `set_config` isn't reachable through the API. New students can be invited (service role used only to send the email). The Academy Students, student detail, batch detail and Mentors pages, and the Mentor's Mentees, now read Postgres. Their mock components, actions and the `student-list` helper were removed | Brief Phase 3 (`specs.md` §8a.3c): "Academy → Batch → Students → Assigned Mentors". Membership in one place per relation avoids two sources of truth. Session-derived scope plus RLS closes the IDOR class for students and mentees (ISO-01–05) |
 
 ---
 
@@ -1431,6 +1432,30 @@ Blocker:
 
 Next task:
 - T082 — Phase 3: Batches + Students + Mentor assignment
+
+Date: 2026-10-08
+Task: T082 — Phase 3: Batches + Students + Mentor assignment
+Status: Complete in code and tests. NOT yet run against a live database (migration 0007 must be applied)
+
+What changed:
+- Migration `0007_batch_membership.sql` (see Decisions Register)
+- Batches: multi-mentor model (`lib/api/batches.ts` reads `batch_overview`; `lib/actions/batches.ts`: add/remove mentor, set student batch); batch form no longer picks a single mentor; table shows mentors and student counts; real batch detail page
+- New `lib/server/academy-people` (validation, repository, service) and `lib/actions/academy-people.ts`: academy students list/detail/add-by-email-or-invite/remove, academy mentors list/invite, mentor's own mentees
+- Pages on real data: `/academy/students`, `/academy/students/[id]`, `/academy/batches/[id]`, `/academy/mentors`, `/mentor/mentees`, `/mentor/mentees/[id]`
+- Removed mock paths: `components/academy/{batch-actions,add-existing-student-to-batch,student-actions}.tsx`, `lib/academy/student-list.ts` (+ test), mock student/batch/invite actions in `lib/actions/academy.ts`, mock mentee reads in `lib/api/mentor.ts`, the `markMentorActive` bridge
+- Shared `ConfirmActionDialog` moved to `components/shared/`
+- Tests: 275 Vitest tests pass; screenshots in `docs/screenshots/phase-3/`
+- Docs note: this entry, the T082 task entry and the ISO test-case updates were added in a follow-up commit. The first Phase 3 commit's doc step didn't run because it was chained after a failing cleanup command
+
+What remains:
+- Apply 0007 after 0004–0006; live check: add/invite students, assign 2 mentors to a batch, move a student between batches, mentor sees only their batches' students (try another id → not found)
+- Still sample data (by phase): Academy dashboard + Reports (T088), Mentor dashboard (T088), evaluations (T086), sessions (T085). Their mentee pickers use sample mentees until then
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T083 — Phase 4: Global content management
 
 ## 14. North Star
 

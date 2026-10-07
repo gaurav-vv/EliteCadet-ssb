@@ -624,9 +624,24 @@ live check with real accounts.
 `users-validation.test.ts` (`checkAcademyChange`), `rbac.test.ts`, `login-suspended.test.ts`;
 integration — `middleware-session.test.ts` (academy suspension).
 
-## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[ ]`
-`batch_students`, `batch_mentors`; a real `students` model replacing `lib/mock/academy.ts`; add/remove
-students; assign/remove mentors; mentors see only assigned batches and students. Builds on T075.
+## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[-]`
+**Spec:** `specs.md` §8a.3c. **Depends on:** T081. **Branch:** `feat/phase-3-batches` (stacked on
+T081).
+**Requirements:**
+- Migration `0007_batch_membership.sql`: `batch_students` (one batch per student) and
+  `batch_mentors` (many per batch) replace `batches.mentor_id`, with existing assignments copied.
+  A role/academy integrity trigger, mentor-scoped RLS, the `batch_overview` and `academy_students`
+  views, `academy_add_student` / `academy_remove_student`, and invited students joining their
+  academy.
+- Academy Admin: Students (real list, filters, add by email or invite, change batch, remove),
+  student detail, batch detail (assign/remove mentors, add/remove students), and Mentors (real
+  list and invite).
+- Mentor: Mentees and mentee detail scoped to their own batches.
+**Acceptance:** `specs.md` §8a.3c (Phase 3 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0007 and a
+live check.
+**Tests:** unit — `academy-people-validation.test.ts`, `academy-people-service.test.ts`,
+`batches-supabase.test.ts` (membership actions), `academy-batch-logic.test.ts`.
 
 ## T083 — Phase 4: Global content management — P1 — `[ ]`
 `contents`, `content_assignments`; Super Admin content library (categories, filters, draft/
