@@ -738,6 +738,40 @@ words, MCQs), so that's a separate, specified task.
 - Online sessions need an https link; offline sessions need a location; the end is after the
   start; sessions are at most 8 hours.
 
+### 8a.4c Assessments and mentor feedback (Phase 7)
+
+- **Assessments** (mentor-created, per batch): title, instructions, category, 1–20 free-text
+  questions, maximum score (1–100), optional due date.
+  - Status `draft → published → closed`. Only published, not-yet-due assessments accept answers.
+  - Only mentors who teach the batch create and manage them; co-mentors of the batch can see and
+    evaluate them.
+- **Attempts:** one per student per assessment. A student saves a draft as often as they like,
+  then **submits once**. A submitted attempt is locked.
+- **Mentor feedback** (`specs.md` §7.5) on a submitted attempt:
+  - Fields: score (0–max), **strengths**, **improvement areas**, comments.
+  - Saving keeps it **in review** (a recoverable draft, visible only to staff); **submitting**
+    marks it **reviewed**. One feedback per attempt, so a double submit can't create a second.
+  - Reviewed feedback is locked and shows the evaluator and timestamp.
+  - A student sees feedback only once it's reviewed.
+  - Evaluation status: `pending` (submitted, no feedback) · `in_review` · `reviewed`.
+- **Who sees what:**
+  - Students see published assessments for their batch, and their own attempts and reviewed
+    feedback.
+  - Mentors see their batches' assessments and attempts.
+  - Academy admins see their academy's.
+  - Enforced by RLS.
+- Feedback is the mentor's own, never presented as an SSB selection outcome (`AGENTS.md` §11).
+  AI-assisted feedback remains blocked on B3.
+
+**Acceptance (Phase 7):**
+- A student can't submit twice, edit after submitting, answer a closed/overdue/draft assessment,
+  or see another student's attempt.
+- A mentor can't create assessments for, or evaluate attempts in, batches they don't teach.
+- A draft evaluation is recoverable after leaving the page. Submitting twice yields one reviewed
+  feedback.
+- The student's assessment page shows the score, strengths, improvement areas and comments with
+  the evaluator's name and date.
+
 ### 8a.5 Domain model
 
 ```text

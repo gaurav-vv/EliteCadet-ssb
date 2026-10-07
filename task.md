@@ -703,8 +703,26 @@ live check.
 live check.
 **Tests:** unit — `sessions-validation.test.ts`, `sessions-service.test.ts`.
 
-## T086 — Phase 7: Assessments + Feedback — P1 — `[ ]`
-`assessments`, `assessment_attempts`, `feedback`; mentor evaluation of assigned students only.
+## T086 — Phase 7: Assessments + Feedback — P1 — `[-]`
+**Spec:** `specs.md` §8a.4c (+ §7.5). **Depends on:** T085. **Branch:** `feat/phase-7-assessments`
+(stacked on T085).
+**Requirements:**
+- Migration `0011_assessments.sql`: `assessments` (per batch, mentor-created, JSON questions,
+  draft/published/closed, questions locked once opened), `assessment_attempts` (one per student,
+  draft → submitted then locked; only while open and only students of the batch) and `feedback`
+  (one per attempt, in_review → reviewed then locked; reviewed requires score, strengths and
+  improvement areas; score within the maximum). All enforced by triggers and RLS.
+- `lib/server/assessments` (validation, service), `lib/actions/assessments.ts`.
+- Mentor: Assessments (create/edit draft, open/close/reopen, submissions), Evaluations queue
+  (pending / in review / reviewed), evaluate page (save draft, submit review), and assessment
+  history on the mentee page.
+- Student: Assessments (answer with drafts, submit once, see reviewed feedback with the evaluator
+  and date). Academy: Assessments overview (nav now live).
+- Removed the sample-data evaluations pages, form and actions.
+**Acceptance:** `specs.md` §8a.4c (Phase 7 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0011 and a
+live check.
+**Tests:** unit — `assessments-validation.test.ts`, `assessments-service.test.ts`.
 
 ## T087 — Phase 8: Progress tracking — P1 — `[ ]`
 `student_progress`: completion, attempts, scores, attendance, feedback, trends, strengths/weaknesses,

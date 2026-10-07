@@ -6,6 +6,10 @@ import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { DetailHeader } from "@/components/ui/detail-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getMyMentee } from "@/lib/server/academy-people/service";
+import { EvaluationStatusTag } from "@/components/assessments/assessment-tags";
+import { ListPanel, ListRow } from "@/components/ui/list-panel";
+import { getMenteeHistory } from "@/lib/server/assessments/service";
+import { evaluationStatusOf } from "@/types/assessments";
 import { formatDay } from "@/lib/utils/format-date";
 
 export const metadata: Metadata = { title: "Mentee" };
@@ -23,7 +27,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 // batch, another academy, or nonexistent — is the same "not found" (specs §7.4).
 export default async function MenteeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const result = await getMyMentee(id);
+  const [result, history] = await Promise.all([getMyMentee(id), getMenteeHistory(id)]);
   if (!result.ok && result.error?.code === "not_found") notFound();
 
   if (!result.ok || !result.data) {
@@ -54,10 +58,24 @@ export default async function MenteeDetailPage({ params }: { params: Promise<{ i
       </section>
 
       <section aria-labelledby="activity-heading" className="flex flex-col gap-3">
-        <h2 id="activity-heading" className="text-[18px] font-semibold text-ink">Activity and evaluations</h2>
-        <div className="glass-regular rounded-card">
-          <EmptyState title="Nothing to show yet" description="Practice activity, assessments and evaluations for this student arrive in later phases." />
-        </div>
+        <h2 id="activity-heading" className="text-[18px] font-semibold text-ink">Assessments and evaluations</h2>
+        {(history.data ?? []).length === 0 ? (
+          <div className="glass-regular rounded-card">
+            <EmptyState title="No submissions yet" description="Assessments this student submits in your batches appear here." />
+          </div>
+        ) : (
+          <ListPanel>
+            {history.data!.map((t) => (
+              <ListRow key={t.id} href={`/mentor/evaluations/${t.id}`}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-ink">{t.assessmentTitle}</p>
+                  <p className="text-[13px] text-ink-secondary">{t.feedback?.status === "reviewed" && t.feedback.score !== null ? `Score ${t.feedback.score} / ${t.maxScore}` : "Not reviewed yet"}</p>
+                </div>
+                <EvaluationStatusTag status={evaluationStatusOf(t) ?? "pending"} />
+              </ListRow>
+            ))}
+          </ListPanel>
+        )}
       </section>
     </div>
   );

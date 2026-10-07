@@ -299,6 +299,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Global learning content** (T083, `0008_contents.sql`). `contents` carries every field in the brief plus body/link. Status moves draft → published → archived, never deleted. `owner_type`/`owner_id` already leave room for mentor content (Phase 5) in the same table. `content_assignments` targets one academy or one batch. Readers are governed only by `can_read_content()` in RLS (published, for their role, visible to everyone or assigned to their academy/batch); the service doesn't re-implement it. Bodies render as plain text, never HTML. Moving the existing practice/journey/resource mocks onto it is a separate task (T083b) because their runners need a structured item model | Brief Phase 4 (`specs.md` §8a.4). One reading rule in the database means the Library can't leak by a UI bug. Deferring T083b avoids breaking working practice flows with an unspecified item format |
 | 2026-10-08 | **Mentor content, starter templates and paid content requests** (T084, `0009_mentor_content.sql`), per the user's 2026-10-08 direction. Mentor content shares the `contents` table (`owner_type = 'mentor'`); a trigger pins it to assigned-only/students, and RLS limits sharing to batches the mentor teaches. Mentors never modify platform content. Starter templates: platform content flagged `is_template`, copied into the mentor's own draft (`template_source_id`). Content requests: `requested → quoted → accepted → in_progress → delivered` (+ declined/cancelled). Mentor transitions go through SECURITY DEFINER functions; staff transitions are super-admin-only. Delivery copies a platform item into the mentor's My Content. The accepted fee is recorded as owed and settled outside the app, then marked settled; there's no automated billing (AGENTS.md, B6) | User chose: templates are copied then edited; fees are tracked and settled manually; only mentors can request. One content table keeps a single reader rule (`can_read_content`) for platform and mentor content alike |
 | 2026-10-08 | **Session scheduling** (T085, `0010_sessions.sql`). One batch and one mentor (who must teach it) per session; whole batch or selected students of that batch; online needs an https link, offline a location; cancel needs a reason. **No double-booking** via a btree_gist exclusion constraint on `(mentor_id, tstzrange)` for scheduled sessions, mapped to a clear message. `can_see_session()` is the single visibility rule. Times are stored in UTC and entered and shown in **IST** ("IST"-labelled) | Brief Phase 6 (`specs.md` §8a.4b). The audience is Indian SSB candidates, so IST avoids hydration-unsafe client time-zone formatting; per-user time zones can come later. A DB constraint, not just an app check, means two concurrent requests can't double-book |
+| 2026-10-08 | **Assessments, attempts and mentor feedback** (T086, `0011_assessments.sql`). Mentor-created per batch; questions are locked once opened. One attempt per student, submitted once then locked, accepted only while open and not overdue. One feedback per attempt (upsert on `attempt_id`, so a double submit is idempotent): `in_review` is a recoverable staff-only draft, `reviewed` is final, locked, needs score + strengths + improvement areas, and only then reaches the student with the evaluator and date. Triggers enforce the lifecycle in the database, not only in the app. Mentor feedback is never presented as an SSB outcome; AI feedback stays blocked (B3) | Brief Phase 7 + `specs.md` §7.5 (draft recoverable, idempotent submit, evaluator + timestamp on the student record) |
 
 ---
 
@@ -1524,6 +1525,29 @@ Blocker:
 
 Next task:
 - T086 — Phase 7: Assessments + Feedback
+
+Date: 2026-10-08
+Task: T086 — Phase 7: Assessments + Feedback
+Status: Complete in code and tests. NOT yet run against a live database (migration 0011 must be applied)
+
+What changed:
+- Migration `0011_assessments.sql` (see Decisions Register)
+- `lib/server/assessments/{validation,service}.ts`, `lib/actions/assessments.ts`
+- Mentor: `/mentor/assessments` (+ new, detail with open/close/reopen and submissions), `/mentor/evaluations` (pending / in review / reviewed), `/mentor/evaluations/[attemptId]` (answers + save draft / submit review); mentee detail now lists the student's submissions and scores
+- Student: `/student/assessments` (+ detail: answer with drafts, submit once, reviewed feedback); Academy: `/academy/assessments` (nav live)
+- Removed the sample-data evaluations: `app/mentor/evaluations/new`, `components/mentor/evaluation-form.tsx`, `submitEvaluationAction`, `getEvaluations`/`getMenteeOptions`; `lib/actions/mentor.ts` keeps only the dashboard demo-data controls
+- Tests: 345 Vitest tests pass; screenshots in `docs/screenshots/phase-7/`
+
+What remains:
+- Apply 0011 after 0004–0010; live check: mentor creates + opens → student drafts, submits (second submit refused) → mentor saves a draft review, leaves, comes back (recovered), submits → student sees score + feedback; another batch's mentor gets "not found"
+- Session-level evaluations (feedback on a session rather than an assessment) are not built; add if needed
+- Progress built on these scores is Phase 8 (T087)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T087 — Phase 8: Progress tracking
 
 ## 14. North Star
 
