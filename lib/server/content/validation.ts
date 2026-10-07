@@ -74,6 +74,7 @@ export interface CleanContentInput {
   visibility: ContentVisibility;
   body: string | null;
   external_url: string | null;
+  is_template?: boolean;
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -118,8 +119,62 @@ export function validateContentInput(input: Partial<Record<keyof ContentInput, u
       visibility: input.visibility as ContentVisibility,
       body: body || null,
       external_url: externalUrl || null,
+      ...(typeof input.isTemplate === "boolean" ? { is_template: input.isTemplate } : {}),
     },
   };
+}
+
+// ---- Content requests ------------------------------------------------------
+
+import type { ContentRequestInput, ContentRequestStatus } from "@/types/content";
+
+export type RequestFieldErrors = Partial<Record<keyof ContentRequestInput, string>>;
+
+export interface CleanRequestInput {
+  title: string;
+  details: string;
+  category: ContentCategory;
+  type: ContentType;
+  needed_by: string | null;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function validateRequestInput(input: Partial<Record<keyof ContentRequestInput, unknown>>, today: string): { ok: true; value: CleanRequestInput } | { ok: false; errors: RequestFieldErrors } {
+  const errors: RequestFieldErrors = {};
+  const title = str(input.title).replace(/\s+/g, " ");
+  const details = str(input.details);
+  const neededBy = str(input.neededBy);
+  if (title.length < 3 || title.length > 140) errors.title = "Title must be 3–140 characters.";
+  if (details.length < 10 || details.length > 4000) errors.details = "Describe what you need in 10–4,000 characters.";
+  if (!isCategory(input.category)) errors.category = "Choose a category.";
+  if (!isContentType(input.type)) errors.type = "Choose a type.";
+  if (neededBy) {
+    const valid = ISO_DATE.test(neededBy) && !Number.isNaN(new Date(`${neededBy}T00:00:00Z`).getTime()) && new Date(`${neededBy}T00:00:00Z`).toISOString().slice(0, 10) === neededBy;
+    if (!valid) errors.neededBy = "Enter a valid date.";
+    else if (neededBy < today) errors.neededBy = "Choose today or a later date.";
+  }
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, value: { title, details, category: input.category as ContentCategory, type: input.type as ContentType, needed_by: neededBy || null } };
+}
+
+// Fee in INR: a positive amount with at most 2 decimals, up to ₹1 crore.
+export function parseFee(value: unknown): number | null {
+  const raw = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim().replace(/[,₹\s]/g, "") : "";
+  if (!/^\d+(\.\d{1,2})?$/.test(raw)) return null;
+  const fee = Number(raw);
+  return fee > 0 && fee <= 10_000_000 ? fee : null;
+}
+
+// Staff-side transitions (mentor-side ones are database functions).
+export function canStaffMove(from: ContentRequestStatus, to: "quoted" | "in_progress"): boolean {
+  if (to === "quoted") return from === "requested" || from === "quoted";
+  return from === "accepted";
+}
+
+export function formatInr(amount: number): string {
+  const whole = Number.isInteger(amount);
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 }).format(amount);
 }
 
 // Allowed status moves: draft ⇄ published → archived → draft (restore).

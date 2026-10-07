@@ -7,18 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addContentAssignmentAction } from "@/lib/actions/content";
+import { assignMyContentAction } from "@/lib/actions/mentor-content";
 
 interface AssignmentPanelProps {
   contentId: string;
   academies: { id: string; name: string }[];
   batches: { id: string; name: string }[];
+  // "mentor": batches only (their own), via the mentor action.
+  mode?: "platform" | "mentor";
 }
 
 // Assign content to one academy or one batch (only matters when its
 // visibility is "assigned"; the reader rule lives in RLS).
-export function AssignmentPanel({ contentId, academies, batches }: AssignmentPanelProps) {
+export function AssignmentPanel({ contentId, academies, batches, mode = "platform" }: AssignmentPanelProps) {
   const router = useRouter();
-  const [kind, setKind] = useState<"academy" | "batch">("academy");
+  const [kind, setKind] = useState<"academy" | "batch">(mode === "mentor" ? "batch" : "academy");
   const [target, setTarget] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +32,8 @@ export function AssignmentPanel({ contentId, academies, batches }: AssignmentPan
     setPending(true);
     setError(null);
     try {
-      const result = await addContentAssignmentAction(contentId, kind === "academy" ? { academyId: target } : { batchId: target });
+      const assign = mode === "mentor" ? assignMyContentAction : addContentAssignmentAction;
+      const result = await assign(contentId, kind === "academy" ? { academyId: target } : { batchId: target });
       if (!result.ok) {
         setError(result.error?.message ?? "That didn't work. Please try again.");
         return;
@@ -50,7 +54,8 @@ export function AssignmentPanel({ contentId, academies, batches }: AssignmentPan
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <div className="grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
+      <div className={mode === "mentor" ? "grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end" : "grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end"}>
+        {mode === "platform" && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="assign-kind">Assign to</Label>
           <Select value={kind} onValueChange={(v) => { setKind(v as "academy" | "batch"); setTarget(""); }} disabled={pending}>
@@ -61,8 +66,9 @@ export function AssignmentPanel({ contentId, academies, batches }: AssignmentPan
             </SelectContent>
           </Select>
         </div>
+        )}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="assign-target">{kind === "academy" ? "Academy" : "Batch"}</Label>
+          <Label htmlFor="assign-target">{mode === "mentor" ? "Share with one of your batches" : kind === "academy" ? "Academy" : "Batch"}</Label>
           <Select value={target} onValueChange={setTarget} disabled={pending || options.length === 0}>
             <SelectTrigger id="assign-target" className="min-h-11 w-full">
               <SelectValue placeholder={options.length === 0 ? `No ${kind === "academy" ? "academies" : "batches"} yet` : "Choose…"} />
@@ -75,7 +81,7 @@ export function AssignmentPanel({ contentId, academies, batches }: AssignmentPan
           </Select>
         </div>
         <Button type="button" className="min-h-11" onClick={add} disabled={pending || !target}>
-          {pending ? "Assigning…" : "Assign"}
+          {pending ? "Saving…" : mode === "mentor" ? "Share" : "Assign"}
         </Button>
       </div>
     </div>

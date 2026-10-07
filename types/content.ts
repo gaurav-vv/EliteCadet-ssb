@@ -45,6 +45,9 @@ export interface ContentRecord {
   status: ContentStatus;
   body: string | null;
   externalUrl: string | null;
+  ownerType: "platform" | "mentor";
+  isTemplate: boolean;
+  templateSourceId: string | null;
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
@@ -60,6 +63,8 @@ export interface ContentInput {
   visibility: string;
   body: string;
   externalUrl: string;
+  // Platform content only: offer it to mentors as a starter template.
+  isTemplate?: boolean;
 }
 
 export interface ContentListParams {
@@ -86,4 +91,48 @@ export interface ContentAssignment {
   academyId: string | null;
   batchId: string | null;
   label: string;
+}
+
+// ---- Content requests (Phase 5, specs.md §8a.4) -----------------------------
+
+export type ContentRequestStatus = "requested" | "quoted" | "accepted" | "declined" | "in_progress" | "delivered" | "cancelled";
+export type SettlementStatus = "not_due" | "owed" | "settled";
+
+export const REQUEST_STATUSES: Record<ContentRequestStatus, string> = {
+  requested: "Requested",
+  quoted: "Quote sent",
+  accepted: "Accepted",
+  declined: "Declined",
+  in_progress: "In progress",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+export const SETTLEMENT_STATUSES: Record<SettlementStatus, string> = { not_due: "No fee due", owed: "Fee owed", settled: "Settled" };
+
+export interface ContentRequest {
+  id: string;
+  mentorId: string;
+  mentorName: string | null;
+  academyName: string | null;
+  title: string;
+  details: string;
+  category: ContentCategory;
+  type: ContentType;
+  neededBy: string | null;
+  status: ContentRequestStatus;
+  quotedFeeInr: number | null;
+  quoteNote: string | null;
+  deliveredContentId: string | null;
+  settlement: SettlementStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentRequestInput {
+  title: string;
+  details: string;
+  category: string;
+  type: string;
+  neededBy: string;
 }

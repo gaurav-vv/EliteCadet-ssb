@@ -55,6 +55,7 @@ all green as of this update):
 - `tests/unit/lib/academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts` — academy management rules, authorization, own-academy scoping, suspension (T081)
 - `tests/unit/lib/academy-people-validation.test.ts`, `academy-people-service.test.ts` — academy students/mentors scoped to the session's academy, add-by-email/invite rules, mentors limited to their own batches (T082)
 - `tests/unit/lib/content-validation.test.ts`, `content-service.test.ts` — content rules, status transitions, super-admin-only management, readers limited to published content (T083)
+- `tests/unit/lib/mentor-content-service.test.ts`, `content-requests-service.test.ts`, `content-requests-validation.test.ts` — mentor ownership and batch sharing, templates, request lifecycle and fees (T084)
 - `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
@@ -137,6 +138,21 @@ implicit.
 | CON-04 | Readers see only published content | P0 | `VERIFIED` (`content-service.test.ts`) + RLS | Open a draft's id as a student | Not found |
 | CON-05 | Assigned-only content reaches only its academies/batches | P0 | MANUAL (needs 0008 applied) | Assign to Academy A; open as Academy B student (list + direct id) | Not listed; not found |
 | CON-06 | Body renders as text, never HTML | P1 | MANUAL | Save `<script>` in a body; open it | Shown literally |
+
+---
+### 2d. Mentor content and content requests (T084 Phase 5)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| MCO-01 | Mentor content is owned by the mentor and pinned to assigned/students | P0 | `VERIFIED` (`mentor-content-service.test.ts`) + DB trigger | Create content sending visibility "everyone" / template flag | Saved as assigned-only, for students, not a template |
+| MCO-02 | A mentor can't edit another mentor's or platform content | P0 | `VERIFIED` (`mentor-content-service.test.ts`) + RLS | Edit/publish another id | Not found; nothing written |
+| MCO-03 | A mentor shares only with batches they teach | P0 | `VERIFIED` (`mentor-content-service.test.ts`) + RLS | Share with another batch's id | Refused |
+| MCO-04 | Mentor content reaches only students of its batches | P0 | MANUAL (needs 0009) | Publish + share with Batch A; open as Batch B student (list + id) | Not visible |
+| MCO-05 | "Use this template" copies a published template into a draft; the template is unchanged | P1 | `VERIFIED` (`mentor-content-service.test.ts`) | Use a template; check both items | New mentor draft with source; template untouched |
+| REQ-01 | Only mentors request; only staff quote/start/deliver/settle | P0 | `VERIFIED` (`content-requests-service.test.ts`) + RLS/functions | Call each action as the wrong role | `unauthorized`; no database call |
+| REQ-02 | Lifecycle is enforced (accept/decline only when quoted; cancel only before accepting) | P0 | `VERIFIED` (`content-requests-service.test.ts`) + DB functions | Accept a non-quoted request | Clear refusal |
+| REQ-03 | Fee validation and Indian formatting | P1 | `VERIFIED` (`content-requests-validation.test.ts`) | Quote -5 / 10.555 / 1,50,000 | Rejected / rejected / shown as ₹1,50,000 |
+| REQ-04 | Nothing is charged automatically; settled only when owed | P0 | `VERIFIED` (`content-requests-service.test.ts`) | Mark settled on a not-owed request | Refused |
 
 ---
 

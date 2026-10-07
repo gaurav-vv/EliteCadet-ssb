@@ -8,7 +8,11 @@ import { CONTENT_PAGE_SIZE, isAudience, isCategory, isContentStatus, isContentTy
 import type { DbResult } from "@/lib/server/users/repository";
 import type { ContentAssignment, ContentCategory, ContentCategoryCounts, ContentListParams, ContentRecord, ContentStatus } from "@/types/content";
 
-const COLUMNS = "id, title, description, category, type, difficulty, target_role, visibility, status, body, external_url, created_at, updated_at, published_at";
+const COLUMNS =
+  "id, title, description, category, type, difficulty, target_role, visibility, status, body, external_url, owner_type, is_template, template_source_id, created_at, updated_at, published_at";
+
+// Which contents a query is about. Readers pass none: RLS alone decides.
+export type ContentOwner = { type: "platform" } | { type: "mentor"; id: string };
 
 const text = (v: unknown) => (typeof v === "string" && v ? v : null);
 
@@ -29,15 +33,33 @@ export function toContent(row: unknown): ContentRecord | null {
     status: r.status,
     body: text(r.body),
     externalUrl: text(r.external_url),
+    ownerType: r.owner_type === "mentor" ? "mentor" : "platform",
+    isTemplate: r.is_template === true,
+    templateSourceId: text(r.template_source_id),
     createdAt: r.created_at,
     updatedAt: typeof r.updated_at === "string" ? r.updated_at : r.created_at,
     publishedAt: text(r.published_at),
   };
 }
 
-export async function findContents(params: ContentListParams, page: number, opts: { publishedOnly?: boolean } = {}): Promise<DbResult<{ rows: ContentRecord[]; total: number }>> {
+// Narrow a query to one owner. Typed loosely on purpose: PostgREST builder
+// generics are too deep for TypeScript to thread through a helper.
+function scope<Q>(query: Q, owner?: ContentOwner): Q {
+  if (!owner) return query;
+  type Eq = { eq: (column: string, value: string) => Q };
+  if (owner.type === "platform") return (query as unknown as Eq).eq("owner_type", "platform");
+  const mentorOnly = (query as unknown as Eq).eq("owner_type", "mentor");
+  return (mentorOnly as unknown as Eq).eq("owner_id", owner.id);
+}
+
+export async function findContents(
+  params: ContentListParams,
+  page: number,
+  opts: { publishedOnly?: boolean; owner?: ContentOwner; templatesOnly?: boolean } = {},
+): Promise<DbResult<{ rows: ContentRecord[]; total: number }>> {
   const supabase = await createClient();
-  let query = supabase.from("contents").select(COLUMNS, { count: "exact" }).eq("owner_type", "platform");
+  let query = scope(supabase.from("contents").select(COLUMNS, { count: "exact" }), opts.owner);
+  if (opts.templatesOnly) query = query.eq("is_template", true);
   if (opts.publishedOnly) query = query.eq("status", "published");
   else if (params.status !== "all") query = query.eq("status", params.status);
   if (params.category !== "all") query = query.eq("category", params.category);
@@ -55,10 +77,10 @@ export async function findContents(params: ContentListParams, page: number, opts
 const CATEGORY_KEYS: ContentCategory[] = ["psychology", "gto", "interview", "communication", "current_affairs", "general"];
 
 // Head-only counts per category (Content Library tabs).
-export async function countByCategory(status?: ContentStatus): Promise<DbResult<ContentCategoryCounts>> {
+export async function countByCategory(status?: ContentStatus, owner: ContentOwner = { type: "platform" }): Promise<DbResult<ContentCategoryCounts>> {
   const supabase = await createClient();
   const base = () => {
-    let q = supabase.from("contents").select("id", { count: "exact", head: true }).eq("owner_type", "platform");
+    let q = scope(supabase.from("contents").select("id", { count: "exact", head: true }), owner);
     if (status) q = q.eq("status", status);
     return q;
   };
@@ -70,27 +92,37 @@ export async function countByCategory(status?: ContentStatus): Promise<DbResult<
   return { data: counts, error: null };
 }
 
-export async function findContentById(id: string): Promise<DbResult<ContentRecord | null>> {
+export async function findContentById(id: string, owner?: ContentOwner): Promise<DbResult<ContentRecord | null>> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("contents").select(COLUMNS).eq("id", id).eq("owner_type", "platform").maybeSingle();
+  const { data, error } = await scope(supabase.from("contents").select(COLUMNS).eq("id", id), owner).maybeSingle();
   if (error) return { data: null, error };
   return { data: data ? toContent(data) : null, error: null };
 }
 
-export async function insertContent(values: CleanContentInput, actorId: string): Promise<DbResult<{ id: string }>> {
+export async function insertContent(
+  values: CleanContentInput & { template_source_id?: string | null },
+  actorId: string,
+  owner: ContentOwner = { type: "platform" },
+): Promise<DbResult<{ id: string }>> {
   const supabase = await createClient();
+  const ownership = owner.type === "platform" ? { owner_type: "platform" } : { owner_type: "mentor", owner_id: owner.id };
   const { data, error } = await supabase
     .from("contents")
-    .insert({ ...values, owner_type: "platform", status: "draft", created_by: actorId, updated_by: actorId })
+    .insert({ ...values, ...ownership, status: "draft", created_by: actorId, updated_by: actorId })
     .select("id")
     .single();
   if (error || !data) return { data: null, error: error ?? {} };
   return { data: { id: data.id as string }, error: null };
 }
 
-export async function updateContent(id: string, values: Partial<CleanContentInput> & { status?: ContentStatus }, actorId: string): Promise<DbResult<number>> {
+export async function updateContent(
+  id: string,
+  values: Partial<CleanContentInput> & { status?: ContentStatus },
+  actorId: string,
+  owner: ContentOwner = { type: "platform" },
+): Promise<DbResult<number>> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("contents").update({ ...values, updated_by: actorId }).eq("id", id).eq("owner_type", "platform").select("id");
+  const { data, error } = await scope(supabase.from("contents").update({ ...values, updated_by: actorId }).eq("id", id), owner).select("id");
   if (error) return { data: null, error };
   return { data: data?.length ?? 0, error: null };
 }
@@ -147,4 +179,12 @@ export async function findBatchOptions(): Promise<DbResult<{ id: string; name: s
     }),
     error: null,
   };
+}
+
+// Platform content (not archived) as options, e.g. to deliver a request.
+export async function findPlatformContentOptions(): Promise<DbResult<{ id: string; name: string }[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("contents").select("id, title").eq("owner_type", "platform").neq("status", "archived").order("updated_at", { ascending: false }).limit(500);
+  if (error) return { data: null, error };
+  return { data: (data ?? []).flatMap((c) => (typeof c.id === "string" && typeof c.title === "string" ? [{ id: c.id, name: c.title }] : [])), error: null };
 }

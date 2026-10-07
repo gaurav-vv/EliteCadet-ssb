@@ -50,7 +50,7 @@ export default async function ContentLibraryPage({ searchParams }: { searchParam
                   getRowKey={(c) => c.id}
                   getRowHref={(c) => `/admin/content/${c.id}`}
                   columns={[
-                    { key: "title", header: "Title", cell: (c) => <span className="text-ink">{c.title}</span> },
+                    { key: "title", header: "Title", cell: (c) => <span className="flex flex-col"><span className="text-ink">{c.title}</span>{c.isTemplate && <span className="text-[12px] text-ink-secondary">Starter template for mentors</span>}</span> },
                     { key: "category", header: "Category", cell: (c) => <CategoryTag category={c.category} /> },
                     { key: "type", header: "Type", cell: (c) => CONTENT_TYPES[c.type] },
                     { key: "difficulty", header: "Difficulty", cell: (c) => CONTENT_DIFFICULTIES[c.difficulty] },

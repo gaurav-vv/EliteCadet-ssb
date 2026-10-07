@@ -297,6 +297,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Academies become a managed domain** (T081, migration `0006_academies.sql`). Academy profile fields + `active/suspended` status. Super admins create, edit, suspend and manage members; academy admins edit only their own academy's details, never its status (RLS + guard trigger). Membership stays only in `profiles.academy_id`. A suspended academy signs out all its non-super-admin members (middleware + login, via the shared pure `lib/auth/blocked.ts`). Mentors/academy admins can't be removed from an academy without a role change first. Academy settings no longer write the in-memory `SETTINGS` mock: `getSettings`, `updateSettingsAction` and the client-side `updateAcademyName` were removed in favour of the server-side `updateMyAcademyAction` | Brief Phase 2 (`specs.md` §8a.3b). One membership column avoids two sources of truth. Server-side scoping (the academy id comes from the session, never the request) is the academy-isolation boundary (`AGENTS.md` §10) |
 | 2026-10-08 | **Batch membership is first-class** (T082, `0007_batch_membership.sql`). `batch_students` (unique per student) and `batch_mentors` (many per batch) replace `batches.mentor_id`, which is dropped after copying. A trigger enforces role + same academy. Mentors read only their batches, those students and co-mentors (`is_batch_mentor` / `is_batch_peer`). Academy admins add or remove academy students only through SECURITY DEFINER functions that set a transaction-local `app.trusted_change` flag, the one sanctioned bypass of the 0005 profile guard; `set_config` isn't reachable through the API. New students can be invited (service role used only to send the email). The Academy Students, student detail, batch detail and Mentors pages, and the Mentor's Mentees, now read Postgres. Their mock components, actions and the `student-list` helper were removed | Brief Phase 3 (`specs.md` §8a.3c): "Academy → Batch → Students → Assigned Mentors". Membership in one place per relation avoids two sources of truth. Session-derived scope plus RLS closes the IDOR class for students and mentees (ISO-01–05) |
 | 2026-10-08 | **Global learning content** (T083, `0008_contents.sql`). `contents` carries every field in the brief plus body/link. Status moves draft → published → archived, never deleted. `owner_type`/`owner_id` already leave room for mentor content (Phase 5) in the same table. `content_assignments` targets one academy or one batch. Readers are governed only by `can_read_content()` in RLS (published, for their role, visible to everyone or assigned to their academy/batch); the service doesn't re-implement it. Bodies render as plain text, never HTML. Moving the existing practice/journey/resource mocks onto it is a separate task (T083b) because their runners need a structured item model | Brief Phase 4 (`specs.md` §8a.4). One reading rule in the database means the Library can't leak by a UI bug. Deferring T083b avoids breaking working practice flows with an unspecified item format |
+| 2026-10-08 | **Mentor content, starter templates and paid content requests** (T084, `0009_mentor_content.sql`), per the user's 2026-10-08 direction. Mentor content shares the `contents` table (`owner_type = 'mentor'`); a trigger pins it to assigned-only/students, and RLS limits sharing to batches the mentor teaches. Mentors never modify platform content. Starter templates: platform content flagged `is_template`, copied into the mentor's own draft (`template_source_id`). Content requests: `requested → quoted → accepted → in_progress → delivered` (+ declined/cancelled). Mentor transitions go through SECURITY DEFINER functions; staff transitions are super-admin-only. Delivery copies a platform item into the mentor's My Content. The accepted fee is recorded as owed and settled outside the app, then marked settled; there's no automated billing (AGENTS.md, B6) | User chose: templates are copied then edited; fees are tracked and settled manually; only mentors can request. One content table keeps a single reader rule (`can_read_content`) for platform and mentor content alike |
 
 ---
 
@@ -1478,6 +1479,27 @@ Blocker:
 
 Next task:
 - T084 — Phase 5: Mentor content management
+
+Date: 2026-10-08
+Task: T084 — Phase 5: Mentor content, starter templates and content requests
+Status: Complete in code and tests. NOT yet run against a live database (migration 0009 must be applied)
+
+What changed:
+- Migration `0009_mentor_content.sql` (see Decisions Register)
+- `lib/server/content/mentor-service.ts` (own content, share with own batches, templates, copy), `lib/server/content/requests.ts` (request lifecycle, quote/start/deliver/settle), `lib/actions/mentor-content.ts`, staff actions in `lib/actions/content.ts`; content repository generalised to an explicit owner (platform / mentor / RLS-only readers)
+- Mentor: `/mentor/content` (My Content), `/mentor/content/new`, `/mentor/content/[id]` (edit, publish, share with batches), `/mentor/content/templates`, `/mentor/content/requests`; nav "My Content"
+- Super Admin: "Offer as a starter template" on platform content (marked in the list), `/admin/content-requests` (filter, quote in INR, start, deliver, mark settled); nav "Content Requests"
+- Tests: 313 Vitest tests pass; screenshots in `docs/screenshots/phase-5/`
+
+What remains:
+- Apply 0009 after 0004–0008; live check: mentor creates + shares with their batch → their student sees it, a student of another batch doesn't; template copy; request → quote → accept (fee owed) → deliver → settle
+- Payouts/earnings themselves aren't in the app (settlement is manual by design)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T085 — Phase 6: Session scheduling
 
 ## 14. North Star
 

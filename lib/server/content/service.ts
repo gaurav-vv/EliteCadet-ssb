@@ -13,15 +13,16 @@ export type ContentServiceResult<T> = ServiceResult<T> & { fieldErrors?: Content
 
 const fail = <T>(code: "validation_error" | "not_found" | "unauthorized", message: string): ServiceResult<T> => ({ ok: false, error: { code, message } });
 const NOT_FOUND = "We couldn't find that content.";
+const PLATFORM: repo.ContentOwner = { type: "platform" };
 
-async function paged(params: ContentListParams, publishedOnly: boolean): Promise<ServiceResult<ContentListResult>> {
+export async function paged(params: ContentListParams, opts: { publishedOnly?: boolean; owner?: repo.ContentOwner; templatesOnly?: boolean }): Promise<ServiceResult<ContentListResult>> {
   let page = params.page;
-  let found = await repo.findContents(params, page, { publishedOnly });
+  let found = await repo.findContents(params, page, opts);
   if (found.error) return mapDbError(found.error, "We couldn't load content. Please try again.");
   const pageCount = Math.max(1, Math.ceil(found.data.total / CONTENT_PAGE_SIZE));
   if (page > pageCount) {
     page = pageCount;
-    found = await repo.findContents(params, page, { publishedOnly });
+    found = await repo.findContents(params, page, opts);
     if (found.error) return mapDbError(found.error, "We couldn't load content. Please try again.");
   }
   return { ok: true, data: { rows: found.data.rows, total: found.data.total, page, pageCount, pageSize: CONTENT_PAGE_SIZE } };
@@ -32,7 +33,7 @@ async function paged(params: ContentListParams, publishedOnly: boolean): Promise
 export async function getContentLibrary(params: ContentListParams): Promise<ServiceResult<{ list: ContentListResult; counts: ContentCategoryCounts }>> {
   const actor = await authorize("content.manage");
   if (isGuardFailure(actor)) return actor;
-  const [list, counts] = await Promise.all([paged(params, false), repo.countByCategory()]);
+  const [list, counts] = await Promise.all([paged(params, { owner: PLATFORM }), repo.countByCategory()]);
   if (!list.ok || !list.data) return list as ServiceResult<never>;
   if (counts.error) return mapDbError(counts.error, "We couldn't load content totals. Please try again.");
   return { ok: true, data: { list: list.data, counts: counts.data } };
@@ -42,7 +43,7 @@ export async function getContentForEdit(id: string): Promise<ServiceResult<{ con
   const actor = await authorize("content.manage");
   if (isGuardFailure(actor)) return actor;
   if (!isUuid(id)) return fail("not_found", NOT_FOUND);
-  const found = await repo.findContentById(id);
+  const found = await repo.findContentById(id, PLATFORM);
   if (found.error) return mapDbError(found.error, "We couldn't load this content. Please try again.");
   if (!found.data) return fail("not_found", NOT_FOUND);
   const assignments = await repo.findAssignments(id);
@@ -87,7 +88,7 @@ export async function changeContentStatus(id: string, status: unknown): Promise<
   if (isGuardFailure(actor)) return actor;
   if (!isUuid(id)) return fail("not_found", NOT_FOUND);
   if (!isContentStatus(status)) return fail("validation_error", "Choose a valid status.");
-  const found = await repo.findContentById(id);
+  const found = await repo.findContentById(id, PLATFORM);
   if (found.error) return mapDbError(found.error);
   if (!found.data) return fail("not_found", NOT_FOUND);
   if (!canTransition(found.data.status, status)) return fail("validation_error", `Content that is ${CONTENT_STATUSES[found.data.status].toLowerCase()} can't move to ${CONTENT_STATUSES[status].toLowerCase()}.`);
@@ -136,7 +137,7 @@ async function reader() {
 
 export async function getLibrary(params: ContentListParams): Promise<ServiceResult<ContentListResult>> {
   if (!(await reader())) return fail("unauthorized", "Sign in to see your library.");
-  return paged(params, true);
+  return paged(params, { publishedOnly: true });
 }
 
 export async function getLibraryItem(id: string): Promise<ServiceResult<ContentRecord>> {
@@ -146,5 +147,13 @@ export async function getLibraryItem(id: string): Promise<ServiceResult<ContentR
   if (found.error) return mapDbError(found.error);
   // RLS returns nothing for content this reader may not see — same as missing.
   if (!found.data || found.data.status !== "published") return fail("not_found", NOT_FOUND);
+  return { ok: true, data: found.data };
+}
+
+export async function getPlatformContentOptions(): Promise<ServiceResult<{ id: string; name: string }[]>> {
+  const actor = await authorize("content.manage");
+  if (isGuardFailure(actor)) return actor;
+  const found = await repo.findPlatformContentOptions();
+  if (found.error) return mapDbError(found.error);
   return { ok: true, data: found.data };
 }

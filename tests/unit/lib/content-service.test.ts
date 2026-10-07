@@ -28,7 +28,7 @@ const AC = "33333333-3333-4333-8333-333333333333";
 const superActor = { id: SUPER, email: null, profile: { id: SUPER, role: "super_admin" as const, fullName: "S", academyId: null, status: "active" as const } };
 const student = { id: "s", email: null, profile: { id: "s", role: "student" as const, fullName: "St", academyId: AC, status: "active" as const } };
 const denied = { ok: false as const, error: { code: "unauthorized" as const, message: "no" } };
-const content = (over: Partial<ContentRecord> = {}): ContentRecord => ({ id: C, title: "GD", description: null, category: "gto", type: "document", difficulty: "medium", targetRole: "student", visibility: "everyone", status: "draft", body: "x", externalUrl: null, createdAt: "t", updatedAt: "t", publishedAt: null, ...over });
+const content = (over: Partial<ContentRecord> = {}): ContentRecord => ({ id: C, title: "GD", description: null, category: "gto", type: "document", difficulty: "medium", targetRole: "student", visibility: "everyone", status: "draft", body: "x", externalUrl: null, ownerType: "platform", isTemplate: false, templateSourceId: null, createdAt: "t", updatedAt: "t", publishedAt: null, ...over });
 const input = { title: "Group Discussion", category: "gto", type: "document", difficulty: "medium", targetRole: "student", visibility: "everyone", body: "text" };
 
 beforeEach(() => {
@@ -103,6 +103,7 @@ describe("readers", () => {
     vi.mocked(repo.findContents).mockResolvedValue({ data: { rows: [], total: 0 }, error: null });
     await service.getLibrary(parseContentParams({ status: "draft" }));
     expect(repo.findContents).toHaveBeenCalledWith(expect.anything(), 1, { publishedOnly: true });
+    expect(vi.mocked(repo.findContents).mock.calls[0][2]).not.toHaveProperty("owner");
   });
 
   it("treat a draft (or RLS-hidden) item as not found", async () => {

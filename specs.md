@@ -673,10 +673,37 @@ batches, content or analytics.
 `lib/mock/*`) onto this content model. Their runners need structured item formats (TAT images, WAT
 words, MCQs), so that's a separate, specified task.
 
-**Mentor content (Phase 5):** mentors create teaching material, session templates, practice
-exercises, documents, videos and assessments where permitted. They edit and archive only their
-own, and publish to their assigned batches/students. It's kept separate from global content; a
-mentor can never modify global content.
+**Mentor content (Phase 5, decided 2026-10-08):** an add-on to global content.
+- **My Content:** mentors create teaching material, session templates, practice exercises,
+  documents and videos (as links; uploads wait for storage, B5).
+  - It's owned by them; only they edit, publish or archive it. A mentor can never modify global
+    content, and Super Admins see mentor content but don't edit it.
+  - Mentor content is always "assigned only", for students, and only to batches the mentor is
+    assigned to. It then appears in those students' Library.
+- **Starter templates:** a Super Admin marks published global content as a *template*. Any mentor
+  can "Use this template", which copies it into their own content as a draft to edit and publish.
+  The original stays unchanged, and the copy remembers its source.
+- **Content requests (paid service):** a mentor can ask the platform team to create content for
+  them.
+  - Lifecycle: `requested → quoted → accepted → in_progress → delivered`, plus `declined` and
+    `cancelled`.
+  - A Super Admin quotes a fee in INR. The mentor accepts or declines it, and can cancel before
+    accepting.
+  - Delivery copies a platform content item into the mentor's My Content as a draft.
+  - The accepted fee is recorded as **owed**. The platform team deducts it from the mentor's
+    payout or invoice **outside the app**, then marks it settled. There's no automated billing or
+    payments (`AGENTS.md`, B6).
+  - Only mentors can request.
+
+**Acceptance (Phase 5):**
+- A mentor's content is invisible to students outside their assigned batches, and to other
+  mentors, even by id.
+- A mentor can't assign content to a batch they don't teach, or edit someone else's content.
+- "Use this template" creates an editable draft copy; the template itself is unchanged.
+- A request's status only moves along the lifecycle above. Only the requesting mentor can
+  accept, decline or cancel; only a Super Admin can quote, progress, deliver or settle.
+- A fee is shown in INR (Indian formatting) and is never charged automatically.
+
 
 ### 8a.5 Domain model
 

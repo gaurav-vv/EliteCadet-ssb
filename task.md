@@ -664,8 +664,26 @@ interview questions with guidance), so this needs a specified item model, e.g. a
 table with a typed JSON payload validated per content type, before the runners can read from
 Postgres. Spec that model in `specs.md` first.
 
-## T084 — Phase 5: Mentor content management — P1 — `[ ]`
-Mentor-owned content, publishable to assigned batches/students; never edits global content.
+## T084 — Phase 5: Mentor content, starter templates and content requests — P1 — `[-]`
+**Spec:** `specs.md` §8a.4 (Mentor content, decided 2026-10-08). **Depends on:** T083.
+**Branch:** `feat/phase-5-mentor-content` (stacked on T083).
+**Requirements:**
+- Migration `0009_mentor_content.sql`: mentor-owned rows in `contents`, pinned to
+  assigned/student by trigger. Mentor RLS covers own read/insert/update and sharing only with
+  batches the mentor teaches. `is_template` and `template_source_id` for platform starter
+  templates. `content_requests`, with `respond_to_content_quote`, `cancel_content_request` and
+  `deliver_content_request` enforcing the lifecycle.
+- Mentor: My Content (create/edit/publish/archive, share with own batches), Starter templates
+  ("Use this template" copies into My Content), and Content requests (request, accept/decline a
+  quote, cancel, open delivered content).
+- Super Admin: "Offer as a starter template" on platform content, and Content Requests (quote in
+  INR, mark in progress, deliver, mark fee settled).
+- Fees are recorded and settled outside the app; there's no automated billing.
+**Acceptance:** `specs.md` §8a.4 (Phase 5 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0009 and a
+live check.
+**Tests:** unit — `mentor-content-service.test.ts`, `content-requests-service.test.ts`,
+`content-requests-validation.test.ts`, `content-service.test.ts`.
 
 ## T085 — Phase 6: Session scheduling — P1 — `[ ]`
 Mentor availability and sessions (batch/students, date, time, online/offline, link) feeding mentor,
