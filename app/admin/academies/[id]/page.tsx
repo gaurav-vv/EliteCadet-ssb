@@ -6,7 +6,7 @@ import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { AcademyFormDialog } from "@/components/admin/academies/academy-form-dialog";
 import { AcademyStatusTag } from "@/components/admin/academies/academy-status-tag";
 import { AddMemberForm } from "@/components/admin/academies/add-member-form";
-import { ConfirmActionDialog } from "@/components/admin/confirm-action-dialog";
+import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog";
 import { RoleTag, UserStatusTag } from "@/components/admin/users/user-tags";
 import { DetailHeader } from "@/components/ui/detail-header";
 import { EmptyState } from "@/components/ui/empty-state";
