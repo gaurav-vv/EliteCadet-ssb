@@ -11,6 +11,8 @@ import { ListPanel, ListRow } from "@/components/ui/list-panel";
 import { formatBatchDate } from "@/lib/academy/batch-list";
 import { addBatchMentorAction, addStudentToBatchAction, removeBatchMentorAction, setStudentBatchAction } from "@/lib/actions/batches";
 import { getBatchDetail } from "@/lib/api/batches";
+import { SessionAgenda } from "@/components/sessions/session-agenda";
+import { getAcademySessions } from "@/lib/server/sessions/service";
 
 export const metadata: Metadata = { title: "Batch" };
 
@@ -18,7 +20,7 @@ export const metadata: Metadata = { title: "Batch" };
 // the signed-in admin's academy. Another academy's batch id is "not found".
 export default async function BatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const result = await getBatchDetail(id);
+  const [result, sessions] = await Promise.all([getBatchDetail(id), getAcademySessions("upcoming", new Date().toISOString(), id)]);
   if (result.notFound) notFound();
 
   if (!result.ok || !result.data) {
@@ -88,6 +90,13 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
             ))}
           </ListPanel>
         )}
+      </section>
+
+      <section aria-labelledby="sessions-heading" className="flex flex-col gap-3">
+        <h2 id="sessions-heading" className="text-[18px] font-bold text-ink">
+          Upcoming sessions
+        </h2>
+        <SessionAgenda sessions={sessions.data ?? []} show={{ mentor: true }} empty={{ title: "No upcoming sessions", description: "This batch's mentors haven't scheduled any yet." }} />
       </section>
 
       <section aria-labelledby="students-heading" className="flex flex-col gap-3">

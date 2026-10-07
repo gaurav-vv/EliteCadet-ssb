@@ -705,6 +705,39 @@ words, MCQs), so that's a separate, specified task.
 - A fee is shown in INR (Indian formatting) and is never charged automatically.
 
 
+### 8a.4b Session scheduling (Phase 6)
+
+- **Availability:** a mentor keeps weekly availability slots (weekday + start/end time). They're
+  shown to the mentor and their academy admin as a guide; scheduling outside them is allowed with
+  a visible note.
+- **Sessions:**
+  - A mentor schedules a session for **one batch they teach**: title, description, start and end
+    time, **online** (https meeting link required) or **offline** (location required).
+  - It goes either to the **whole batch** or to **selected students** of that batch.
+  - Status is `scheduled · completed · cancelled`. Cancelling needs a reason, which participants
+    see.
+- **No double-booking:** a mentor can't have two scheduled sessions that overlap. The database
+  enforces this.
+- **Calendars (agenda views):**
+  - **Mentor:** their sessions.
+  - **Batch:** a batch page shows that batch's upcoming sessions.
+  - **Student:** sessions for their batch, or ones they were selected for.
+  - **Academy admin:** all their academy's sessions.
+  - A session is visible to no one else; this is enforced by RLS.
+- **Times:** stored as UTC and shown in **IST (Asia/Kolkata)**, labelled "IST". This product serves
+  Indian SSB candidates; per-user time zones can come later.
+- **Notifications** ("you've been scheduled") arrive with the notification system in Phase 10.
+  Until then, the session appears in the student's Sessions page immediately.
+
+**Acceptance (Phase 6):**
+- A mentor can only schedule for, edit, cancel or complete sessions of batches they teach, and
+  only their own sessions.
+- Overlapping sessions for the same mentor are refused with a clear message.
+- A student sees only sessions for their batch, or ones they were selected for. Another batch's
+  session id is "not found".
+- Online sessions need an https link; offline sessions need a location; the end is after the
+  start; sessions are at most 8 hours.
+
 ### 8a.5 Domain model
 
 ```text

@@ -14,13 +14,12 @@ import { revalidatePath } from "next/cache";
 import {
   evaluations,
   getMenteeDetail,
-  sessions,
   MENTOR_NAME,
   clearMentorDemoData,
   resetMentorDemoData,
 } from "@/lib/mock/mentor";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
-import type { Evaluation, EvaluationInput, MentorSession, SessionInput } from "@/types/mentor";
+import type { Evaluation, EvaluationInput } from "@/types/mentor";
 
 export interface ActionError {
   code: "validation_error" | "not_found";
@@ -86,50 +85,6 @@ export async function submitEvaluationAction(
   revalidatePath("/mentor/mentees");
 
   return { ok: true, data: evaluation };
-}
-
-function validateSessionInput(input: SessionInput): Record<string, string> {
-  const errors: Record<string, string> = {};
-  if (!input.title.trim()) errors.title = "Give the session a title.";
-  if (!getMenteeDetail(input.menteeId)) errors.menteeId = "Select a mentee.";
-  if (!input.scheduledFor) errors.scheduledFor = "Pick a date and time.";
-  return errors;
-}
-
-export async function createSessionAction(input: SessionInput): Promise<ActionResult<MentorSession>> {
-  const fieldErrors = validateSessionInput(input);
-  if (Object.keys(fieldErrors).length > 0) {
-    return { ok: false, error: { code: "validation_error", message: Object.values(fieldErrors)[0] } };
-  }
-
-  const mentee = getMenteeDetail(input.menteeId)!;
-  const session: MentorSession = {
-    id: `session-${Date.now()}`,
-    title: input.title,
-    menteeId: input.menteeId,
-    menteeName: mentee.fullName,
-    scheduledFor: input.scheduledFor,
-    status: "scheduled",
-  };
-  sessions.push(session);
-
-  revalidatePath("/mentor/sessions");
-  revalidatePath("/mentor");
-
-  return { ok: true, data: session };
-}
-
-export async function cancelSessionAction(id: string): Promise<ActionResult<null>> {
-  const session = sessions.find((s) => s.id === id);
-  if (!session) {
-    return { ok: false, error: { code: "not_found", message: "Session not found." } };
-  }
-  session.status = "cancelled";
-
-  revalidatePath("/mentor/sessions");
-  revalidatePath("/mentor");
-
-  return { ok: true, data: null };
 }
 
 export async function loadDemoDataAction(): Promise<ActionResult<null>> {

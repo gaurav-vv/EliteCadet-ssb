@@ -685,9 +685,23 @@ live check.
 **Tests:** unit — `mentor-content-service.test.ts`, `content-requests-service.test.ts`,
 `content-requests-validation.test.ts`, `content-service.test.ts`.
 
-## T085 — Phase 6: Session scheduling — P1 — `[ ]`
-Mentor availability and sessions (batch/students, date, time, online/offline, link) feeding mentor,
-batch and student calendars plus notifications.
+## T085 — Phase 6: Session scheduling — P1 — `[-]`
+**Spec:** `specs.md` §8a.4b. **Depends on:** T084. **Branch:** `feat/phase-6-sessions` (stacked on T084).
+**Requirements:**
+- Migration `0010_sessions.sql`: `mentor_availability` (weekly IST slots), `sessions` (one batch
+  and one mentor who teaches it, online with an https link or offline with a location, whole
+  batch or selected students, scheduled/completed/cancelled with a reason, at most 8h) and
+  `session_participants` (students of that batch only). A btree_gist exclusion constraint
+  prevents a mentor double-booking. `can_see_session()` is the single visibility rule (RLS).
+- `lib/server/sessions` (IST ⇄ UTC validation, service), `lib/actions/sessions.ts`.
+- Mentor: agenda (upcoming/past/cancelled), schedule, edit, cancel with a reason, mark
+  completed, availability.
+- Student: Sessions page. Academy: Sessions page. The batch page lists upcoming sessions.
+- The sample-data mentor sessions UI and actions were removed. Notifications come in Phase 10.
+**Acceptance:** `specs.md` §8a.4b (Phase 6 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0010 and a
+live check.
+**Tests:** unit — `sessions-validation.test.ts`, `sessions-service.test.ts`.
 
 ## T086 — Phase 7: Assessments + Feedback — P1 — `[ ]`
 `assessments`, `assessment_attempts`, `feedback`; mentor evaluation of assigned students only.

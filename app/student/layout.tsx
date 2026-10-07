@@ -5,6 +5,7 @@ import type { WorkspaceNavItem } from "@/lib/navigation/workspace";
 const NAV_ITEMS: WorkspaceNavItem[] = [
   { href: "/student", label: "Dashboard", icon: "dashboard", availability: "available" },
   { href: "/student/practice", label: "Practice", icon: "practice", availability: "available" },
+  { href: "/student/sessions", label: "Sessions", icon: "sessions", availability: "available" },
   { href: "/student/progress", label: "Progress", icon: "progress", availability: "available" },
   { href: "/student/resources", label: "Resources", icon: "resources", availability: "available" },
   { href: "/student/library", label: "Library", icon: "content", availability: "available" },

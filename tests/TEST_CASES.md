@@ -56,6 +56,7 @@ all green as of this update):
 - `tests/unit/lib/academy-people-validation.test.ts`, `academy-people-service.test.ts` — academy students/mentors scoped to the session's academy, add-by-email/invite rules, mentors limited to their own batches (T082)
 - `tests/unit/lib/content-validation.test.ts`, `content-service.test.ts` — content rules, status transitions, super-admin-only management, readers limited to published content (T083)
 - `tests/unit/lib/mentor-content-service.test.ts`, `content-requests-service.test.ts`, `content-requests-validation.test.ts` — mentor ownership and batch sharing, templates, request lifecycle and fees (T084)
+- `tests/unit/lib/sessions-validation.test.ts`, `sessions-service.test.ts` — IST conversion, session rules, availability, mentor scope, double-booking (T085)
 - `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
@@ -153,6 +154,18 @@ implicit.
 | REQ-02 | Lifecycle is enforced (accept/decline only when quoted; cancel only before accepting) | P0 | `VERIFIED` (`content-requests-service.test.ts`) + DB functions | Accept a non-quoted request | Clear refusal |
 | REQ-03 | Fee validation and Indian formatting | P1 | `VERIFIED` (`content-requests-validation.test.ts`) | Quote -5 / 10.555 / 1,50,000 | Rejected / rejected / shown as ₹1,50,000 |
 | REQ-04 | Nothing is charged automatically; settled only when owed | P0 | `VERIFIED` (`content-requests-service.test.ts`) | Mark settled on a not-owed request | Refused |
+
+---
+### 2e. Sessions (T085 Phase 6)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| SES-01 | A mentor schedules only for batches they teach, and only that batch's students | P0 | `VERIFIED` (`sessions-service.test.ts`) + RLS/trigger | Schedule for another batch / pick an outside student | Refused with field errors |
+| SES-02 | No double-booking | P0 | `VERIFIED` (`sessions-service.test.ts`: 23P01 mapping) + DB exclusion constraint | Schedule two overlapping sessions | Second refused: "overlaps another session" |
+| SES-03 | Session rules: https link online, location offline, end after start, ≤ 8h, future only | P1 | `VERIFIED` (`sessions-validation.test.ts`) | Submit each invalid case | Field errors |
+| SES-04 | IST entry and display are correct | P1 | `VERIFIED` (`sessions-validation.test.ts`) | 18:30 IST | Stored 13:00 UTC; shown "6:30 pm … IST" |
+| SES-05 | Cancel needs a reason; completing before the start is refused | P1 | `VERIFIED` (`sessions-service.test.ts`) | Cancel with "no"; complete a future session | Refused |
+| SES-06 | A student sees only their batch's sessions or ones they were selected for | P0 | MANUAL (needs 0010) | As a Batch B student, list sessions and open a Batch A session id | Not visible |
 
 ---
 
