@@ -61,14 +61,13 @@ all green as of this update):
 - `tests/unit/lib/progress-compute.test.ts`, `progress-service.test.ts` — progress derivations, attention rules, attendance, role and academy scope (T087)
 - `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
 - `tests/unit/lib/notifications-service.test.ts`, `analytics-service.test.ts` — own-notifications scope, safe links, mark read, super-admin-only analytics, boundary validation (T089)
-- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies migrations 0001–0013 to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics (60 checks)
+- `tests/unit/lib/practice-validation.test.ts`, `practice-service.test.ts`, `practice-journey.test.ts`; `tests/integration/bank-practice-runner.test.tsx`, `mock-session.test.tsx` — answer/attempt validation, streak, role scope, server-side scoring, idempotent submit, journey wiring vs the 0014 seed, autosave with retry (T083b)
+- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies migrations 0001–0014 to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics, practice (85 checks)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
-- `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
+- `tests/unit/lib/ssb-journey-progress.test.ts` — the on-device Day 5 self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
 - `tests/unit/hooks/use-countdown.test.tsx` — countdown ticks, `onExpire` fires exactly once, latest callback used
 - `tests/integration/middleware-session.test.ts` — `updateSession()` with a faked Supabase client: logged-out → `/login`, every wrong-role combination and a missing profile → `/forbidden`, correct role allowed, browser-supplied `?role=` ignored (AGENTS.md §10); `/admin` → super_admin only, super admin kept out of other workspaces, suspended accounts signed out (T080)
-- `tests/integration/practice-api.test.ts` — `lib/api/practice.ts` against real content: advertised item counts equal real counts (AGENTS.md §8), unknown activity, empty submit, idempotent submit
-- `tests/integration/ssb-journey-api.test.ts` — every 5-Day Journey day/module resolves and has content, unique ids, valid MCQ answers, progress totals exclude timed tests, idempotent test submit
 - `tests/integration/bank-practice-runner.test.tsx` — practice runner + real progress store: MCQ check/feedback text, navigation, mark done persists across remount
 - `tests/e2e/public-pages.spec.ts` — `/`, `/login`, `/signup` render for a logged-out visitor
 - `tests/e2e/auth-guard.spec.ts` — `/student`, `/mentor`, `/academy`, `/onboarding`, `/admin`, `/admin/access` redirect to `/login?reason=login_required&next=<path>` when logged out; nested paths preserve `next`; `/forbidden` itself is reachable
@@ -219,6 +218,18 @@ implicit.
 | NTF-05 | Bell shows unread count; mark one / all read updates it | P1 | MANUAL | Open the bell, click an item, then "Mark all read" | Badge decreases, then disappears |
 | ANL-01 | Only a super admin can load platform analytics | P0 | `VERIFIED` (`analytics-service.test.ts`) + SQL guard; MANUAL live | Call `platform_analytics` as an academy admin | Error, no data |
 | ANL-02 | Analytics shows 0 / "—" / empty states with no data, never invented values | P1 | `VERIFIED` (`analytics-service.test.ts`: boundary coercion) | Fresh platform | Zeros, dashes, empty states |
+
+### 2j. Practice banks and saved practice (T083b)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| PRC-01 | A student's practice is saved to their account and restored on another device | P0 | `VERIFIED` (`bank-practice-runner.test.tsx`, `practice-service.test.ts`) + DB; MANUAL live | Answer on one browser, open another | Same answers, ticks and done |
+| PRC-02 | A failed save never loses typed text and offers a retry | P0 | `VERIFIED` (`bank-practice-runner.test.tsx`, `mock-session.test.tsx`) | Go offline, type, mark done | Text stays; Retry saves it |
+| PRC-03 | Only the student and their batch's mentors read answers; admins see counts only | P0 | `VERIFIED` (`supabase/tests/workflow-check.sql`) + RLS | Read as another student / other mentor / academy admin | Nothing / nothing / counts only |
+| PRC-04 | Tests are scored by the database; correct options never reach the browser in a test | P0 | `VERIFIED` (`practice-service.test.ts`, `workflow-check.sql`) | Submit OIR test | Score from server; no `correctOptionId` in the page |
+| PRC-05 | A retried submit doesn't create a duplicate | P1 | `VERIFIED` (`practice-service.test.ts`, `workflow-check.sql`, `mock-session.test.tsx`) | Submit twice with the same run | One attempt |
+| PRC-06 | Only a super admin edits banks; hiding keeps saved answers | P0 | `VERIFIED` (`practice-service.test.ts`, `workflow-check.sql`) | Edit as a mentor; hide an answered question | Refused; answer kept, question gone for students |
+| PRC-07 | Every journey bank module points at a seeded bank; counts are real | P1 | `VERIFIED` (`practice-journey.test.ts`) | — | 11 banks, 209 questions |
 ---
 
 ## 3. Academy isolation / IDOR

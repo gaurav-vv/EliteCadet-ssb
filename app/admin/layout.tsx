@@ -10,6 +10,7 @@ const NAV_ITEMS: WorkspaceNavItem[] = [
   { href: "/admin/academies", label: "Academies", icon: "academy", availability: "available" },
   { href: "/admin/content", label: "Content Library", icon: "content", availability: "available" },
   { href: "/admin/content-requests", label: "Content Requests", icon: "checklist", availability: "available" },
+  { href: "/admin/practice", label: "Practice Banks", icon: "practice", availability: "available" },
   { href: "/admin/analytics", label: "Analytics", icon: "reports", availability: "available" },
 ];
 

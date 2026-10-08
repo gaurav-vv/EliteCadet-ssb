@@ -230,7 +230,9 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
     if (p && typeof r.student_id === "string") pointsBy.set(r.student_id, [...(pointsBy.get(r.student_id) ?? []), p]);
   }
   const summaryBy = new Map<string, { batchId: string | null; summary: ProgressSummary }>();
+  const practiceBy = new Map<string, number>();
   for (const r of (rows.data ?? []) as Record<string, unknown>[]) {
+    if (typeof r.student_id === "string") practiceBy.set(r.student_id, Number(r.practice_done) || 0);
     if (typeof r.student_id === "string") summaryBy.set(r.student_id, { batchId: typeof r.batch_id === "string" ? r.batch_id : null, summary: summarize(progressRow(r), pointsBy.get(r.student_id) ?? []) });
   }
   const openBatches = new Set(((open.data ?? []) as { batch_id: string }[]).map((a) => a.batch_id));
@@ -241,7 +243,8 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
     const points = memberIds.flatMap((id) => pointsBy.get(id) ?? []);
     const present = members.reduce((s, m) => s + m.summary.sessionsPresent, 0);
     const absent = members.reduce((s, m) => s + m.summary.sessionsAbsent, 0);
-    return { batchId: b.id, batchName: b.name, students: members.length, avgScorePct: averagePct(points), attendancePct: attendancePct(present, absent), reviewedCount: points.length };
+    const practiceDone = memberIds.reduce((sum, id) => sum + (practiceBy.get(id) ?? 0), 0);
+    return { batchId: b.id, batchName: b.name, students: members.length, avgScorePct: averagePct(points), attendancePct: attendancePct(present, absent), reviewedCount: points.length, practiceDone };
   });
 
   const attention: AttentionStudent[] = [];

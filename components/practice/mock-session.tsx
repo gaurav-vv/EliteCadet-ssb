@@ -10,11 +10,18 @@ import { MOCK_SESSIONS } from "@/lib/practice/config";
 import { pickMockQuestions } from "@/lib/practice/mock-questions";
 import { buildPiqQuestions } from "@/lib/practice/piq-questions";
 import { readPiq } from "@/lib/student/piq-storage";
-import { readMockAttempt, writeMockAttempt, type MockAttempt, type MockKind } from "@/lib/student/mock-attempts";
+import { saveMockReviewAction, submitAttemptAction } from "@/lib/actions/practice";
+import type { MockAttemptRecord } from "@/types/practice";
 import type { GuidedPracticeItem } from "@/types/ssb-journey";
+
+export type MockKind = "interview" | "conference";
 
 interface MockSessionProps {
   kind: MockKind;
+  /** The practice bank (0014) the general questions come from. */
+  slug: string;
+  /** The student's latest saved run, read on the server. */
+  initialLast: MockAttemptRecord | null;
   title: string;
   intro: string;
   tips: string[];
@@ -37,46 +44,65 @@ function useLeavePageGuard(active: boolean) {
   }, [active]);
 }
 
+const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
 // Timed mock interview / conference (specs.md §6.4b): one question at a time
-// on the shared CarouselRunner, then a review screen. Only the latest attempt
-// is kept, per browser.
-export function MockSession({ kind, title, intro, tips, questions, selfReview, backHref, backLabel }: MockSessionProps) {
+// on the shared CarouselRunner, then a review screen. Each run and its
+// self-review ticks are saved to the student's account (0014); a failed save
+// keeps the answers on screen with a retry.
+export function MockSession({ kind, slug, initialLast, title, intro, tips, questions, selfReview, backHref, backLabel }: MockSessionProps) {
   const config = MOCK_SESSIONS[kind];
   const [phase, setPhase] = useState<Phase>("instructions");
   const [runQuestions, setRunQuestions] = useState<GuidedPracticeItem[]>([]);
-  const [attempt, setAttempt] = useState<MockAttempt | null>(null);
-  const [lastAttempt, setLastAttempt] = useState<MockAttempt | null>(null);
+  const [attempt, setAttempt] = useState<MockAttemptRecord | null>(null);
+  const [lastAttempt, setLastAttempt] = useState<MockAttemptRecord | null>(initialLast);
+  const [runKey, setRunKey] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useLeavePageGuard(phase === "running");
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe external-store (localStorage) read, not derived state
-    setLastAttempt(readMockAttempt(kind));
-  }, [kind]);
 
   function start() {
     const piq = kind === "interview" ? buildPiqQuestions(readPiq() ?? {}) : [];
     setRunQuestions(pickMockQuestions(config, questions, piq));
+    setRunKey(newKey());
+    setSaveError(null);
     setPhase("running");
   }
 
-  function finish(answers: Record<string, string>) {
-    const saved = writeMockAttempt(kind, {
-      completedAt: new Date().toISOString(),
-      questions: runQuestions,
-      answers,
-      selfReview: {},
-    });
+  async function save(run: MockAttemptRecord) {
+    setSaving(true);
+    const bankIds = new Set(questions.map((q) => q.id));
+    const result = await submitAttemptAction(
+      slug,
+      "mock",
+      runKey,
+      run.questions.map((q) => (bankIds.has(q.id) ? { key: q.id, response: run.answers[q.id] ?? "" } : { prompt: q.prompt, response: run.answers[q.id] ?? "" })),
+    );
+    setSaving(false);
+    if (!result.ok || !result.data) {
+      setSaveError(result.error?.message ?? "We couldn't save this run. Your answers are still here.");
+      return;
+    }
+    const saved = { ...run, id: result.data.id, completedAt: result.data.submittedAt };
+    setSaveError(null);
     setAttempt(saved);
     setLastAttempt(saved);
+  }
+
+  function finish(answers: Record<string, string>) {
+    const run: MockAttemptRecord = { id: "", completedAt: new Date().toISOString(), questions: runQuestions, answers, selfReview: {} };
+    setAttempt(run);
     setPhase("review");
+    void save(run);
   }
 
   function updateSelfReview(questionId: string, checked: string[]) {
     if (!attempt) return;
-    const next = writeMockAttempt(kind, { ...attempt, selfReview: { ...attempt.selfReview, [questionId]: checked } });
+    const next = { ...attempt, selfReview: { ...attempt.selfReview, [questionId]: checked } };
     setAttempt(next);
     setLastAttempt(next);
+    if (next.id) void saveMockReviewAction(next.id, next.selfReview);
   }
 
   if (phase === "running") {
@@ -103,9 +129,17 @@ export function MockSession({ kind, title, intro, tips, questions, selfReview, b
           <h1 className="text-[28px] font-bold text-ink">{title}: review</h1>
           <p className="text-[14px] text-ink-secondary">
             You answered {answered} of {attempt.questions.length} questions. Read each answer against its guidance and
-            tick your self-review. This is saved on this device only.
+            tick your self-review. {attempt.id ? "Saved to your account; your mentor can read it." : saving ? "Saving…" : ""}
           </p>
         </div>
+        {saveError && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-danger">
+            <span>{saveError}</span>
+            <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => void save(attempt)}>
+              Retry save
+            </Button>
+          </div>
+        )}
         <ol className="flex flex-col gap-4">
           {attempt.questions.map((q, i) => {
             const answer = attempt.answers[q.id]?.trim();

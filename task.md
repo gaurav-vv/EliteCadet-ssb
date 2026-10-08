@@ -657,12 +657,40 @@ live check.
 live check.
 **Tests:** unit — `content-validation.test.ts`, `content-service.test.ts`, `rbac.test.ts`.
 
-## T083b — Move practice banks, journey modules and resources onto `contents` — P1 — `[ ]`
-**Depends on:** T083. **Why:** `lib/mock/{practice,ssb-journey,resources,day2-resources}.ts` are still
-hard-coded. Their runners need structured items (TAT images, WAT words, MCQ options and answers,
-interview questions with guidance), so this needs a specified item model, e.g. a `content_items`
-table with a typed JSON payload validated per content type, before the runners can read from
-Postgres. Spec that model in `specs.md` first.
+## T083b — Practice banks and saved practice — P1 — `[-]`
+**Spec:** `specs.md` §8a.4g. **Depends on:** T083, T089. **Branch:** `feat/t083b-practice-content`
+(stacked on T089). **Decided 2026-10-08:** banks and saved practice; Super Admin edits banks;
+answers readable by the student and their mentors, counts only for admins.
+**Requirements:**
+- Migration `0014_practice.sql`:
+  - `practice_banks` and `practice_items`, seeded with the shipped content (209 questions)
+  - `practice_answers` and `practice_attempts`, with MCQ scored in the database, idempotent on the
+    client key
+  - `is_my_mentee()`, `practice_stats()` (counts only) and `practice_move_item()`
+  - `student_progress` gains practice counts
+- Server: `lib/server/practice/{validation,service,journey-progress}.ts`, `lib/actions/practice.ts`.
+  The journey structure moves to `lib/practice/journey.ts`, the psychology list to
+  `lib/practice/activities.ts`.
+- Runners save to the account:
+  - self-paced answers autosave, with a retry on failure
+  - tests and mock runs submit through server actions
+  - progress ring, badges, continue card and final summary are server-rendered from saved answers
+- Super Admin **Practice Banks** pages: list, add, edit, reorder, hide or show.
+- Student dashboard: Today's Mission and practice streak. Mentor mentee page: Practice section.
+  Academy Performance: Practice Done column.
+- Removed:
+  - `lib/mock/{practice,ssb-journey}.ts` (moved) and `lib/api/{practice,ssb-journey}.ts`
+  - `lib/student/{practice-answers,mock-attempts}.ts` and the journey part of
+    `ssb-journey-progress.ts`
+  - their tests
+- Stays on the device by design: the PIQ form and its answers, the self-assessment and onboarding.
+  Resources and the curated Day-2 library stay in code.
+**Acceptance:** `specs.md` §8a.4g. Lint, typecheck, tests, build and `supabase/tests` pass.
+**Status:** code and tests done; database layer verified on a local Postgres; UI reviewed locally with
+sample data. Waiting on applying 0014 to the real project.
+**Tests:** unit — `practice-validation.test.ts`, `practice-service.test.ts`, `practice-journey.test.ts`;
+integration — `bank-practice-runner.test.tsx`, `mock-session.test.tsx` (rewritten);
+`supabase/tests/workflow-check.sql` (25 practice checks).
 
 ## T084 — Phase 5: Mentor content, starter templates and content requests — P1 — `[-]`
 **Spec:** `specs.md` §8a.4 (Mentor content, decided 2026-10-08). **Depends on:** T083.

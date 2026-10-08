@@ -118,13 +118,13 @@ describe("getAcademyPerformance", () => {
     vi.mocked(getActor).mockResolvedValue(actor("academy_admin"));
     db.queue.push(
       { data: [{ id: "b1", name: "Alpha" }], error: null },
-      { data: [{ student_id: STUDENT, batch_id: "b1", reviewed_count: 1, sessions_present: 1, sessions_absent: 0, content_completed: 0, last_submission_at: "2026-10-05T00:00:00Z" }], error: null },
+      { data: [{ student_id: STUDENT, batch_id: "b1", reviewed_count: 1, sessions_present: 1, sessions_absent: 0, content_completed: 0, last_submission_at: "2026-10-05T00:00:00Z", practice_done: 4 }], error: null },
       { data: [scoreRow({ score_pct: 30 })], error: null },
       { data: [{ id: STUDENT, full_name: "Asha", batch_id: "b1", batch_name: "Alpha" }], error: null },
       { data: [{ batch_id: "b1" }], error: null },
     );
     const res = await service.getAcademyPerformance(NOW);
-    expect(res.data?.batches).toEqual([{ batchId: "b1", batchName: "Alpha", students: 1, avgScorePct: 30, attendancePct: 100, reviewedCount: 1 }]);
+    expect(res.data?.batches).toEqual([{ batchId: "b1", batchName: "Alpha", students: 1, avgScorePct: 30, attendancePct: 100, reviewedCount: 1, practiceDone: 4 }]);
     expect(res.data?.attention).toEqual([{ studentId: STUDENT, name: "Asha", batchName: "Alpha", reason: expect.stringMatching(/Average score 30%/) }]);
     expect(db.calls[0].q.eq).toHaveBeenCalledWith("academy_id", "acad");
   });

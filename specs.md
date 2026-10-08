@@ -850,7 +850,8 @@ list links to where the user acts on it.
 **Decisions (2026-10-08):**
 - There is **no readiness score**. "Average reviewed score" replaces it until a readiness formula is
   defined.
-- **Today's Mission and the practice streak are hidden** until practice is stored (T083b).
+- **Today's Mission and the practice streak were hidden** until practice was stored. T083b now shows
+  them from saved practice (§8a.4g).
 - The sample-data dashboards and the "Load/Clear demo data" controls are removed.
 
 **Acceptance:**
@@ -898,6 +899,45 @@ anyone else. It shows:
 - Another user's notifications can't be read or marked read.
 - Only a super admin can call the analytics function.
 - With no data, every figure is 0, "—" or the shared empty state.
+
+### 8a.4g Practice banks and saved practice (T083b)
+
+The Practice journey's question banks and every student's practice work are stored in Postgres
+(`0014_practice.sql`). The journey's days, modules and reading copy stay in code as product copy.
+
+- **Banks:**
+  - Eleven banks, seeded with the exact content the app shipped with: TAT, WAT, SRT, SDT, OIR
+    verbal and non-verbal (practice and test sets for each), PPDT, interview and conference.
+  - Each question keeps a stable key, e.g. `tat-13`.
+  - Only the **Super Admin** edits banks, under **Practice Banks**: add, edit, reorder, hide.
+  - Hiding a question removes it for students but keeps their saved answers.
+  - Multiple-choice questions need 2–6 options and one correct option, checked in the database.
+- **Saved practice:**
+  - **Self-paced:** each answer, chosen option, self-review tick and "done" is saved per question.
+    Typing saves after a short pause. A failed save keeps the text on screen with a retry.
+  - **Timed tests and mock interview/conference runs:** saved once per run. A retried submit returns
+    the original. MCQ tests are scored by the database, and correct answers are never sent to the
+    browser for a test.
+- **Who reads it (decided 2026-10-08):**
+  - The student, and the mentors of their batch, can read the written answers.
+  - Academy admins and super admins see counts only, through `practice_stats()`.
+- **What shows it:**
+  - journey progress rings and badges
+  - "Continue where you left off"
+  - the student dashboard's **Today's Mission** and **practice streak**: consecutive IST days with
+    practice, ending today or yesterday
+  - a **Practice** section on the mentor's mentee page
+  - a **Practice Done** column on Academy Performance
+- **Stays on the device, by design:** the PIQ form and answers to questions built from it, the Day 5
+  self-assessment, the onboarding draft and the recently-viewed list. Resources and the curated Day-2
+  library also stay in code.
+
+**Acceptance:**
+- The banks match the shipped content (209 questions).
+- A student's practice survives a reload and a different device.
+- A mentor of another batch, another academy's admin, or another student can't read it.
+- Only a super admin can change a bank.
+- No count shown is invented.
 
 ### 8a.5 Domain model
 

@@ -54,6 +54,8 @@ export interface BatchPerformance {
   avgScorePct: number | null;
   attendancePct: number | null;
   reviewedCount: number;
+  /** Practice questions marked done by the batch's students (counts only, 0014). */
+  practiceDone: number;
 }
 
 export interface AttentionStudent {

@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0013 under real RLS.
+-- End-to-end workflow check of migrations 0001–0014 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -227,6 +227,63 @@ select t.eq(((:'PA')::jsonb #>> '{activity,avgScorePct}')::numeric::bigint, 70, 
 select t.eq(((:'PA')::jsonb #>> '{activity,attendancePct}')::numeric::bigint, 50, 'analytics: attendance 50%');
 select t.eq(((:'PA')::jsonb #>> '{activity,sessionsHeld}')::bigint, 1, 'analytics: 1 session held');
 select t.eq(jsonb_array_length((:'PA')::jsonb -> 'monthly'), 6, 'analytics: six months');
+reset role;
+
+-- ---------- 9. Practice banks and saved practice (0014) ----------
+select id as "TAT1" from public.practice_items where bank_slug = 'tat' and key = 'tat-1' \gset
+select id as "OIRT1" from public.practice_items where bank_slug = 'oir-verbal-test' and key = 'oir-t-1' \gset
+select correct_option_id as "OIRT1_OK" from public.practice_items where id = :'OIRT1' \gset
+select id as "OIRT2" from public.practice_items where bank_slug = 'oir-verbal-test' and key = 'oir-t-2' \gset
+select t.eq((select count(*) from public.practice_items), 209, 'seed: 209 practice questions in 11 banks');
+
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.eq((select count(*) from public.practice_items where bank_slug = 'tat'), 13, 'student reads the TAT bank');
+select t.fails(format('insert into public.practice_items (bank_slug, prompt, created_by) values (%L, %L, %L)', 'tat', 'Mine', :'S1'), 'student cannot add bank questions');
+insert into public.practice_answers (student_id, item_id, answer_text, done) values (:'S1', :'TAT1', 'A determined young officer...', true);
+select t.fails(format('insert into public.practice_answers (student_id, item_id, answer_text) values (%L, %L, %L)', :'S2', :'TAT1', 'x'), 'student cannot save answers for another student');
+insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers)
+  values (:'S1', 'oir-verbal-test', 'test', 'run-0000000001', json_build_array(json_build_object('itemId', :'OIRT1', 'optionId', :'OIRT1_OK'), json_build_object('itemId', :'OIRT2', 'optionId', 'wrong'))::jsonb);
+select t.eq((select correct from public.practice_attempts where client_key = 'run-0000000001'), 1, 'MCQ test scored by the database: 1 of 2');
+select t.fails(format('insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers) values (%L, %L, %L, %L, %L)', :'S1', 'oir-verbal-test', 'test', 'run-0000000001', '[]'), 'a repeated submit (same client key) is refused');
+select t.fails(format('insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers) values (%L, %L, %L, %L, %L::jsonb)', :'S1', 'tat', 'test', 'run-0000000002', json_build_array(json_build_object('itemId', :'OIRT1'))), 'an answer for another bank''s question is refused');
+select t.fails(format('insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers) values (%L, %L, %L, %L, %L)', :'S1', 'interview', 'test', 'run-0000000003', '[{"prompt":"About Pune?","response":"Home"}]'), 'own (PIQ) questions only in mock runs');
+insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers) values (:'S1', 'interview', 'mock', 'run-0000000004', '[{"prompt":"About Pune?","response":"Home"}]');
+select t.eq(t.affected(format('update public.practice_attempts set self_review = %L where client_key = %L', '{"own-1":["Honest"]}', 'run-0000000004')), 1, 'student ticks self-review on their mock run');
+select t.fails(format('update public.practice_attempts set answers = %L where client_key = %L', '[]', 'run-0000000004'), 'submitted answers can''t be changed');
+reset role;
+
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select t.eq((select count(*) from public.practice_answers where student_id = :'S1'), 0, 'S2 cannot read S1''s practice');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.practice_answers where student_id = :'S1'), 1, 'mentor A reads their mentee''s practice answers');
+select t.eq((select count(*) from public.practice_attempts where student_id = :'S1'), 2, 'mentor A sees their mentee''s tests and mock runs');
+select t.fails(format('insert into public.practice_answers (student_id, item_id, answer_text) values (%L, %L, %L)', :'MENT_A', :'TAT1', 'x'), 'a mentor cannot save practice answers');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.practice_answers where student_id = :'S1'), 0, 'mentor B cannot read academy A practice');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from public.practice_answers where student_id = :'S1'), 0, 'academy admin cannot read answer text');
+select t.eq((select practice_done from public.student_progress where student_id = :'S1'), 1, 'academy admin sees the practice count');
+select t.eq((select practice_tests from public.student_progress where student_id = :'S1'), 2, 'academy admin sees the test count');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_B', false); set role authenticated;
+select t.eq((select count(*) from public.practice_stats(:'S1') where practice_done is not null), 0, 'admin B gets no counts for academy A''s student');
+reset role;
+
+select set_config('request.jwt.claim.sub', :'SUPER', false); set role authenticated;
+insert into public.practice_items (bank_slug, key, prompt, created_by) values ('tat', 'tat-new', 'A new scene.', :'SUPER');
+select t.eq((select position from public.practice_items where key = 'tat-new'), 14, 'new question goes to the end of the bank');
+select t.fails(format('insert into public.practice_items (bank_slug, prompt, options, correct_option_id, created_by) values (%L, %L, %L, %L, %L)', 'oir-verbal-test', 'Q?', '[{"id":"a","label":"A"}]', 'a', :'SUPER'), 'an MCQ needs at least two options');
+select public.practice_move_item(:'TAT1', 1);
+select t.eq((select position from public.practice_items where id = :'TAT1'), 2, 'reorder swaps with the next question');
+update public.practice_items set active = false where id = :'TAT1';
+reset role;
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.eq((select count(*) from public.practice_items where id = :'TAT1'), 0, 'a hidden question disappears for students');
+select t.eq((select count(*) from public.practice_answers where item_id = :'TAT1'), 1, '...and their saved answer is kept');
+select t.fails('select public.practice_move_item(gen_random_uuid(), 1)', 'only a super admin can reorder');
 reset role;
 \echo
 \echo ALL CHECKS PASSED

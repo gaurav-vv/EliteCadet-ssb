@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { CarouselRunner } from "@/components/practice/carousel-runner";
 import { McqTestRunner } from "@/components/practice/mcq-test-runner";
-import { submitSsbBankTest } from "@/lib/api/ssb-journey";
+import { submitAttemptAction } from "@/lib/actions/practice";
 import type { CarouselTiming } from "@/lib/practice/config";
 import type { McqItem, SsbBankItemKind } from "@/types/ssb-journey";
 import type { PracticeItem } from "@/types/practice";
 
 interface SsbBankTestSessionProps {
+  /** The practice bank (0014) this test's items come from. */
+  slug: string;
   title: string;
   description: string;
   context?: string;
@@ -42,6 +44,7 @@ function useLeavePageGuard(active: boolean) {
 // (WAT/TAT/SRT/SDT) already have that dedicated flow and link there via
 // `href` instead of using this component.
 export function SsbBankTestSession({
+  slug,
   title,
   description,
   context,
@@ -55,6 +58,7 @@ export function SsbBankTestSession({
   const [phase, setPhase] = useState<SessionPhase>("instructions");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastAnswers, setLastAnswers] = useState<Record<string, string> | null>(null);
+  const [score, setScore] = useState<{ correct: number; total: number } | null>(null);
   const [idempotencyKey] = useState(() =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
   );
@@ -69,12 +73,19 @@ export function SsbBankTestSession({
     setPhase("submitting");
     setErrorMessage(null);
 
-    const result = await submitSsbBankTest(answers, idempotencyKey);
-    if (!result.ok) {
+    // Every item is sent; MCQ is scored on the server, never in the browser.
+    const result = await submitAttemptAction(
+      slug,
+      "test",
+      idempotencyKey,
+      items.map((item) => (itemKind === "mcq" ? { key: item.id, ...(answers[item.id] ? { optionId: answers[item.id] } : {}) } : { key: item.id, response: answers[item.id] ?? "" })),
+    );
+    if (!result.ok || !result.data) {
       setPhase("error");
       setErrorMessage(result.error?.message ?? "We couldn't submit your test. Please try again.");
       return;
     }
+    if (result.data.correct !== null) setScore({ correct: result.data.correct, total: result.data.total });
     setPhase("submitted");
   }
 
@@ -144,9 +155,15 @@ export function SsbBankTestSession({
     <div className="mx-auto flex max-w-xl flex-1 flex-col items-center justify-center gap-4 py-10 text-center">
       <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10">
         <h1 className="text-xl font-semibold text-ink">Submitted</h1>
+        {score && (
+          <p className="text-[28px] font-bold text-ink">
+            {score.correct} / {score.total}
+            <span className="sr-only"> correct</span>
+          </p>
+        )}
         <p className="text-sm text-ink-secondary">
-          Your {title} responses were recorded. AI feedback isn&apos;t available yet (tracked as T034) —
-          your mentor will be able to review this once mentor tools are built.
+          {score ? `You got ${score.correct} of ${score.total} right. ` : ""}Your {title} responses are saved to your account, and your
+          mentor can see them.
         </p>
         <Button asChild size="sm">
           <Link href={backHref}>Back to {backLabel}</Link>

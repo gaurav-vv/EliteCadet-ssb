@@ -1,7 +1,9 @@
 // Role dashboards (specs.md §8a.4e, Phase 9). Every field comes from a real
-// row — no readiness score, no practice streak (status.md Decisions, T088).
+// row — no readiness score (status.md Decisions, T088). Mission and streak
+// come from saved practice (T083b).
 
 import type { AttentionStudent, CategoryAverage, ProgressSummary, Recommendation } from "@/types/progress";
+import type { JourneyMission } from "@/types/practice";
 import type { SessionRecord } from "@/types/sessions";
 
 export interface ActivityEntry {
@@ -18,6 +20,10 @@ export interface StudentDashboard {
   nextSession: SessionRecord | null;
   recommendations: Recommendation[];
   recentActivity: ActivityEntry[];
+  /** The next self-paced practice bank to work on (Today's Mission). */
+  mission: JourneyMission;
+  /** Consecutive IST days with practice, ending today or yesterday. */
+  streakDays: number;
 }
 
 export interface MenteeRow {

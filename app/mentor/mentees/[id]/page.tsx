@@ -13,6 +13,8 @@ import { evaluationStatusOf } from "@/types/assessments";
 import { formatDay } from "@/lib/utils/format-date";
 import { ProgressBody, ProgressStats } from "@/components/progress/progress-views";
 import { getMenteeProgress } from "@/lib/server/progress/service";
+import { MenteePractice } from "@/components/progress/mentee-practice";
+import { getMenteePractice } from "@/lib/server/practice/service";
 
 export const metadata: Metadata = { title: "Mentee" };
 
@@ -29,7 +31,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 // batch, another academy, or nonexistent — is the same "not found" (specs §7.4).
 export default async function MenteeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [result, history, progress] = await Promise.all([getMyMentee(id), getMenteeHistory(id), getMenteeProgress(id)]);
+  const [result, history, progress, practice] = await Promise.all([getMyMentee(id), getMenteeHistory(id), getMenteeProgress(id), getMenteePractice(id)]);
   if (!result.ok && result.error?.code === "not_found") notFound();
 
   if (!result.ok || !result.data) {
@@ -68,6 +70,15 @@ export default async function MenteeDetailPage({ params }: { params: Promise<{ i
           </>
         ) : (
           <RetryErrorState message={progress.error?.message ?? "We couldn't load this student's progress. Please try again."} />
+        )}
+      </section>
+
+      <section aria-labelledby="practice-heading" className="flex flex-col gap-3">
+        <h2 id="practice-heading" className="text-[18px] font-semibold text-ink">Practice</h2>
+        {practice.ok && practice.data ? (
+          <MenteePractice answers={practice.data.answers} attempts={practice.data.attempts} />
+        ) : (
+          <RetryErrorState message={practice.error?.message ?? "We couldn't load this student's practice. Please try again."} />
         )}
       </section>
 

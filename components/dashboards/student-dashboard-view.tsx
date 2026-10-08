@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, CalendarClock, History, ListChecks } from "lucide-react";
+import { ContinueJourneyCard } from "@/components/practice/continue-journey-card";
 import { ProgressStats } from "@/components/progress/progress-views";
+import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPanel, ListRow } from "@/components/ui/list-panel";
 import { PageHeader } from "@/components/ui/page-header";
@@ -19,8 +21,8 @@ function Section({ title, link, children }: { title: string; link?: { href: stri
   );
 }
 
-// Real data only (specs.md §8a.4e): no readiness score and no practice streak
-// until those have a defined, stored source (status.md Decisions, T088).
+// Real data only (specs.md §8a.4e): no readiness score (status.md Decisions,
+// T088). Today's Mission and the streak come from saved practice (T083b).
 
 export function StudentDashboardView({ d }: { d: StudentDashboard }) {
 
@@ -28,6 +30,13 @@ export function StudentDashboardView({ d }: { d: StudentDashboard }) {
     <div className="flex flex-col gap-8 pb-10">
       <PageHeader title={`Welcome back, ${d.firstName}`} subtitle="Your next steps and progress, from your mentor's reviews and your sessions." />
       <ProgressStats summary={d.summary} />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <ContinueJourneyCard mission={d.mission} heading="Today's Mission" />
+        <section aria-label="Practice streak" className="flex flex-col gap-3 lg:pt-[44px]">
+          <StatCard icon="activities" label="Practice streak" value={d.streakDays === 1 ? "1 day" : `${d.streakDays} days`} />
+        </section>
+      </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <Section title="Do next">

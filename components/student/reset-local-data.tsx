@@ -9,10 +9,9 @@ const LOCAL_KEYS = [
   "ssb-onboarding-complete",
   "ssb-student-profile",
   "ssb-resources-read",
-  "ssb-practice-answers",
   "ssb-interview-piq",
-  "ssb-mock-attempt-interview",
-  "ssb-mock-attempt-conference",
+  "ssb-piq-answers",
+  "ssb-journey-self-assessment",
 ];
 
 export function ResetLocalData() {
@@ -32,8 +31,8 @@ export function ResetLocalData() {
       <div>
         <h2 className="text-sm font-medium text-ink-secondary">Demo data</h2>
         <p className="text-xs text-ink-secondary">
-          Your onboarding answers and profile are stored in this browser only (status.md, 2026-09-18).
-          Clearing them resets you to a brand-new student.
+          Your onboarding draft, profile, PIQ form and self-assessment are stored in this browser only. Clearing
+          them doesn&apos;t touch your saved practice, which is kept in your account.
         </p>
       </div>
       {message && (

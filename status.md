@@ -303,6 +303,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Progress is derived, not stored** (T087, `0012_progress.sql`). Only two new source tables: `session_attendance` (mentor-marked, only after the session starts, only participants; excused counts neither way) and `content_progress` (student-marked Library completion). Scores come from mentor-reviewed feedback only; practice runners are not counted (they have no reviewed score). Summaries are security-invoker views (`student_scores`, `student_progress`), so every reader's RLS applies and there is one source of truth. No value is invented: with no data the UI says so. Needs-attention and recommendations are plain rules, each shown with its reason (average below 50%, no submission in 14 days while assessments are open, attendance below 50%) | Brief Phase 8 + `AGENTS.md` §8 (no fabricated data) + `specs.md` §8a.4d |
 | 2026-10-08 | **Dashboards are read-only summaries over real data** (T088, no migration). One server function per role (`lib/server/dashboards`) reuses the progress, sessions, assessments and people services, so every figure matches the page it links to. **No readiness score**: "average reviewed score" replaces it until a readiness formula is defined. **Today's Mission and the practice streak are hidden** until practice is stored (T083b). The sample-data dashboards, the `getAnalytics` "Demo data" panels and the "Load/Clear demo data" controls are removed; this supersedes the 2026-09-19 demo-data and 2026-10-03 analytics decisions above | User-approved 2026-10-08 (both recommendations) + `AGENTS.md` §8 (no fabricated data) |
 | 2026-10-08 | **Notifications come from database triggers; analytics from one guarded SQL function** (T089, `0013_notifications_analytics.sql`). Events write `notifications` rows inside the same transaction as the change: sessions scheduled or cancelled, assessments opened, submissions, reviews, batch membership, content requests. No code path can forget one, and there is no insert policy, so clients can't forge one. Recipients can only set `read_at` (column grant). Each event notifies a person once (`ref_id` de-duplication), except content-request status changes. Hrefs are same-site paths, checked in the DB and the service. Platform analytics is a SECURITY DEFINER function that refuses everyone but a super admin, so aggregates don't widen any table's RLS. The bell's badge is rendered by the layout and its list is fetched when it opens. There is no realtime push yet | Brief Phase 10 + `AGENTS.md` §10 (server-side authorization) + §15 (no infrastructure without measured need: realtime deferred) |
+| 2026-10-08 | **Practice banks and saved practice move to Postgres** (T083b, `0014_practice.sql`). The 11 question banks (209 items) are seeded with the exact shipped content and edited only by the Super Admin; the journey's days/modules/copy stay in code and point at banks by slug. Students' self-paced answers, ticks and "done" are saved per question; timed tests and mock runs are saved once per run (idempotent on a browser-generated key) and MCQ is scored by the database, so a test never ships the correct options. The student and their batch's mentors can read answers; academy and super admins get counts only via `practice_stats()`. Items are hidden, never deleted, so answers keep their question. PIQ-based questions, the PIQ form and the self-assessment stay on the device | User decisions 2026-10-08 (scope: banks + saved practice; editors: Super Admin only; visibility: student + mentors) + `AGENTS.md` §8, §11 (never lose input) |
 
 ---
 
@@ -1635,6 +1636,26 @@ What remains:
 
 Next task:
 - Real-project smoke test; then T083b
+
+Date: 2026-10-08
+Task: T083b — Practice banks and saved practice
+Status: Complete in code and tests; database layer VERIFIED on a local Postgres 17. Not yet applied to the real project
+
+What changed:
+- Migration `0014_practice.sql` (see Decisions Register)
+- `lib/server/practice/{validation,service,journey-progress}.ts`, `lib/actions/practice.ts`, `lib/practice/{journey,activities}.ts`
+- Runners: self-paced answers autosave to the account with retry; Psychology/OIR/PPDT tests and mock interview/conference submit via server actions (OIR shows the server's score); progress ring, badges, continue card and Day 5 summary are server-rendered
+- Super Admin `/admin/practice` (+ `[slug]`): add, edit, reorder, hide/show questions; nav item added
+- Student dashboard: Today's Mission + practice streak; mentor mentee page: Practice section; Academy Performance: Practice Done column
+- Removed `lib/mock/{practice,ssb-journey}.ts` (moved), `lib/api/{practice,ssb-journey}.ts`, `lib/student/{practice-answers,mock-attempts}.ts` and their tests
+- Tests: Vitest 383 pass (335 unit + 48 integration); `supabase/tests/run-workflow-check.sh` 85/85 (25 new practice checks); screenshots in `docs/screenshots/t083b/`
+
+What remains:
+- Apply 0014 after 0004–0013 on the real project; live check: a student answers on one device and sees it on another; their mentor reads it; another academy's admin sees no counts
+- Resources articles and the curated Day-2 library are still code (out of this task's scope); PIQ form/answers and the self-assessment stay on the device by design
+
+Next task:
+- Real-project smoke test across all roles
 
 ## 14. North Star
 

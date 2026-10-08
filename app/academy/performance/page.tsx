@@ -64,6 +64,7 @@ export default async function AcademyPerformancePage() {
                     { key: "reviewed", header: "Reviewed", cell: (b) => b.reviewedCount },
                     { key: "score", header: "Avg Score", cell: (b) => pct(b.avgScorePct) },
                     { key: "attendance", header: "Attendance", cell: (b) => pct(b.attendancePct) },
+                    { key: "practice", header: "Practice Done", cell: (b) => b.practiceDone },
                   ]}
                 />
               )}
