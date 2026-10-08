@@ -1,5 +1,6 @@
 import { WorkspaceLayout } from "@/components/layout/workspace/workspace-layout";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
+import { getMyUnreadCount } from "@/lib/server/notifications/service";
 import type { WorkspaceNavItem } from "@/lib/navigation/workspace";
 
 const NAV_ITEMS: WorkspaceNavItem[] = [
@@ -14,7 +15,7 @@ const NAV_ITEMS: WorkspaceNavItem[] = [
 ];
 
 export default async function MentorLayout({ children }: { children: React.ReactNode }) {
-  const { profile } = await getCurrentUserAndProfile();
+  const [{ profile }, unreadCount] = await Promise.all([getCurrentUserAndProfile(), getMyUnreadCount()]);
   const name = profile?.fullName || "Mentor";
 
   return (
@@ -29,6 +30,7 @@ export default async function MentorLayout({ children }: { children: React.React
       searchLabel="Search mentees"
       profileHref="/mentor/profile"
       profileLabel="Profile"
+      unreadCount={unreadCount}
     >
       {children}
     </WorkspaceLayout>

@@ -19,6 +19,8 @@ interface WorkspaceLayoutProps {
   searchLabel: string;
   profileHref: string;
   profileLabel: string;
+  // Unread badge on the bell (the role layout reads it server-side).
+  unreadCount?: number;
   children: React.ReactNode;
 }
 
@@ -36,6 +38,7 @@ export function WorkspaceLayout({
   searchLabel,
   profileHref,
   profileLabel,
+  unreadCount = 0,
   children,
 }: WorkspaceLayoutProps) {
   const homeHref = items[0]?.href ?? "/";
@@ -62,6 +65,8 @@ export function WorkspaceLayout({
           searchLabel={searchLabel}
           profileHref={profileHref}
           profileLabel={profileLabel}
+          unreadCount={unreadCount}
+          notificationsHref={`${homeHref}/notifications`}
           mobileNav={
             <WorkspaceMobileNav
               items={items}

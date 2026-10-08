@@ -861,6 +861,44 @@ list links to where the user acts on it.
 - The academy dashboard reads only the admin's own academy.
 - Figures match the linked pages: Performance, Evaluations, Sessions, Mentees.
 
+### 8a.4f Analytics and notifications (Phase 10)
+
+**Notifications** are written by database triggers on the events themselves, so no code path can
+skip one, and they are never created from the browser.
+
+| Event | Who is notified | Opens |
+|---|---|---|
+| Session scheduled | Its students: the whole batch, or the selected students | Sessions |
+| Session cancelled | Its students and the academy's admins | Sessions |
+| Assessment opened | The batch's students | The assessment |
+| Assessment submitted | The assessment's mentor | The evaluate page |
+| Review completed | The student | The assessment's feedback |
+| Added to a batch | The student, or the mentor | Dashboard or Mentees |
+| New content request | Super admins | Content Requests |
+| Content request status changes | The mentor | My requests |
+
+- Each event notifies a person at most once. The exception is content-request status changes, which
+  notify on every change.
+- A recipient can read only their own notifications and change only `read_at`.
+- Links are same-site paths only.
+- The header bell shows the unread count. Its list loads fresh each time it opens.
+- Each role has a Notifications page, with "Mark all read".
+
+**Platform Analytics** (Super Admin, `/admin/analytics`) is built by one SQL function that refuses
+anyone else. It shows:
+- platform totals
+- activity for the last 30 days, 90 days or 12 months: new accounts, sessions held, submissions,
+  reviews, average score, attendance and Library reads
+- a per-academy table
+- the last six months by month
+- published content by category
+
+**Acceptance:**
+- Each event above creates exactly one notification for the right people, and no one else.
+- Another user's notifications can't be read or marked read.
+- Only a super admin can call the analytics function.
+- With no data, every figure is 0, "—" or the shared empty state.
+
 ### 8a.5 Domain model
 
 ```text

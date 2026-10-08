@@ -1,5 +1,6 @@
 import { WorkspaceLayout } from "@/components/layout/workspace/workspace-layout";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
+import { getMyUnreadCount } from "@/lib/server/notifications/service";
 import type { WorkspaceNavItem } from "@/lib/navigation/workspace";
 
 const NAV_ITEMS: WorkspaceNavItem[] = [
@@ -14,7 +15,7 @@ const NAV_ITEMS: WorkspaceNavItem[] = [
 ];
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
-  const { profile } = await getCurrentUserAndProfile();
+  const [{ profile }, unreadCount] = await Promise.all([getCurrentUserAndProfile(), getMyUnreadCount()]);
   const name = profile?.fullName || "Student";
 
   return (
@@ -29,6 +30,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
       searchLabel="Search practice and resources"
       profileHref="/student/profile"
       profileLabel="Profile"
+      unreadCount={unreadCount}
     >
       {children}
     </WorkspaceLayout>

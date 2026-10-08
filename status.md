@@ -302,6 +302,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Assessments, attempts and mentor feedback** (T086, `0011_assessments.sql`). Mentor-created per batch; questions are locked once opened. One attempt per student, submitted once then locked, accepted only while open and not overdue. One feedback per attempt (upsert on `attempt_id`, so a double submit is idempotent): `in_review` is a recoverable staff-only draft, `reviewed` is final, locked, needs score + strengths + improvement areas, and only then reaches the student with the evaluator and date. Triggers enforce the lifecycle in the database, not only in the app. Mentor feedback is never presented as an SSB outcome; AI feedback stays blocked (B3) | Brief Phase 7 + `specs.md` §7.5 (draft recoverable, idempotent submit, evaluator + timestamp on the student record) |
 | 2026-10-08 | **Progress is derived, not stored** (T087, `0012_progress.sql`). Only two new source tables: `session_attendance` (mentor-marked, only after the session starts, only participants; excused counts neither way) and `content_progress` (student-marked Library completion). Scores come from mentor-reviewed feedback only; practice runners are not counted (they have no reviewed score). Summaries are security-invoker views (`student_scores`, `student_progress`), so every reader's RLS applies and there is one source of truth. No value is invented: with no data the UI says so. Needs-attention and recommendations are plain rules, each shown with its reason (average below 50%, no submission in 14 days while assessments are open, attendance below 50%) | Brief Phase 8 + `AGENTS.md` §8 (no fabricated data) + `specs.md` §8a.4d |
 | 2026-10-08 | **Dashboards are read-only summaries over real data** (T088, no migration). One server function per role (`lib/server/dashboards`) reuses the progress, sessions, assessments and people services, so every figure matches the page it links to. **No readiness score**: "average reviewed score" replaces it until a readiness formula is defined. **Today's Mission and the practice streak are hidden** until practice is stored (T083b). The sample-data dashboards, the `getAnalytics` "Demo data" panels and the "Load/Clear demo data" controls are removed; this supersedes the 2026-09-19 demo-data and 2026-10-03 analytics decisions above | User-approved 2026-10-08 (both recommendations) + `AGENTS.md` §8 (no fabricated data) |
+| 2026-10-08 | **Notifications come from database triggers; analytics from one guarded SQL function** (T089, `0013_notifications_analytics.sql`). Events write `notifications` rows inside the same transaction as the change: sessions scheduled or cancelled, assessments opened, submissions, reviews, batch membership, content requests. No code path can forget one, and there is no insert policy, so clients can't forge one. Recipients can only set `read_at` (column grant). Each event notifies a person once (`ref_id` de-duplication), except content-request status changes. Hrefs are same-site paths, checked in the DB and the service. Platform analytics is a SECURITY DEFINER function that refuses everyone but a super admin, so aggregates don't widen any table's RLS. The bell's badge is rendered by the layout and its list is fetched when it opens. There is no realtime push yet | Brief Phase 10 + `AGENTS.md` §10 (server-side authorization) + §15 (no infrastructure without measured need: realtime deferred) |
 
 ---
 
@@ -1596,6 +1597,28 @@ Blocker:
 
 Next task:
 - T089 — Phase 10: Analytics + Notifications
+
+Date: 2026-10-08
+Task: T089 — Phase 10: Analytics + Notifications
+Status: Complete in code and tests. NOT yet run against a live database (migration 0013 must be applied)
+
+What changed:
+- Migration `0013_notifications_analytics.sql` (see Decisions Register)
+- `lib/server/notifications/service.ts`, `lib/server/analytics/service.ts`, `lib/actions/notifications.ts`, `types/{notifications,analytics}.ts`
+- Header bell in every workspace (`components/layout/workspace/notification-bell.tsx`): unread badge, list fetched on open, mark one or all read; Notifications page per role (`/student|/mentor|/academy|/admin/notifications`). Academy nav Notifications now live
+- Super Admin `/admin/analytics` (nav now live): platform totals, 30/90/365-day activity, per academy, by month, published content
+- Tests: 380 Vitest tests pass; screenshots in `docs/screenshots/phase-10/`
+
+What remains:
+- Apply 0013 after 0004–0012; live check: schedule a session → batch students get one notification; cancel → students + academy admins; open an assessment → students; submit → mentor; review → student; another account cannot read or mark them; a non-super-admin calling `platform_analytics` gets an error
+- Realtime push (the badge updates on navigation/refresh, not live) and email delivery are not built
+- All ten brief phases are now in code; practice/resources moving onto content (T083b) is the remaining planned item
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- Apply migrations 0004–0013 and run the live checks; then T083b
 
 ## 14. North Star
 

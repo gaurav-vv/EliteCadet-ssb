@@ -60,6 +60,7 @@ all green as of this update):
 - `tests/unit/lib/assessments-validation.test.ts`, `assessments-service.test.ts` — assessment/answer/feedback rules, submit-once, idempotent review, mentor scope (T086)
 - `tests/unit/lib/progress-compute.test.ts`, `progress-service.test.ts` — progress derivations, attention rules, attendance, role and academy scope (T087)
 - `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
+- `tests/unit/lib/notifications-service.test.ts`, `analytics-service.test.ts` — own-notifications scope, safe links, mark read, super-admin-only analytics, boundary validation (T089)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
@@ -205,6 +206,18 @@ implicit.
 | DSH-04 | No invented values: empty data shows "—" or the empty state | P0 | `VERIFIED` (`academy-dashboard-view.test.ts`, `dashboards-service.test.ts`) | New academy / mentor without batches | Dashes and empty states, no sample numbers |
 | DSH-05 | Dashboard figures match the linked pages | P1 | MANUAL (needs 0004–0012) | Compare reviews waiting vs Evaluations, attention vs Performance, sessions vs Sessions | Same numbers |
 | DSH-06 | "Today" and session times use IST | P1 | `VERIFIED` (`dashboards-compute.test.ts`) | Session at 23:30 IST vs 00:30 IST next day | Only the first counts as today |
+
+### 2i. Notifications and platform analytics (T089 Phase 10)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| NTF-01 | A user reads and marks only their own notifications | P0 | `VERIFIED` (`notifications-service.test.ts`: `recipient_id` = caller) + RLS + column grant; MANUAL live | As user B, select/update user A's notification id via the API | Nothing returned; update affects 0 rows |
+| NTF-02 | Clients cannot create notifications | P0 | MANUAL (needs 0013) | Insert into `notifications` with the anon/auth key | Refused (no insert grant or policy) |
+| NTF-03 | Each event notifies the right people once | P0 | MANUAL (needs 0013) | Schedule (whole batch / selected), cancel, open assessment, submit, review, add to batch, content request | One row per intended recipient; edits don't repeat it |
+| NTF-04 | Notification links are same-site only | P1 | `VERIFIED` (`notifications-service.test.ts`) + DB check | Row with an external href | Not followed (href null) |
+| NTF-05 | Bell shows unread count; mark one / all read updates it | P1 | MANUAL | Open the bell, click an item, then "Mark all read" | Badge decreases, then disappears |
+| ANL-01 | Only a super admin can load platform analytics | P0 | `VERIFIED` (`analytics-service.test.ts`) + SQL guard; MANUAL live | Call `platform_analytics` as an academy admin | Error, no data |
+| ANL-02 | Analytics shows 0 / "—" / empty states with no data, never invented values | P1 | `VERIFIED` (`analytics-service.test.ts`: boundary coercion) | Fresh platform | Zeros, dashes, empty states |
 ---
 
 ## 3. Academy isolation / IDOR

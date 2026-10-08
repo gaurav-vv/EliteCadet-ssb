@@ -770,8 +770,23 @@ T087).
 **Tests:** unit — `dashboards-compute.test.ts`, `dashboards-service.test.ts`,
 `academy-dashboard-view.test.ts` (rewritten).
 
-## T089 — Phase 10: Analytics + Notifications — P2 — `[ ]`
-Platform analytics for Super Admin; in-app notifications.
+## T089 — Phase 10: Analytics + Notifications — P2 — `[-]`
+**Spec:** `specs.md` §8a.4f. **Depends on:** T088. **Branch:** `feat/phase-10-analytics-notifications`
+(stacked on T088).
+**Requirements:**
+- Migration `0013_notifications_analytics.sql`:
+  - a `notifications` table: own rows only, recipients change only `read_at`, no client inserts
+  - trigger-written events: sessions scheduled or cancelled, assessments opened, submissions,
+    reviews, batch membership, content requests
+  - `platform_analytics(p_since)`: SECURITY DEFINER, refuses everyone but a super admin
+- `lib/server/notifications`, `lib/server/analytics`, `lib/actions/notifications.ts`.
+- A header bell in every workspace: unread badge, a fresh list when opened, mark one or all read.
+  A Notifications page for each role (the Academy nav item is now live).
+- Super Admin Platform Analytics with a 30/90/365-day range (the nav item is now live).
+**Acceptance:** `specs.md` §8a.4f. Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0013 and a
+live check.
+**Tests:** unit — `notifications-service.test.ts`, `analytics-service.test.ts`.
 
 ---
 
