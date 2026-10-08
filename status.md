@@ -2,6 +2,8 @@
 
 **Type:** Current project state. Reporting only — never a source of requirements.
 **Question this file answers:** *If I open this project today, what is the exact state?*
+**Last updated:** 2026-10-07 (T080 Phase 1: auth, users, roles, RBAC and the Super Admin workspace,
+on `feat/admin-access-foundation`; see §13a)
 **Last updated:** 2026-09-24 (test suite split into unit / integration / e2e layers, new tests
 added, CI workflow added on `chore/test-structure-audit`; see §13a)
 **Last updated:** 2026-09-23 (Day 2 Resources visual/text refinement, round 3; includes the latest `origin/main` changes merged into this branch)
@@ -291,6 +293,9 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-04 | **Batches are the first Academy domain on real Supabase.** New migration `supabase/migrations/0003_batches.sql` (table `batches`: academy_id, name, mentor_id → profiles, status enum active/archived, start_date, created_at; unique name per academy; RLS for the academy admin; `current_admin_academy_id()` / `mentor_in_academy()` helpers; a new `profiles_select_academy_admin` policy so admins can read their academy's mentors). Reads/writes use the admin's own session (anon key + RLS), never the service-role key. **No delete policy:** batches are archived, so future student→batch links can't be orphaned. The Batches page no longer shares data with the dashboard/Students/batch-detail pages, which still read the in-memory batches (`lib/mock/academy.ts`) until students move to Postgres | User chose "write the migration, then build on it". Student counts are intentionally not shown: there is no `students` table, and the in-memory students reference in-memory batch ids, so any count would be fake |
 
 ---
+
+| 2026-10-07 | **Platform re-architected around four roles** from the user's brief (`specs.md` §8a): `super_admin` added to `user_role` (migration `0004_super_admin_role.sql`, run alone because a new enum value can't be used in the same transaction); `profiles` extended into the central users table (email, phone, status, last_login_at, updated_at) with 1:1 `student/mentor/academy_admin/super_admin_profiles` and an append-only `audit_log` (`0005_users_rbac.sql`). User Management is kept separate from Content Management. Backend modules live in this app under `lib/server/<module>/`, with Postgres RLS as the second line of defence. Delivered as ten phases (T080–T089), one branch and PR each. The short-lived "per-area grants" design (an `admin_grants` table, never applied to any database) was dropped before merge | The user's brief makes Super Admin a real role: mentors own their content in `/mentor`, academies manage their own data in `/academy`, and `/admin` is the platform workspace. The user chose to extend `profiles` rather than rename it, keep backend modules in the Next.js app on Supabase, and ship one PR per phase |
+| 2026-10-07 | **Two security holes on `main` closed in Phase 1.** (1) The `profiles_update_own` RLS policy let any user rewrite every column of their own row, including `role` and `academy_id`. A `before update` trigger now rejects privileged-column changes from anyone except an active super admin (never on their own role/status) and trusted server contexts. (2) The signup trigger trusted `role`/`academy_id` from browser-supplied user metadata, so anyone could self-register as a mentor of any academy. Now: self-signup creates only student or academy_admin; mentor only with `auth.users.invited_at` set (a real invite); any role only from service-role-only `app_metadata`; `super_admin` never from signup | `AGENTS.md` §10: never trust a role supplied by the browser. Fixed before `super_admin` exists, because with that role, hole (1) would have been a one-request path to platform takeover |
 
 ## 9. Technical Debt
 
@@ -1357,6 +1362,31 @@ Blocker:
 
 Next task:
 - User review
+
+Date: 2026-10-07
+Task: T080 — Phase 1: Authentication + Users + Roles + RBAC (platform brief, specs.md §8a)
+Status: Complete in code and tests. NOT yet run against a live database (migrations must be applied first)
+
+What changed:
+- Migrations `0004_super_admin_role.sql` and `0005_users_rbac.sql` (see Decisions Register, including the two security fixes)
+- `types/auth.ts`: `super_admin` role, `UserStatus`, `ROLE_LABELS`; `lib/auth/redirect.ts`: super admin → `/admin`
+- `lib/supabase/middleware.ts`: anchored `/admin` → `super_admin`; a suspended account is signed out on its next protected request (`/login?reason=account_suspended`); `lib/api/auth.ts` refuses a suspended login
+- Backend modules: `lib/server/permissions/rbac.ts` (role → permission rules, workspaces), `lib/server/auth/guard.ts` (`requireRole` for pages, `authorize` for actions), `lib/server/users/{validation,repository,service}.ts` (list/search/filter/paginate, detail, role change, suspend/reactivate, audit), `lib/actions/users.ts`
+- UI (`/admin`, "Super Admin" role label in sidebar and header): Dashboard (real totals and newest accounts), User Management (search, role/status filters, sort, pagination, responsive table → cards), user detail (account info, change role and suspend/reactivate behind confirmation dialogs, account history); loading, empty and error states
+- Dev preview gains a Super Admin account; its role is now passed via `app_metadata`
+- Removed: the earlier per-area grant implementation (never merged, never applied)
+- Verified: lint, typecheck, build clean; 221 Vitest tests pass (Node 22 semantics); running dev server — public pages 200, every workspace incl. `/admin` → `/login` when signed out, `/administration` not caught by the guard, suspended-login message renders; UI reviewed in a browser through a temporary sample-data harness (deleted, not committed), with no console errors from the new code
+
+What remains:
+- Run 0004, then 0005, in the Supabase SQL Editor; bootstrap the first super admin (SQL in the 0005 header)
+- Live check with real accounts: role change, suspend → signed out → can't log in, reactivate, audit entries, non-super user refused by RLS when calling the API directly
+- Decide whether the reference image's dark navy sidebar applies to every workspace (design-system change, needs approval)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T081 — Phase 2: Academies + Academy Admin
 
 ## 14. North Star
 

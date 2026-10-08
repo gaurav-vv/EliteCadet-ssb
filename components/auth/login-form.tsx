@@ -14,6 +14,7 @@ const REASON_MESSAGES: Record<string, string> = {
   login_required: "Please log in to continue.",
   link_invalid: "That link is invalid or has expired. Please log in again.",
   password_updated: "Your password has been updated. Please log in.",
+  account_suspended: "This account has been suspended. Contact your academy or the platform team for help.",
 };
 
 interface LoginFormProps {

@@ -5,6 +5,8 @@
 import { createClient } from "@/lib/supabase/client";
 import type { AuthResult, LoginInput, SignupInput } from "@/types/auth";
 
+export const SUSPENDED_MESSAGE = "This account has been suspended. Contact your academy or the platform team for help.";
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateEmail(email: string): string | null {
@@ -93,7 +95,14 @@ export async function logIn(input: LoginInput): Promise<AuthResult<{ role: strin
       return { ok: false, error: { code: "invalid_credentials", message: "Incorrect email or password." } };
     }
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", data.user.id).single();
+
+    // Suspended accounts are refused here too (the middleware also signs them
+    // out on any protected route), so they never land on a dashboard.
+    if (profile?.status === "suspended") {
+      await supabase.auth.signOut();
+      return { ok: false, error: { code: "account_suspended", message: SUSPENDED_MESSAGE } };
+    }
 
     return { ok: true, data: { role: profile?.role ?? "student" } };
   } catch {

@@ -19,6 +19,7 @@ export const DEV_PREVIEW_ACCOUNTS: Record<Role, DevPreviewAccount> = {
     fullName: "Preview Admin",
     academyName: "Preview Academy",
   },
+  super_admin: { email: "preview.superadmin@ssbacademy.dev", fullName: "Preview Super Admin" },
 };
 
 export function isDevPreviewEnabled(): boolean {

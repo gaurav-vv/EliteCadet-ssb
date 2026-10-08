@@ -31,6 +31,7 @@ Supported by: **Mentor Guidance** and **Academy Visibility**.
 STUDENT
 MENTOR
 ACADEMY_ADMIN
+SUPER_ADMIN   (added 2026-10-07 — see §8a)
 ```
 
 | Role | Uses the platform to |
@@ -483,8 +484,9 @@ Profile · editable fields · settings.
 Dashboard · Students · Batches · Mentors · Reports · Settings
 ```
 
-Deferred: courses, attendance, assessments, admin-side practice authoring, announcements, messages,
-advanced insights.
+Deferred: courses, attendance, assessments, announcements, messages, advanced insights.
+Admin-side practice authoring, previously listed here, was un-deferred 2026-10-07 as Super Admin
+global content plus mentor-owned content. See §8a.4.
 
 ### 8.2 Academy dashboard
 
@@ -532,6 +534,105 @@ misleading chart.
 ### 8.7 Academy profile / settings
 
 Academy information · admin profile · basic settings.
+
+---
+
+## 8a. Platform Architecture — Four Roles (brief 2026-10-07)
+
+**Decision:** the user supplied a full platform brief on 2026-10-07. It supersedes the earlier
+"three admin panels with per-area grants" idea and un-defers "admin-side practice authoring" from
+§8.1, as platform content owned by the Super Admin (§8a.4). Delivered in ten phases (§8a.6),
+tracked as T080–T089.
+
+### 8a.1 Roles and workspaces
+
+One application, one authentication system, one design system, one database. Four role-based
+workspaces:
+
+| Role | Workspace | Manages |
+|---|---|---|
+| `SUPER_ADMIN` | `/admin` | The entire platform: all users, academies, global learning content, permissions, platform analytics, system configuration |
+| `ACADEMY_ADMIN` | `/academy` | Their own academy only: batches, students, mentor-to-batch assignment, academy content, academy/batch performance |
+| `MENTOR` | `/mentor` | Their own teaching content and schedule; evaluates and monitors only the batches/students assigned to them |
+| `STUDENT` | `/student` | Their own academy, batch, mentors, available content, sessions, assessments, submissions, feedback, progress, notifications |
+
+The UI must make it immediately clear which role is signed in (sidebar and header role label) and
+what that role may manage.
+
+### 8a.2 Authorization chain
+
+```text
+Authentication → Role → Academy → Batch → Assignment → Resource → Permission
+```
+
+Enforced server-side on every page, action and query, with Postgres RLS as a second line of defence.
+Possessing an ID never grants access. An academy can never reach another academy's students, mentors,
+batches, content or analytics.
+
+### 8a.3 User Management (separate from Content Management)
+
+- **One identity system.** Supabase Auth stays the only authentication provider. `profiles` is the
+  central users table: id, name, email, phone, auth provider, role, academy membership, status
+  (`active · suspended`), last login, created/updated timestamps.
+- **Role-specific profiles** (1:1): `student_profiles`, `mentor_profiles`, `academy_admin_profiles`,
+  `super_admin_profiles`.
+- **Who can set what.** Self-signup creates only a Student or an Academy Admin. A Mentor joins only
+  through an invite. Only a Super Admin can change role, academy, status or email, and never their own
+  role or status. The first Super Admin is created by hand in the database.
+- **Suspension.** A suspended account is signed out on its next request and can't log in.
+- **Audit.** Every role or status change records who changed it, when, and from/to what.
+
+**Acceptance (Phase 1):**
+- A signed-out visitor to any workspace is sent to login. A signed-in user of another role gets the
+  forbidden state. A Super Admin can't open other roles' workspaces either.
+- A user can't change their own role, academy or status by any means, including calling the API
+  directly.
+- The Super Admin dashboard shows real platform totals. User Management lists every account with
+  search, role/status filters, sorting and pagination. A user's detail page shows their account
+  information, role and status changes with confirmation, and the account history.
+- Changing a user to Mentor or Academy Admin requires them to belong to an academy.
+
+### 8a.4 Content Management (Phase 4–5)
+
+"Student content" means **platform learning content that students consume**, not managing students.
+
+- **Global content** (Super Admin): Psychology, GTO, Interview, Communication, Current Affairs,
+  practice exercises, assessments, session templates, study material, videos, documents, mock SSB
+  activities. Fields: title, description, category, type, difficulty, target role, visibility,
+  status (`draft · published · archived`), created_by, updated_by, created_at, updated_at. Published
+  content becomes available according to assignment, academy, batch or permission rules.
+- **Mentor content** (Mentor): teaching material, session templates, practice exercises, documents,
+  videos, assessments where permitted. Edited and archived only by its owner, published to assigned
+  batches/students. Kept separate from global content; a mentor can never modify global content.
+
+### 8a.5 Domain model
+
+```text
+users(profiles) · student_profiles · mentor_profiles · academy_admin_profiles · super_admin_profiles
+academies · batches · batch_students · batch_mentors · contents · content_assignments · sessions ·
+session_participants · assessments · assessment_attempts · feedback · student_progress ·
+notifications · audit_log
+```
+
+Proper foreign keys, indexes, timestamps and audit fields. Seed data is for development only. No
+dashboard figure, user, academy, batch, session, content item or progress value is hard-coded.
+
+### 8a.6 Phases and end-to-end workflow
+
+```text
+1 Auth + Users + Roles + RBAC        6 Session scheduling
+2 Academies + Academy Admin          7 Assessments + Feedback
+3 Batches + Students + Mentor assign 8 Progress tracking
+4 Global content management          9 Role-specific dashboards
+5 Mentor content management          10 Analytics + Notifications
+```
+
+Every phase ships with a working frontend and backend against the real database, never as static
+mockups. The finished workflow is: Super Admin publishes content → Academy Admin creates a batch,
+adds students and assigns mentors → Mentor schedules a session → students attend and practise → the
+mentor evaluates and the feedback is stored → progress updates → each role sees the same progress
+data at its own scope (Student: "My Progress"; Mentor: "My Assigned Students"; Academy: "Academy /
+Batch Performance"; Super Admin: "Platform Analytics").
 
 ---
 

@@ -88,6 +88,13 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+        {showDevPreview && (
+          <p className="mt-6 text-center">
+            <Link href="/dev-preview/super_admin" className="text-xs text-brand-accent hover:underline">
+              Preview the platform Super Admin workspace (dev only) →
+            </Link>
+          </p>
+        )}
       </section>
 
       <section className="border-t border-border/60">

@@ -2,7 +2,7 @@
 
 **Type:** Manual test plan + index of the automated suite.
 **Answers:** T066 (Critical testing) in `task.md`, and the "Testing" section of `AGENTS.md` §17.
-**Last updated:** 2026-09-24.
+**Last updated:** 2026-10-07 (§2a Super Admin + RBAC, T080 Phase 1).
 
 This file is reporting/planning material, same tier as `status.md` — it does not change what the
 product must do (`specs.md`) or how it's built (`AGENTS.md`). Update it whenever a case is added,
@@ -47,17 +47,22 @@ all green as of this update):
 - `tests/unit/lib/auth-validation.test.ts` — email/password/signup/login field validation (`lib/api/auth.ts`)
 - `tests/unit/lib/redirect.test.ts` — `dashboardPathForRole`
 - `tests/unit/lib/middleware-role.test.ts` — the route→role authorization mapping (`roleForPath`), including a documented latent gap (unanchored `startsWith` prefix matching)
+- `tests/unit/lib/rbac.test.ts` — role → permission rules (super admin only for user management), the four roles, workspaces, academy-required roles (T080)
+- `tests/unit/lib/users-validation.test.ts` — user-list URL parsing (hostile values fall back), query building, search sanitising (ILIKE wildcards + PostgREST filter syntax), role/status change rules incl. no self-change (T080)
+- `tests/unit/lib/users-service.test.ts` — users service with mocked guard + repository: unauthorized before any data access, page clamping, setup guidance, audit on success only, RLS refusal mapped, no raw error leaks (T080)
+- `tests/unit/lib/users-repository.test.ts` — user row boundary validation (T080)
+- `tests/unit/lib/login-suspended.test.ts` — suspended accounts are signed straight back out at login (T080)
 - `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
 - `tests/unit/hooks/use-countdown.test.tsx` — countdown ticks, `onExpire` fires exactly once, latest callback used
-- `tests/integration/middleware-session.test.ts` — `updateSession()` with a faked Supabase client: logged-out → `/login`, every wrong-role combination and a missing profile → `/forbidden`, correct role allowed, browser-supplied `?role=` ignored (AGENTS.md §10)
+- `tests/integration/middleware-session.test.ts` — `updateSession()` with a faked Supabase client: logged-out → `/login`, every wrong-role combination and a missing profile → `/forbidden`, correct role allowed, browser-supplied `?role=` ignored (AGENTS.md §10); `/admin` → super_admin only, super admin kept out of other workspaces, suspended accounts signed out (T080)
 - `tests/integration/practice-api.test.ts` — `lib/api/practice.ts` against real content: advertised item counts equal real counts (AGENTS.md §8), unknown activity, empty submit, idempotent submit
 - `tests/integration/ssb-journey-api.test.ts` — every 5-Day Journey day/module resolves and has content, unique ids, valid MCQ answers, progress totals exclude timed tests, idempotent test submit
 - `tests/integration/bank-practice-runner.test.tsx` — practice runner + real progress store: MCQ check/feedback text, navigation, mark done persists across remount
 - `tests/e2e/public-pages.spec.ts` — `/`, `/login`, `/signup` render for a logged-out visitor
-- `tests/e2e/auth-guard.spec.ts` — `/student`, `/mentor`, `/academy`, `/onboarding` redirect to `/login?reason=login_required&next=<path>` when logged out; nested paths preserve `next`; `/forbidden` itself is reachable
+- `tests/e2e/auth-guard.spec.ts` — `/student`, `/mentor`, `/academy`, `/onboarding`, `/admin`, `/admin/access` redirect to `/login?reason=login_required&next=<path>` when logged out; nested paths preserve `next`; `/forbidden` itself is reachable
 
 Everything else in this document is `MANUAL` or `GAP` — a written test case, not yet wired into
 `npm test`/`npm run test:e2e`. The reason is stated per section (needs a seeded second account,
@@ -82,11 +87,28 @@ implicit.
 | AUTH-10 | Logout ends the session everywhere it matters | P0 | MANUAL | Log in, click Log out from the profile menu | Session cookie cleared; visiting any protected route afterward requires login again |
 | AUTH-11 | Forgot-password → reset-password round trip | P1 | MANUAL | Request reset, open emailed link, set new password | `/auth/callback` exchanges the code; new password logs in; old password no longer works |
 | AUTH-12 | An expired/invalid password-reset link shows a clear message, not a crash | P1 | MANUAL | Use an old/reused reset link | Redirected to `/login?reason=link_invalid` with the mapped banner text |
-| AUTH-13 | Unauthenticated access to any protected route redirects to `/login` with `reason=login_required` | P0 | `VERIFIED` (`auth-guard.spec.ts`) | Visit `/student`, `/mentor`, `/academy`, `/onboarding` (and nested paths) while logged out | 307 → `/login?next=<path>&reason=login_required` |
+| AUTH-13 | Unauthenticated access to any protected route redirects to `/login` with `reason=login_required` | P0 | `VERIFIED` (`auth-guard.spec.ts`) | Visit `/student`, `/mentor`, `/academy`, `/onboarding`, `/admin`, `/admin/access` (and nested paths) while logged out | 307 → `/login?next=<path>&reason=login_required` |
 | AUTH-14 | A student cannot open `/mentor` or `/academy` (role mismatch) | P0 | MANUAL — needs a seeded student session; not automated because it requires a real signed-in cookie, not just "logged out" | Log in as a student, navigate to `/mentor` and `/academy` directly | Redirected to `/forbidden`, not shown mentor/academy content even briefly |
 | AUTH-15 | A mentor cannot open `/student` or `/academy`; an academy admin cannot open `/student` or `/mentor` | P0 | MANUAL, same reason as AUTH-14 | Repeat AUTH-14 for the other two roles | Same: `/forbidden`, no content leak |
 | AUTH-16 | Session expiry mid-session is handled, not left as a silent hang | P1 | MANUAL | Expire/revoke the session server-side, then perform an action | User is redirected to log in again with a clear reason, not a stuck spinner or raw 401 |
 | AUTH-17 | The route→role prefix map has no accidental overlap for a new top-level route | P2 | `VERIFIED` (`middleware-role.test.ts`, documents a **known gap**: `startsWith` is unanchored, so e.g. `/mentorship` would incorrectly require the `mentor` role) | n/a (regression guard) | Any new top-level route starting with `student`/`mentor`/`academy` must be deliberately reviewed against this mapping |
+
+---
+
+### 2a. Super Admin + RBAC (`/admin`, T080 Phase 1)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| ADM-01 | Signed-out visitor to any `/admin` route is sent to login | P0 | `VERIFIED` (`middleware-session.test.ts`, `auth-guard.spec.ts`) | Visit `/admin/users` while logged out | 307 → `/login?next=/admin/users&reason=login_required` |
+| ADM-02 | Student, mentor and academy admin are forbidden from `/admin` | P0 | `VERIFIED` (`middleware-session.test.ts`) | Open `/admin` as each role | `/forbidden` |
+| ADM-03 | A super admin can't open other roles' workspaces | P1 | `VERIFIED` (`middleware-session.test.ts`) | Super admin opens `/student`, `/mentor`, `/academy` | `/forbidden` |
+| ADM-04 | A suspended account is signed out and can't log in | P0 | `VERIFIED` (`middleware-session.test.ts`, `login-suspended.test.ts`) + MANUAL live | Suspend a user; they navigate / log in | Signed out → `/login?reason=account_suspended` with a clear message |
+| ADM-05 | User management actions refuse non-super-admins before any data access | P0 | `VERIFIED` (`users-service.test.ts`) | Call list/detail/role/status as another role | `unauthorized`; repository never called |
+| ADM-06 | No self role/status change; mentor/academy admin need an academy | P0 | `VERIFIED` (`users-validation.test.ts`, `users-service.test.ts`) + DB trigger | Try to change own role; promote a user without an academy to mentor | Refused with a clear message; nothing written |
+| ADM-07 | Every role/status change is audited | P1 | `VERIFIED` (`users-service.test.ts`) + MANUAL live | Change a role, suspend, reactivate | Entries appear in the user's Account history |
+| ADM-08 | A user can't rewrite their own role via the API (closed hole) | P0 | MANUAL (needs 0005 applied + a real session) | As a student, `PATCH /rest/v1/profiles?id=eq.<self>` with `{"role":"super_admin"}` | Rejected (`42501`); role unchanged |
+| ADM-09 | Signup can't self-assign mentor or super admin (closed hole) | P0 | MANUAL (needs 0005 applied) | `supabase.auth.signUp` with `data: { role: "mentor", academy_id: <any> }` or `role: "super_admin"` | Account is created as a student with no academy |
+| ADM-10 | Dashboard totals and user list come from the database | P0 | MANUAL (live) | Compare `/admin` totals with `profiles`/`academies` counts | Numbers match; nothing hard-coded |
 
 ---
 
