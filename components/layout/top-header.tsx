@@ -24,17 +24,25 @@ interface TopHeaderProps {
   userName: string;
   roleLabel: string;
   profileHref: string;
+  // Shells that already show the wordmark in their sidebar can hide it here.
+  showBrand?: boolean;
 }
 
-export function TopHeader({ searchPlaceholder, userName, roleLabel, profileHref }: TopHeaderProps) {
+export function TopHeader({ searchPlaceholder, userName, roleLabel, profileHref, showBrand = true }: TopHeaderProps) {
   return (
     <header className="glass-thick sticky top-4 z-10 mx-4 flex h-16 items-center justify-between gap-4 rounded-panel px-4 md:mx-6">
-      <Link
-        href="/"
-        className="hidden shrink-0 text-base font-semibold tracking-tight text-ink no-underline sm:block"
-      >
-        SSB Academy
-      </Link>
+      {showBrand ? (
+        <Link
+          href="/"
+          className="hidden shrink-0 text-base font-semibold tracking-tight text-ink no-underline sm:block"
+        >
+          SSB Academy
+        </Link>
+      ) : (
+        <Link href="/" className="shrink-0 text-base font-semibold tracking-tight text-ink no-underline md:hidden">
+          SSB Academy
+        </Link>
+      )}
 
       <label className="glass-thin flex min-w-0 flex-1 items-center gap-2 rounded-pill px-4 py-2 sm:max-w-xs">
         <Search aria-hidden="true" size={16} className="shrink-0 text-ink-secondary" />
