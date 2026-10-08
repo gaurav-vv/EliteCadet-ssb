@@ -61,6 +61,7 @@ all green as of this update):
 - `tests/unit/lib/progress-compute.test.ts`, `progress-service.test.ts` — progress derivations, attention rules, attendance, role and academy scope (T087)
 - `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
 - `tests/unit/lib/notifications-service.test.ts`, `analytics-service.test.ts` — own-notifications scope, safe links, mark read, super-admin-only analytics, boundary validation (T089)
+- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies migrations 0001–0013 to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics (60 checks)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
@@ -181,7 +182,7 @@ implicit.
 | ASM-04 | Answers are cleaned to the real questions | P1 | `VERIFIED` (`assessments-validation.test.ts`) | Send unknown/duplicate question ids | Ignored |
 | FDB-01 | Draft review is recoverable; submitting needs score, strengths and improvements | P0 | `VERIFIED` (`assessments-validation.test.ts`) + DB check | Save partial, reload; submit incomplete | Draft kept; submit refused |
 | FDB-02 | One feedback per attempt; reviewed is locked (idempotent submit) | P0 | `VERIFIED` (`assessments-service.test.ts`: upsert on `attempt_id`, locked after review) + trigger | Submit twice | One reviewed feedback; second refused |
-| FDB-03 | Students see feedback only once reviewed; never another student's attempt | P0 | MANUAL (needs 0011) | As student B, open A's attempt/feedback ids via the API | Nothing returned |
+| FDB-03 | Students see feedback only once reviewed; never another student's attempt | P0 | `VERIFIED` (`supabase/tests/workflow-check.sql`, local Postgres 17) | As student B, open A's attempt/feedback ids via the API | Nothing returned |
 
 ### 2g. Progress tracking (T087 Phase 8)
 
@@ -192,7 +193,7 @@ implicit.
 | PRG-03 | A mentor sees progress only for students in their batches | P0 | `VERIFIED` (`progress-service.test.ts`) + RLS | Open another batch's student progress | Not found |
 | PRG-04 | Attendance: only the session's mentor, only after it starts, only participants | P0 | `VERIFIED` (`progress-service.test.ts`) + trigger/RLS | Mark before start; mark a non-participant | Refused / dropped |
 | PRG-05 | Needs-attention flags carry their reason | P1 | `VERIFIED` (`progress-compute.test.ts`, `progress-service.test.ts`) | Low average, no recent submission, low attendance | Flagged with the matching reason; on-track students aren't |
-| PRG-06 | A student marks only content they can read as done; counts update | P1 | MANUAL (needs 0012) | Mark a Library item done, then an unassigned content id via the API | First counts in Library read; second refused by RLS |
+| PRG-06 | A student marks only content they can read as done; counts update | P1 | `VERIFIED` (`supabase/tests/workflow-check.sql`, local Postgres 17) | Mark a Library item done, then an unassigned content id via the API | First counts in Library read; second refused by RLS |
 | PRG-07 | Academy Performance is scoped to the admin's academy | P0 | `VERIFIED` (`progress-service.test.ts`: `academy_id` filter) + RLS; MANUAL live check | Admin of academy A views Performance | Only academy A's batches and students |
 
 
@@ -212,8 +213,8 @@ implicit.
 | ID | Case | Priority | Status | Steps | Expected result |
 |---|---|---|---|---|---|
 | NTF-01 | A user reads and marks only their own notifications | P0 | `VERIFIED` (`notifications-service.test.ts`: `recipient_id` = caller) + RLS + column grant; MANUAL live | As user B, select/update user A's notification id via the API | Nothing returned; update affects 0 rows |
-| NTF-02 | Clients cannot create notifications | P0 | MANUAL (needs 0013) | Insert into `notifications` with the anon/auth key | Refused (no insert grant or policy) |
-| NTF-03 | Each event notifies the right people once | P0 | MANUAL (needs 0013) | Schedule (whole batch / selected), cancel, open assessment, submit, review, add to batch, content request | One row per intended recipient; edits don't repeat it |
+| NTF-02 | Clients cannot create notifications | P0 | `VERIFIED` (`supabase/tests/workflow-check.sql`, local Postgres 17) | Insert into `notifications` with the anon/auth key | Refused (no insert grant or policy) |
+| NTF-03 | Each event notifies the right people once | P0 | `VERIFIED` (`supabase/tests/workflow-check.sql`, local Postgres 17) | Schedule (whole batch / selected), cancel, open assessment, submit, review, add to batch, content request | One row per intended recipient; edits don't repeat it |
 | NTF-04 | Notification links are same-site only | P1 | `VERIFIED` (`notifications-service.test.ts`) + DB check | Row with an external href | Not followed (href null) |
 | NTF-05 | Bell shows unread count; mark one / all read updates it | P1 | MANUAL | Open the bell, click an item, then "Mark all read" | Badge decreases, then disappears |
 | ANL-01 | Only a super admin can load platform analytics | P0 | `VERIFIED` (`analytics-service.test.ts`) + SQL guard; MANUAL live | Call `platform_analytics` as an academy admin | Error, no data |

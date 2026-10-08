@@ -90,7 +90,7 @@ as $$
 declare
   r record;
 begin
-  if new.for_whole_batch and new.status = 'scheduled' then
+  if new.for_whole_batch and new.status = 'scheduled' and new.starts_at > now() then
     for r in select student_id from public.batch_students where batch_id = new.batch_id loop
       perform public.notify(r.student_id, 'session_scheduled', 'New session scheduled', new.title || ' · ' || public.ist_label(new.starts_at), '/student/sessions', new.id);
     end loop;

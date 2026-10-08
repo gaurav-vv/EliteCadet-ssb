@@ -1620,6 +1620,22 @@ Blocker:
 Next task:
 - Apply migrations 0004–0013 and run the live checks; then T083b
 
+Date: 2026-10-08
+Task: Live check of migrations 0001–0013 (T080–T089)
+Status: Database layer VERIFIED on a local Postgres 17 (no Supabase project credentials available locally)
+
+What changed:
+- `supabase/tests/{supabase-stub.sql,workflow-check.sql,run-workflow-check.sh}`: a reusable check. It applies all 13 migrations in order, each as one transaction like the SQL Editor, to a throwaway database with a stand-in for Supabase's roles and `auth` schema. Then it runs the brief's whole workflow as each real user under RLS: super admin publishes → academy admin builds a batch → mentor schedules, marks attendance, opens an assessment → student submits → mentor reviews → progress, notifications and analytics
+- Result: all 13 migrations apply cleanly; 60/60 checks pass. These cover cross-academy isolation (batches, sessions, assessments, scores, progress), signup role not trusted from the browser, double-booking, attendance rules, submit-once and locked reviews, draft reviews hidden from students, each notification to exactly the right people once, private notifications, and super-admin-only analytics
+- Fix found by the check: 0013 announced a whole-batch session that had already started; it now notifies only for future sessions, like selected-student sessions
+
+What remains:
+- Running the app itself against a real Supabase project (GoTrue/PostgREST, invites, email) — needs the project credentials in `.env.local`
+- Apply 0004–0013 to the real project (0004 on its own), then smoke-test each role in the browser
+
+Next task:
+- Real-project smoke test; then T083b
+
 ## 14. North Star
 
 > **Build the smallest reliable web product that proves students prepare better with structured
