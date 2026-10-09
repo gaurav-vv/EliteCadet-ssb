@@ -550,6 +550,19 @@ regression" also needs a branch-protection rule requiring the CI checks on `main
 
 ---
 
+## T076 — One workspace shell for every role — P1 — `[x]`
+**Why:** User request 2026-10-07: every role should get the reference image's dark navy sidebar,
+not only Academy.
+**Requirements:** generalise the Academy shell into `components/layout/workspace/` (brand,
+navigation, mobile drawer, header, sidebar footer, `WorkspaceLayout`). Student, Mentor and Academy
+use it now; Super Admin adopts it when T080 (PR #8) is updated. Rename the scoped CSS classes
+`.academy-app/-sidebar/-nav-item` to `.workspace-*`.
+**Acceptance:** each workspace shows the navy sidebar with its role in the wordmark and the role
+label in the header. The mobile drawer works, there is no horizontal overflow at 375px, and Academy
+is visually unchanged. Lint, typecheck, tests and build pass.
+**Done with PR #8 merged in:** `/admin` uses `WorkspaceLayout`, and the old glass
+`components/layout/{app-shell,sidebar,top-header,mobile-tab-bar}.tsx` are deleted.
+
 ## T070 — Design system consistency pass — P1 — `[ ]`
 **Updated 2026-09-19:** the design system itself changed (Glass Capsule → Apple-Inspired Glass UI v3,
 `AGENTS.md` §7, see `status.md` → Decisions). The core migration (tokens, shell, primary dashboards)
@@ -594,10 +607,22 @@ role/status changes and history.
 `users-repository.test.ts`, `login-suspended.test.ts`, `middleware-role.test.ts`, `redirect.test.ts`;
 integration — `middleware-session.test.ts`; e2e — `/admin` logged-out redirects.
 
-## T081 — Phase 2: Academies + Academy Admin — P0 — `[ ]`
-Super Admin academy management (list, create, edit, status, logo/description/contact), academy
-admin assignment, and assigning a user to an academy (unblocks role changes to mentor/academy admin).
-Academy Admin sees and edits only their own academy.
+## T081 — Phase 2: Academies + Academy Admin — P0 — `[-]`
+**Spec:** `specs.md` §8a.3b. **Depends on:** T080. **Branch:** `feat/phase-2-academies` (stacked on
+T076/T080).
+**Requirements:** migration `0006_academies.sql` (academy profile + status, super-admin
+insert/update, academy-admin update of their own academy, status/owner guard trigger,
+`academy_member_counts` security-invoker view). `lib/server/academies` (validation, repository,
+service). Super Admin `/admin/academies` list and detail: create, edit, suspend/reactivate, members
+(add by email with role, remove students), history. "Change academy" on user detail. Academy Admin
+settings read and write the real academy. Members of a suspended academy are signed out and can't
+log in.
+**Acceptance:** `specs.md` §8a.3b (Phase 2 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0006 and a
+live check with real accounts.
+**Tests:** unit — `academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts`,
+`users-validation.test.ts` (`checkAcademyChange`), `rbac.test.ts`, `login-suspended.test.ts`;
+integration — `middleware-session.test.ts` (academy suspension).
 
 ## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[ ]`
 `batch_students`, `batch_mentors`; a real `students` model replacing `lib/mock/academy.ts`; add/remove

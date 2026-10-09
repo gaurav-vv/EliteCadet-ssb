@@ -6,7 +6,6 @@
 import {
   BATCHES,
   MENTORS,
-  SETTINGS,
   STUDENTS,
   getBatch,
   getBatchName,
@@ -15,7 +14,7 @@ import {
   getStudent,
 } from "@/lib/mock/academy";
 import { getMockAnalytics } from "@/lib/mock/academy-analytics";
-import type { AcademyAnalytics, AcademyBatch, AcademyDashboardData, AcademyMentor, AcademySettings, AcademyStudent } from "@/types/academy";
+import type { AcademyAnalytics, AcademyBatch, AcademyDashboardData, AcademyMentor, AcademyStudent } from "@/types/academy";
 
 export interface ApiError {
   code: "validation_error" | "not_found";
@@ -60,10 +59,6 @@ export async function getBatchById(id: string): Promise<ApiResult<AcademyBatch>>
 
 export async function getMentors(): Promise<ApiResult<AcademyMentor[]>> {
   return { ok: true, data: MENTORS };
-}
-
-export async function getSettings(): Promise<ApiResult<AcademySettings>> {
-  return { ok: true, data: SETTINGS };
 }
 
 export { getBatchName, getMentorName };

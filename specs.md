@@ -592,6 +592,34 @@ batches, content or analytics.
   information, role and status changes with confirmation, and the account history.
 - Changing a user to Mentor or Academy Admin requires them to belong to an academy.
 
+### 8a.3b Academies (Phase 2)
+
+- **Academy record:** name (2–80 chars), description, logo URL, contact email, contact phone,
+  status (`active · suspended`), created/updated timestamps.
+- **Super Admin** (`/admin/academies`):
+  - List with search, status filter, pagination, and per-academy counts of admins, mentors and
+    students.
+  - Create and edit academies.
+  - Suspend or reactivate an academy, with confirmation.
+  - Manage members: add an existing account by email as Student, Mentor or Academy Admin; move
+    someone between academies; remove a student.
+  - A Mentor or Academy Admin can't be left without an academy: change their role first.
+  - A user's academy can also be changed from their User Management page.
+  - Every change is audited.
+- **Academy Admin** (`/academy/settings`): edits their own academy's name, description and contact
+  details. They can never change its status or reach another academy.
+- **Suspension:** while an academy is suspended, its admins, mentors and students are signed out on
+  their next request and can't log in. Super Admins are unaffected.
+
+**Acceptance (Phase 2):**
+- Academy counts and lists come from the database. A newly created academy appears immediately with
+  zero members.
+- Adding a member by email fails clearly for an unknown email, for a super admin, and when the
+  role/academy rules above would be broken.
+- An academy admin can edit only their own academy, and can't change its status, even by calling
+  the API directly.
+- Members of a suspended academy can't use the platform until it's reactivated.
+
 ### 8a.4 Content Management (Phase 4–5)
 
 "Student content" means **platform learning content that students consume**, not managing students.

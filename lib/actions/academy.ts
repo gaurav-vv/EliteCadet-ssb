@@ -10,7 +10,6 @@ import { headers } from "next/headers";
 import {
   BATCHES,
   MENTORS,
-  SETTINGS,
   STUDENTS,
   clearAcademyDemoData,
   getBatch,
@@ -22,7 +21,6 @@ import { getCurrentUserAndProfile } from "@/lib/auth/session";
 import type {
   AcademyBatch,
   AcademyMentor,
-  AcademySettings,
   AcademyStudent,
   BatchInput,
   MentorInviteInput,
@@ -228,17 +226,4 @@ export async function clearDemoDataAction(): Promise<ActionResult<null>> {
   revalidatePath("/academy/mentors");
   revalidatePath("/academy/reports");
   return { ok: true, data: null };
-}
-
-export async function updateSettingsAction(input: AcademySettings): Promise<ActionResult<AcademySettings>> {
-  if (!input.academyName.trim()) {
-    return { ok: false, error: { code: "validation_error", message: "Academy name is required." } };
-  }
-  SETTINGS.academyName = input.academyName.trim();
-  SETTINGS.contactEmail = input.contactEmail.trim();
-  SETTINGS.adminName = input.adminName.trim();
-
-  revalidatePath("/academy");
-  revalidatePath("/academy/settings");
-  return { ok: true, data: { ...SETTINGS } };
 }

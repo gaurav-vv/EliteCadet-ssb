@@ -52,6 +52,7 @@ all green as of this update):
 - `tests/unit/lib/users-service.test.ts` — users service with mocked guard + repository: unauthorized before any data access, page clamping, setup guidance, audit on success only, RLS refusal mapped, no raw error leaks (T080)
 - `tests/unit/lib/users-repository.test.ts` — user row boundary validation (T080)
 - `tests/unit/lib/login-suspended.test.ts` — suspended accounts are signed straight back out at login (T080)
+- `tests/unit/lib/academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts` — academy management rules, authorization, own-academy scoping, suspension (T081)
 - `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
@@ -109,6 +110,19 @@ implicit.
 | ADM-08 | A user can't rewrite their own role via the API (closed hole) | P0 | MANUAL (needs 0005 applied + a real session) | As a student, `PATCH /rest/v1/profiles?id=eq.<self>` with `{"role":"super_admin"}` | Rejected (`42501`); role unchanged |
 | ADM-09 | Signup can't self-assign mentor or super admin (closed hole) | P0 | MANUAL (needs 0005 applied) | `supabase.auth.signUp` with `data: { role: "mentor", academy_id: <any> }` or `role: "super_admin"` | Account is created as a student with no academy |
 | ADM-10 | Dashboard totals and user list come from the database | P0 | MANUAL (live) | Compare `/admin` totals with `profiles`/`academies` counts | Numbers match; nothing hard-coded |
+
+---
+### 2b. Academies (T081 Phase 2)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| ACA-01 | Academy management refuses non-super-admins before any data access | P0 | `VERIFIED` (`academies-service.test.ts`) | Call list/create/status/add/remove as another role | `unauthorized`; repository never called |
+| ACA-02 | Academy form validated on the server | P1 | `VERIFIED` (`academies-validation.test.ts`, `academies-service.test.ts`) | Submit a 1-char name, bad email/phone, `http:`/`javascript:` logo | Field errors; nothing written |
+| ACA-03 | Add member: unknown email, super admin, self, invalid role refused | P0 | `VERIFIED` (`academies-service.test.ts`) | Add each case by email | Clear message; no write |
+| ACA-04 | Mentors/academy admins can't be left without an academy | P0 | `VERIFIED` (`users-validation.test.ts`, `academies-service.test.ts`) | Remove a mentor; set an admin's academy to none | Refused: "change their role first" |
+| ACA-05 | Academy admin edits only their own academy, never its status | P0 | `VERIFIED` (`academies-service.test.ts`) + DB trigger/RLS (MANUAL live) | Submit settings with another academy's id / a status field; PATCH `academies` directly | Own academy updated; id/status ignored or refused (`42501`) |
+| ACA-06 | Members of a suspended academy are signed out and can't log in | P0 | `VERIFIED` (`blocked.test.ts`, `middleware-session.test.ts`, `login-suspended.test.ts`) + MANUAL live | Suspend an academy; members navigate / log in | `/login?reason=academy_suspended`; super admins unaffected |
+| ACA-07 | Member counts come from the database | P1 | MANUAL (live) | Add/remove members, compare list counts | Counts match `profiles` |
 
 ---
 
