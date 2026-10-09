@@ -1,105 +1,90 @@
 import type { Metadata } from "next";
+import { BarChart3, UserCog } from "lucide-react";
+import { ChartCard } from "@/components/academy/shared/chart-card";
+import { DataTable } from "@/components/academy/shared/data-table";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
+import { StatusBadge } from "@/components/academy/shared/status-badge";
+import { CategoryBars } from "@/components/progress/progress-views";
 import { EmptyState } from "@/components/ui/empty-state";
-import { getDashboardData, getMentors, getStudents } from "@/lib/api/academy";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { getAcademyDashboard } from "@/lib/server/dashboards/service";
 
 export const metadata: Metadata = { title: "Reports" };
 
-const BUCKETS = [
-  { label: "0–39", min: 0, max: 39 },
-  { label: "40–59", min: 40, max: 59 },
-  { label: "60–79", min: 60, max: 79 },
-  { label: "80–100", min: 80, max: 100 },
-];
-
+// Same data as the dashboard (lib/server/dashboards), laid out for review.
+// Charts only where real points exist; otherwise the shared empty state.
 export default async function ReportsPage() {
-  const [dashboardResult, studentsResult, mentorsResult] = await Promise.all([
-    getDashboardData(),
-    getStudents(),
-    getMentors(),
-  ]);
-
-  const dashboard = dashboardResult.data;
-  const students = studentsResult.data ?? [];
-  const mentors = mentorsResult.data ?? [];
-
-  const scoredStudents = students.filter((s) => s.readiness !== null);
-  const distribution = BUCKETS.map((bucket) => ({
-    ...bucket,
-    count: scoredStudents.filter((s) => (s.readiness ?? -1) >= bucket.min && (s.readiness ?? -1) <= bucket.max).length,
-  }));
-
-  const activeCount = students.filter((s) => s.status === "active" && s.lastActivityAt).length;
-  const inactiveCount = students.length - activeCount;
+  const result = await getAcademyDashboard(new Date().toISOString());
+  if (!result.ok || !result.data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="Reports" />
+        <RetryErrorState message={result.error?.message ?? "We couldn't load reports. Please try again."} />
+      </div>
+    );
+  }
+  const d = result.data;
+  const scored = d.scoreBuckets.reduce((s, b) => s + b.count, 0);
+  const maxBucket = Math.max(1, ...d.scoreBuckets.map((b) => b.count));
 
   return (
     <div className="flex flex-col gap-8 pb-10">
-      <div>
-        <h1 className="text-[28px] font-bold text-ink">Reports</h1>
-        <p className="text-sm text-ink-secondary">Academy-wide numbers, scoped to what you can actually act on.</p>
+      <PageHeader title="Reports" subtitle="Academy-wide numbers from reviewed assessments, marked attendance and submissions." />
+
+      <section aria-label="Summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard icon="students" label="Students" value={d.totalStudents} />
+        <StatCard icon="activities" label="Submitted, last 14 days" value={d.activeStudents14Days} />
+        <StatCard icon="performance" label="Average score" value={d.summary.avgScorePct === null ? "—" : `${d.summary.avgScorePct}%`} />
+        <StatCard icon="sessions" label="Attendance" value={d.summary.attendancePct === null ? "—" : `${d.summary.attendancePct}%`} />
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title="Students by Average Score" description={scored === 0 ? undefined : `${scored} of ${d.totalStudents} students have a reviewed score.`}>
+          {scored === 0 ? (
+            <EmptyState icon={<BarChart3 aria-hidden="true" size={22} />} title="Not enough data yet" description="No student has a reviewed assessment yet." />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {d.scoreBuckets.map((b) => (
+                <li key={b.label} className="grid grid-cols-[110px_1fr_40px] items-center gap-3 text-[13px]">
+                  <span className="text-ink">{b.label}</span>
+                  <span className="h-2 overflow-hidden rounded-full bg-[var(--hairline)]" aria-hidden="true">
+                    <span className="block h-full rounded-full bg-[var(--academy-chart-overall)]" style={{ width: `${(b.count / maxBucket) * 100}%` }} />
+                  </span>
+                  <span className="text-right text-ink">{b.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ChartCard>
+
+        <ChartCard title="Scores by Area">
+          {d.categories.length === 0 ? (
+            <EmptyState icon={<BarChart3 aria-hidden="true" size={22} />} title="Not enough data yet" description="Averages appear once mentors review assessments." />
+          ) : (
+            <CategoryBars categories={d.categories} />
+          )}
+        </ChartCard>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Readiness distribution</h2>
-        {scoredStudents.length === 0 ? (
-          <EmptyState title="Not enough data yet" description="No students have a readiness score yet." />
+      <ChartCard title="Mentor Workload" action={{ label: "Mentors", href: "/academy/mentors" }}>
+        {d.mentors.length === 0 ? (
+          <EmptyState icon={<UserCog aria-hidden="true" size={22} />} title="No mentors yet" description="Invite a mentor from Mentors." />
         ) : (
-          <div className="glass-regular flex items-end gap-4 px-6 py-6">
-            {distribution.map((bucket) => (
-              <div key={bucket.label} className="flex flex-col items-center gap-1">
-                <div className="w-10 rounded-t-sm bg-brand-accent/40" style={{ height: `${Math.max(bucket.count * 20, 4)}px` }} aria-hidden="true" />
-                <span className="text-xs text-ink-secondary">{bucket.label}</span>
-                <span className="text-xs font-medium text-ink">{bucket.count}</span>
-              </div>
-            ))}
-          </div>
+          <DataTable
+            caption="Mentor workload"
+            rows={d.mentors}
+            getRowKey={(m) => m.mentorId}
+            columns={[
+              { key: "name", header: "Mentor", cell: (m) => m.name },
+              { key: "status", header: "Status", cell: (m) => <StatusBadge label={m.invited ? "Invite pending" : "Active"} tone={m.invited ? "warning" : "success"} /> },
+              { key: "batches", header: "Batches", cell: (m) => m.batches },
+              { key: "sessions", header: "Sessions, next 7 days", cell: (m) => m.sessionsNext7Days },
+              { key: "reviews", header: "Waiting for review", cell: (m) => m.pendingReviews },
+            ]}
+          />
         )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Batch performance</h2>
-        {dashboard && dashboard.batchPerformance.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {dashboard.batchPerformance.map((batch) => (
-              <div key={batch.batchId} className="glass-regular flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-ink">{batch.name}</span>
-                <span className="text-xs text-ink-secondary">
-                  {batch.studentCount} students · avg readiness {batch.averageReadiness ?? "—"}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="No batches yet" description="Create a batch to see performance here." />
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Student activity</h2>
-        <div className="glass-regular flex flex-col gap-1 px-5 py-4">
-          <span className="text-sm text-ink">{activeCount} students with recorded activity</span>
-          <span className="text-sm text-ink-secondary">{inactiveCount} students with no recent activity or inactive status</span>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Mentor workload</h2>
-        {mentors.filter((m) => m.status === "active").length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {mentors
-              .filter((m) => m.status === "active")
-              .map((mentor) => (
-                <div key={mentor.id} className="glass-regular flex items-center justify-between px-5 py-3">
-                  <span className="text-sm text-ink">{mentor.fullName}</span>
-                  <span className="text-xs text-ink-secondary">
-                    {mentor.sessionsThisWeek} sessions this week · {mentor.pendingEvaluations} pending evaluations
-                  </span>
-                </div>
-              ))}
-          </div>
-        ) : (
-          <EmptyState title="No active mentors yet" description="Invited mentors appear here once they accept." />
-        )}
-      </section>
+      </ChartCard>
     </div>
   );
 }

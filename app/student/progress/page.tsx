@@ -1,130 +1,44 @@
 import type { Metadata } from "next";
-import { EmptyState } from "@/components/ui/empty-state";
-import { getProgressData } from "@/lib/api/progress";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
+import { ProgressBody, ProgressStats } from "@/components/progress/progress-views";
+import { PageHeader } from "@/components/ui/page-header";
+import { getMyProgress } from "@/lib/server/progress/service";
 
 export const metadata: Metadata = { title: "Progress" };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-}
-
-export default async function ProgressPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ preview?: string }>;
-}) {
-  const { preview } = await searchParams;
-  const variant = preview === "active" ? "active" : "empty";
-  const result = await getProgressData(variant);
-  const data = result.data!;
-
+export default async function ProgressPage() {
+  const result = await getMyProgress(new Date().toISOString());
   return (
-    <div className="flex flex-col gap-8 pb-10">
-      <div>
-        <h1 className="text-[28px] font-bold text-ink">My Progress</h1>
-        <p className="text-sm text-ink-secondary">
-          Your readiness, skill-area performance and history, based only on what you&apos;ve actually
-          practised.
-        </p>
-      </div>
-
-      <section className="glass-regular flex flex-col gap-1 px-5 py-4">
-        <span className="text-[11px] font-semibold tracking-[0.04em] text-ink-secondary uppercase">
-          Overall readiness
-        </span>
-        {data.readiness ? (
-          <>
-            <span className="text-3xl font-semibold text-ink">
-              {data.readiness.score}
-              <span className="text-base font-normal text-ink-secondary">/100</span>
-            </span>
-            <span className="text-xs text-ink-secondary">{data.readiness.basis}</span>
-          </>
-        ) : (
-          <span className="text-sm text-ink-secondary">
-            Not enough data yet — complete a few practices to get your first reading.
-          </span>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Trend</h2>
-        {data.trend ? (
-          <div className="glass-regular flex items-end gap-3 px-5 py-4">
-            {data.trend.map((point) => (
-              <div key={point.label} className="flex flex-col items-center gap-1">
-                <div
-                  className="w-8 rounded-t-sm bg-brand-accent/40"
-                  style={{ height: `${Math.max(point.value, 4)}px` }}
-                  aria-hidden="true"
-                />
-                <span className="text-[10px] text-ink-secondary">{point.label}</span>
-              </div>
-            ))}
-            <span className="sr-only">
-              {data.trend.map((p) => `${p.label}: ${p.value}`).join(", ")}
-            </span>
-          </div>
-        ) : (
-          <EmptyState title="Not enough data yet" description="A trend needs at least a few weeks of activity." />
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Skill-area performance</h2>
-        {data.skillAreas.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {data.skillAreas.map((skill) => (
-              <div key={skill.skillArea} className="glass-regular flex items-center justify-between gap-3 px-5 py-3">
-                <div>
-                  <p className="text-sm font-medium text-ink">{skill.skillArea}</p>
-                  <p className="text-xs text-ink-secondary">{skill.basis}</p>
-                </div>
-                <span className="text-lg font-semibold text-ink">{skill.score}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="No skill data yet" description="Complete a practice in each test to see it here." />
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Improvement areas</h2>
-        {data.improvementAreas.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {data.improvementAreas.map((area) => (
-              <li key={area.title} className="glass-regular flex flex-col gap-1 px-5 py-3">
-                <p className="text-sm font-medium text-ink">{area.title}</p>
-                <p className="text-xs text-ink-secondary">{area.reason}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState
-            title="No improvement areas yet"
-            description="These appear once we can see a real pattern in your responses."
-          />
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-[18px] font-semibold text-ink">Activity history</h2>
-        {data.activityHistory.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {data.activityHistory.map((item) => (
-              <li key={item.id} className="glass-regular flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-ink">{item.title}</span>
-                <span className="text-xs text-ink-secondary">
-                  {item.category} · {formatDate(item.completedAt)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState title="No activity yet" description="Your completed practices will show up here." />
-        )}
-      </section>
+    <div className="flex flex-col gap-6 pb-10">
+      <PageHeader title="My Progress" subtitle="Built only from mentor-reviewed scores, session attendance and what you've read." />
+      {!result.ok || !result.data ? (
+        <RetryErrorState message={result.error?.message ?? "We couldn't load your progress. Please try again."} />
+      ) : (
+        <>
+          <ProgressStats summary={result.data.summary} />
+          {result.data.recommendations.length > 0 && (
+            <section className="glass-regular rounded-card p-6">
+              <h2 className="mb-3 text-[18px] font-semibold text-ink">Next steps</h2>
+              <ul className="flex flex-col divide-y divide-hairline">
+                {result.data.recommendations.map((r) => (
+                  <li key={r.href + r.title}>
+                    <Link href={r.href} className="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+                      <span>
+                        <span className="block text-ink">{r.title}</span>
+                        <span className="block text-[13px] text-ink-secondary">{r.reason}</span>
+                      </span>
+                      <ArrowRight aria-hidden="true" size={16} className="shrink-0 text-ink-secondary" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <ProgressBody progress={result.data} emptyHint="Submit an assessment — your trend starts once your mentor reviews it." />
+        </>
+      )}
     </div>
   );
 }

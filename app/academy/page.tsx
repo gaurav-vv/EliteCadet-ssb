@@ -1,29 +1,17 @@
 import type { Metadata } from "next";
 import { AcademyDashboard } from "@/components/academy/dashboard/academy-dashboard";
-import { ErrorState } from "@/components/ui/error-state";
-import { getAnalytics, getDashboardData, getMentors, getStudents } from "@/lib/api/academy";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { buildDashboardViewModel } from "@/lib/academy/dashboard-view";
-import { getCurrentAcademyName, getCurrentUserAndProfile } from "@/lib/auth/session";
+import { getCurrentUserAndProfile } from "@/lib/auth/session";
+import { getAcademyDashboard } from "@/lib/server/dashboards/service";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function AcademyDashboardPage() {
-  // Independent reads run in parallel; the page only assembles their results.
-  const [result, studentsResult, mentorsResult, analyticsResult, { profile }] = await Promise.all([
-    getDashboardData(),
-    getStudents(),
-    getMentors(),
-    getAnalytics(),
-    getCurrentUserAndProfile(),
-  ]);
-  if (!result.data || !studentsResult.data || !mentorsResult.data || !analyticsResult.data) {
-    return <ErrorState message="We couldn't load your academy dashboard. Please try again." />;
+  const [result, { profile }] = await Promise.all([getAcademyDashboard(new Date().toISOString()), getCurrentUserAndProfile()]);
+  if (!result.ok || !result.data) {
+    return <RetryErrorState message={result.error?.message ?? "We couldn't load your academy dashboard. Please try again."} />;
   }
-
-  const academyName = (await getCurrentAcademyName(profile?.academyId ?? null)) || result.data.academyName;
-  const data = { ...result.data, academyName };
-  const view = buildDashboardViewModel(data, studentsResult.data, mentorsResult.data);
   const adminFirstName = profile?.fullName?.trim().split(/\s+/)[0] || "there";
-
-  return <AcademyDashboard data={data} analytics={analyticsResult.data} view={view} adminFirstName={adminFirstName} />;
+  return <AcademyDashboard data={result.data} view={buildDashboardViewModel(result.data)} adminFirstName={adminFirstName} />;
 }

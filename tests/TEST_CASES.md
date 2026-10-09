@@ -52,7 +52,14 @@ all green as of this update):
 - `tests/unit/lib/users-service.test.ts` — users service with mocked guard + repository: unauthorized before any data access, page clamping, setup guidance, audit on success only, RLS refusal mapped, no raw error leaks (T080)
 - `tests/unit/lib/users-repository.test.ts` — user row boundary validation (T080)
 - `tests/unit/lib/login-suspended.test.ts` — suspended accounts are signed straight back out at login (T080)
-- `tests/unit/lib/academy-isolation.test.ts` — documents that academy data has no `academyId` scoping yet; `.todo` cases define the isolation behavior to enable once T060's backend migration lands
+- `tests/unit/lib/academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts` — academy management rules, authorization, own-academy scoping, suspension (T081)
+- `tests/unit/lib/academy-people-validation.test.ts`, `academy-people-service.test.ts` — academy students/mentors scoped to the session's academy, add-by-email/invite rules, mentors limited to their own batches (T082)
+- `tests/unit/lib/content-validation.test.ts`, `content-service.test.ts` — content rules, status transitions, super-admin-only management, readers limited to published content (T083)
+- `tests/unit/lib/mentor-content-service.test.ts`, `content-requests-service.test.ts`, `content-requests-validation.test.ts` — mentor ownership and batch sharing, templates, request lifecycle and fees (T084)
+- `tests/unit/lib/sessions-validation.test.ts`, `sessions-service.test.ts` — IST conversion, session rules, availability, mentor scope, double-booking (T085)
+- `tests/unit/lib/assessments-validation.test.ts`, `assessments-service.test.ts` — assessment/answer/feedback rules, submit-once, idempotent review, mentor scope (T086)
+- `tests/unit/lib/progress-compute.test.ts`, `progress-service.test.ts` — progress derivations, attention rules, attendance, role and academy scope (T087)
+- `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — journey completion per day/module, progress totals, self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
@@ -111,6 +118,94 @@ implicit.
 | ADM-10 | Dashboard totals and user list come from the database | P0 | MANUAL (live) | Compare `/admin` totals with `profiles`/`academies` counts | Numbers match; nothing hard-coded |
 
 ---
+### 2b. Academies (T081 Phase 2)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| ACA-01 | Academy management refuses non-super-admins before any data access | P0 | `VERIFIED` (`academies-service.test.ts`) | Call list/create/status/add/remove as another role | `unauthorized`; repository never called |
+| ACA-02 | Academy form validated on the server | P1 | `VERIFIED` (`academies-validation.test.ts`, `academies-service.test.ts`) | Submit a 1-char name, bad email/phone, `http:`/`javascript:` logo | Field errors; nothing written |
+| ACA-03 | Add member: unknown email, super admin, self, invalid role refused | P0 | `VERIFIED` (`academies-service.test.ts`) | Add each case by email | Clear message; no write |
+| ACA-04 | Mentors/academy admins can't be left without an academy | P0 | `VERIFIED` (`users-validation.test.ts`, `academies-service.test.ts`) | Remove a mentor; set an admin's academy to none | Refused: "change their role first" |
+| ACA-05 | Academy admin edits only their own academy, never its status | P0 | `VERIFIED` (`academies-service.test.ts`) + DB trigger/RLS (MANUAL live) | Submit settings with another academy's id / a status field; PATCH `academies` directly | Own academy updated; id/status ignored or refused (`42501`) |
+| ACA-06 | Members of a suspended academy are signed out and can't log in | P0 | `VERIFIED` (`blocked.test.ts`, `middleware-session.test.ts`, `login-suspended.test.ts`) + MANUAL live | Suspend an academy; members navigate / log in | `/login?reason=academy_suspended`; super admins unaffected |
+| ACA-07 | Member counts come from the database | P1 | MANUAL (live) | Add/remove members, compare list counts | Counts match `profiles` |
+
+---
+### 2c. Content (T083 Phase 4)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| CON-01 | Content management is super-admin only | P0 | `VERIFIED` (`content-service.test.ts`) + RLS | Call create/status/assign as another role | `unauthorized`; nothing written |
+| CON-02 | Content form validated on the server; links must be https | P1 | `VERIFIED` (`content-validation.test.ts`) | Submit a 2-char title, unknown enums, `javascript:`/`http:` link, no body or link | Field errors |
+| CON-03 | Status rules: draft ⇄ published, → archived, archived → draft only | P1 | `VERIFIED` (`content-validation.test.ts`, `content-service.test.ts`) | Try archived → published | Refused |
+| CON-04 | Readers see only published content | P0 | `VERIFIED` (`content-service.test.ts`) + RLS | Open a draft's id as a student | Not found |
+| CON-05 | Assigned-only content reaches only its academies/batches | P0 | MANUAL (needs 0008 applied) | Assign to Academy A; open as Academy B student (list + direct id) | Not listed; not found |
+| CON-06 | Body renders as text, never HTML | P1 | MANUAL | Save `<script>` in a body; open it | Shown literally |
+
+---
+### 2d. Mentor content and content requests (T084 Phase 5)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| MCO-01 | Mentor content is owned by the mentor and pinned to assigned/students | P0 | `VERIFIED` (`mentor-content-service.test.ts`) + DB trigger | Create content sending visibility "everyone" / template flag | Saved as assigned-only, for students, not a template |
+| MCO-02 | A mentor can't edit another mentor's or platform content | P0 | `VERIFIED` (`mentor-content-service.test.ts`) + RLS | Edit/publish another id | Not found; nothing written |
+| MCO-03 | A mentor shares only with batches they teach | P0 | `VERIFIED` (`mentor-content-service.test.ts`) + RLS | Share with another batch's id | Refused |
+| MCO-04 | Mentor content reaches only students of its batches | P0 | MANUAL (needs 0009) | Publish + share with Batch A; open as Batch B student (list + id) | Not visible |
+| MCO-05 | "Use this template" copies a published template into a draft; the template is unchanged | P1 | `VERIFIED` (`mentor-content-service.test.ts`) | Use a template; check both items | New mentor draft with source; template untouched |
+| REQ-01 | Only mentors request; only staff quote/start/deliver/settle | P0 | `VERIFIED` (`content-requests-service.test.ts`) + RLS/functions | Call each action as the wrong role | `unauthorized`; no database call |
+| REQ-02 | Lifecycle is enforced (accept/decline only when quoted; cancel only before accepting) | P0 | `VERIFIED` (`content-requests-service.test.ts`) + DB functions | Accept a non-quoted request | Clear refusal |
+| REQ-03 | Fee validation and Indian formatting | P1 | `VERIFIED` (`content-requests-validation.test.ts`) | Quote -5 / 10.555 / 1,50,000 | Rejected / rejected / shown as ₹1,50,000 |
+| REQ-04 | Nothing is charged automatically; settled only when owed | P0 | `VERIFIED` (`content-requests-service.test.ts`) | Mark settled on a not-owed request | Refused |
+
+---
+### 2e. Sessions (T085 Phase 6)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| SES-01 | A mentor schedules only for batches they teach, and only that batch's students | P0 | `VERIFIED` (`sessions-service.test.ts`) + RLS/trigger | Schedule for another batch / pick an outside student | Refused with field errors |
+| SES-02 | No double-booking | P0 | `VERIFIED` (`sessions-service.test.ts`: 23P01 mapping) + DB exclusion constraint | Schedule two overlapping sessions | Second refused: "overlaps another session" |
+| SES-03 | Session rules: https link online, location offline, end after start, ≤ 8h, future only | P1 | `VERIFIED` (`sessions-validation.test.ts`) | Submit each invalid case | Field errors |
+| SES-04 | IST entry and display are correct | P1 | `VERIFIED` (`sessions-validation.test.ts`) | 18:30 IST | Stored 13:00 UTC; shown "6:30 pm … IST" |
+| SES-05 | Cancel needs a reason; completing before the start is refused | P1 | `VERIFIED` (`sessions-service.test.ts`) | Cancel with "no"; complete a future session | Refused |
+| SES-06 | A student sees only their batch's sessions or ones they were selected for | P0 | MANUAL (needs 0010) | As a Batch B student, list sessions and open a Batch A session id | Not visible |
+
+---
+### 2f. Assessments and feedback (T086 Phase 7)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| ASM-01 | Mentors create/manage assessments only for batches they teach | P0 | `VERIFIED` (`assessments-service.test.ts`) + RLS | Create for another batch | Refused |
+| ASM-02 | Questions are locked once an assessment is open; only valid status moves | P1 | `VERIFIED` (`assessments-service.test.ts`) + trigger | Edit an open assessment; draft → closed | Refused |
+| ASM-03 | A student answers only while open and not overdue, and submits once | P0 | `VERIFIED` (`assessments-service.test.ts`) + trigger/RLS | Answer a closed/overdue one; submit twice | Refused |
+| ASM-04 | Answers are cleaned to the real questions | P1 | `VERIFIED` (`assessments-validation.test.ts`) | Send unknown/duplicate question ids | Ignored |
+| FDB-01 | Draft review is recoverable; submitting needs score, strengths and improvements | P0 | `VERIFIED` (`assessments-validation.test.ts`) + DB check | Save partial, reload; submit incomplete | Draft kept; submit refused |
+| FDB-02 | One feedback per attempt; reviewed is locked (idempotent submit) | P0 | `VERIFIED` (`assessments-service.test.ts`: upsert on `attempt_id`, locked after review) + trigger | Submit twice | One reviewed feedback; second refused |
+| FDB-03 | Students see feedback only once reviewed; never another student's attempt | P0 | MANUAL (needs 0011) | As student B, open A's attempt/feedback ids via the API | Nothing returned |
+
+### 2g. Progress tracking (T087 Phase 8)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| PRG-01 | Progress shows no invented values; empty data reads as "no data yet" | P0 | `VERIFIED` (`progress-compute.test.ts`, `progress-service.test.ts`) | Student with no reviews/attendance | Averages and attendance are null, shown as "—" with an empty state |
+| PRG-02 | Each view refuses the wrong role before reading data | P0 | `VERIFIED` (`progress-service.test.ts`) | Call student/mentor/academy progress as another role | `unauthorized`, no database call |
+| PRG-03 | A mentor sees progress only for students in their batches | P0 | `VERIFIED` (`progress-service.test.ts`) + RLS | Open another batch's student progress | Not found |
+| PRG-04 | Attendance: only the session's mentor, only after it starts, only participants | P0 | `VERIFIED` (`progress-service.test.ts`) + trigger/RLS | Mark before start; mark a non-participant | Refused / dropped |
+| PRG-05 | Needs-attention flags carry their reason | P1 | `VERIFIED` (`progress-compute.test.ts`, `progress-service.test.ts`) | Low average, no recent submission, low attendance | Flagged with the matching reason; on-track students aren't |
+| PRG-06 | A student marks only content they can read as done; counts update | P1 | MANUAL (needs 0012) | Mark a Library item done, then an unassigned content id via the API | First counts in Library read; second refused by RLS |
+| PRG-07 | Academy Performance is scoped to the admin's academy | P0 | `VERIFIED` (`progress-service.test.ts`: `academy_id` filter) + RLS; MANUAL live check | Admin of academy A views Performance | Only academy A's batches and students |
+
+
+### 2h. Role dashboards (T088 Phase 9)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| DSH-01 | Each dashboard refuses other roles server-side | P0 | `VERIFIED` (`dashboards-service.test.ts`) | Call another role's dashboard function | `unauthorized`, no data read |
+| DSH-02 | Mentor dashboard reads only students in the mentor's batches | P0 | `VERIFIED` (`dashboards-service.test.ts`: `batch_id in` own batches) + RLS | Mentor with batch A views dashboard | Only batch A students in mentees/attention |
+| DSH-03 | Academy dashboard and Reports read only the admin's academy | P0 | `VERIFIED` (`dashboards-service.test.ts`) + RLS; MANUAL live | Two academies with data | Each sees only its own figures |
+| DSH-04 | No invented values: empty data shows "—" or the empty state | P0 | `VERIFIED` (`academy-dashboard-view.test.ts`, `dashboards-service.test.ts`) | New academy / mentor without batches | Dashes and empty states, no sample numbers |
+| DSH-05 | Dashboard figures match the linked pages | P1 | MANUAL (needs 0004–0012) | Compare reviews waiting vs Evaluations, attention vs Performance, sessions vs Sessions | Same numbers |
+| DSH-06 | "Today" and session times use IST | P1 | `VERIFIED` (`dashboards-compute.test.ts`) | Session at 23:30 IST vs 00:30 IST next day | Only the first counts as today |
+---
 
 ## 3. Academy isolation / IDOR
 
@@ -118,18 +213,17 @@ Per `AGENTS.md` §7/§10, academy isolation is a **security boundary**, not a UI
 `status.md` → Technical Debt, this is **currently a `GAP`, not a passing/failing test target**:
 `lib/mock/academy.ts` holds one shared `STUDENTS`/`BATCHES`/`MENTORS` array, with no `academyId`
 field at all, read and written by every academy_admin session on the server. The cases below are
-written against the *intended* behavior so they're ready to enable the moment the backend migration
-(real Postgres tables with `academy_id` + RLS) lands — see `.todo` entries in
-`tests/unit/lib/academy-isolation.test.ts`.
+written against the *intended* behavior. Academy data is now real Postgres with `academy_id` + RLS;
+the service tests named in each row cover the scoping in code.
 
 | ID | Case | Priority | Status | Steps | Expected result |
 |---|---|---|---|---|---|
-| ISO-01 | Two academy admins in different academies see disjoint student lists | P0 | `GAP` — cannot pass today; there is only one mock dataset shared by all accounts | Create Academy A admin and Academy B admin, each add a student, both view `/academy/students` | Each sees only their own academy's students |
-| ISO-02 | Changing a student ID in the URL to another academy's student is rejected server-side | P0 | `GAP` | As Academy A admin, visit `/academy/students/<Academy-B-student-id>` | 403/404 server-side, not merely hidden by client routing — AGENTS.md calls this a P0 bug class |
-| ISO-03 | Same as ISO-02 for a batch ID | P0 | `GAP` | Visit `/academy/batches/<other-academy-batch-id>` | 403/404 server-side |
-| ISO-04 | A mentor can only be assigned students within their own academy | P0 | `GAP` | Attempt to assign Academy B's mentor to Academy A's batch (via direct action call, not just UI) | Rejected — Server Action validates the mentor and batch share an `academy_id` |
-| ISO-05 | A mentor only sees mentees from their own academy in `/mentor/mentees` | P0 | `GAP` | Log in as a mentor, inspect the mentee list | No cross-academy mentee ever appears, even if the mock array contains one |
-| ISO-06 | Reports (`/academy/reports`) never aggregate another academy's numbers into this academy's totals | P0 | `GAP` | Compare two academies' report pages | Numbers are computed from that academy's own students/batches only |
+| ISO-01 | Two academy admins in different academies see disjoint student lists | P0 | `VERIFIED` in code (`academy-people-service.test.ts`: academy always from the session) + RLS; MANUAL live | Create Academy A admin and Academy B admin, each add a student, both view `/academy/students` | Each sees only their own academy's students |
+| ISO-02 | Changing a student ID in the URL to another academy's student is rejected server-side | P0 | `VERIFIED` in code (`academy-people-service.test.ts`) + RLS; MANUAL live | As Academy A admin, visit `/academy/students/<Academy-B-student-id>` | 403/404 server-side, not merely hidden by client routing — AGENTS.md calls this a P0 bug class |
+| ISO-03 | Same as ISO-02 for a batch ID | P0 | `VERIFIED` in code (`batches-supabase.test.ts`: academy-scoped lookups) + RLS; MANUAL live | Visit `/academy/batches/<other-academy-batch-id>` | 403/404 server-side |
+| ISO-04 | A mentor can only be assigned students within their own academy | P0 | `VERIFIED` in code (`batches-supabase.test.ts`) + DB trigger `check_batch_member`; MANUAL live | Attempt to assign Academy B's mentor to Academy A's batch (via direct action call, not just UI) | Rejected — Server Action validates the mentor and batch share an `academy_id` |
+| ISO-05 | A mentor only sees mentees from their own academy in `/mentor/mentees` | P0 | `VERIFIED` in code (`academy-people-service.test.ts`: own batches only, other ids not found) + RLS; MANUAL live | Log in as a mentor, inspect the mentee list | No cross-academy mentee ever appears, even if the mock array contains one |
+| ISO-06 | Reports (`/academy/reports`) never aggregate another academy's numbers into this academy's totals | P0 | `VERIFIED` in code (`dashboards-service.test.ts`: academy id from the session, `academy_id` filters) + RLS; MANUAL live | Compare two academies' report pages | Numbers are computed from that academy's own students/batches only |
 | ISO-07 | `inviteMentorAction` scopes the invited mentor to the inviting admin's `academy_id` | P1 | MANUAL (partially real today — see note) | Invite a mentor as Academy A admin | The created Supabase user's `academy_id` metadata matches Academy A; **note:** the mock `MENTORS` array push in `lib/actions/academy.ts` is *not* academy-scoped yet, so the mentor currently also appears in every other admin's mock mentor list — this half of the bridge is the open part of ISO-01 |
 | ISO-08 | Deleting/removing a student from a batch never deletes another academy's data as a side effect | P1 | `GAP` | Remove a student from a batch | Only that student/batch pair is affected |
 
@@ -174,8 +268,8 @@ suite (visible, not silently missing) and `GAP` here, with a clear trigger for w
 | MEN-11 | Inviting a mentor sends a real Supabase invite and reflects "invited" status until accepted | P0 | MANUAL (real email + real Supabase account creation — needs a disposable test inbox) | Invite a mentor, check their status before/after accepting | Shows "invited" beforehand; flips to "active" the first time the mentor's own dashboard loads |
 | MEN-12 | Inviting a mentor with a duplicate email is rejected | P1 | MANUAL | Invite the same email twice | Second attempt: "A mentor with this email already exists." |
 | MEN-13 | Academy settings form validates and saves | P1 | MANUAL | Submit `/academy/settings` with an empty academy name, then valid data | Blocked on empty name; valid save persists and confirms |
-| MEN-14 | "Load demo data" / "Clear demo data" only ever affect this academy's mock arrays, never break real auth state | P2 | MANUAL | Use both controls from `/academy/settings` | Mock students/batches/mentors reset or empty; the signed-in admin's own session/profile is untouched |
-| MEN-15 | Academy reports state "insufficient data" rather than fabricating a chart when data is sparse | P1 | MANUAL | View `/academy/reports` with 0–1 students | Explicit "not enough data yet" message, no invented chart |
+| MEN-14 | ~~"Load demo data" / "Clear demo data"~~ — removed in T088 (dashboards read real data) | — | `DEFERRED` (feature removed) | — | — |
+| MEN-15 | Academy reports show the empty state rather than fabricating a chart when data is sparse | P1 | `VERIFIED` (`academy-dashboard-view.test.ts`, `dashboards-compute.test.ts`: null/empty with no data) | View `/academy/reports` with no reviewed scores | Empty state "Not enough data yet", no invented chart |
 
 ---
 
