@@ -222,6 +222,15 @@ One-off values in components are a review failure. If a value is needed twice, i
 
 ### 7.3 App shell (persists across every authenticated section)
 
+> **Decision 2026-10-07 (user-approved, from their reference image):** every signed-in workspace
+> (Student, Mentor, Academy, Super Admin) uses the one shared `WorkspaceLayout`
+> (`components/layout/workspace/`): a navy sidebar whose wordmark names the workspace, a white sticky
+> header with the role label, and solid white hairline cards. That material is scoped to
+> `.workspace-app` in `app/globals.css`, so the public site and auth pages keep the glass material
+> described here. Where this section's glass-tier rules conflict with that, `.workspace-app` wins
+> inside workspaces. Tokens, radius, typography, motion, accessibility and the content patterns in
+> §7.4–§7.13 still apply everywhere. Never build a per-role shell.
+
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │                    Top Header (glass-thick, 64px)              │

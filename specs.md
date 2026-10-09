@@ -592,18 +592,91 @@ batches, content or analytics.
   information, role and status changes with confirmation, and the account history.
 - Changing a user to Mentor or Academy Admin requires them to belong to an academy.
 
+### 8a.3b Academies (Phase 2)
+
+- **Academy record:** name (2–80 chars), description, logo URL, contact email, contact phone,
+  status (`active · suspended`), created/updated timestamps.
+- **Super Admin** (`/admin/academies`):
+  - List with search, status filter, pagination, and per-academy counts of admins, mentors and
+    students.
+  - Create and edit academies.
+  - Suspend or reactivate an academy, with confirmation.
+  - Manage members: add an existing account by email as Student, Mentor or Academy Admin; move
+    someone between academies; remove a student.
+  - A Mentor or Academy Admin can't be left without an academy: change their role first.
+  - A user's academy can also be changed from their User Management page.
+  - Every change is audited.
+- **Academy Admin** (`/academy/settings`): edits their own academy's name, description and contact
+  details. They can never change its status or reach another academy.
+- **Suspension:** while an academy is suspended, its admins, mentors and students are signed out on
+  their next request and can't log in. Super Admins are unaffected.
+
+**Acceptance (Phase 2):**
+- Academy counts and lists come from the database. A newly created academy appears immediately with
+  zero members.
+- Adding a member by email fails clearly for an unknown email, for a super admin, and when the
+  role/academy rules above would be broken.
+- An academy admin can edit only their own academy, and can't change its status, even by calling
+  the API directly.
+- Members of a suspended academy can't use the platform until it's reactivated.
+
+### 8a.3c Batches, Students and Mentor assignment (Phase 3)
+
+- **Batch membership** is first-class: `batch_students` (a student is in at most one batch at a
+  time) and `batch_mentors` (any number of mentors per batch). Both sides must belong to the
+  batch's academy and have the right role, which the database enforces.
+- **Academy Admin**, for their own academy only:
+  - **Students:** list with search, batch and status filters, sorting and pagination.
+  - **Add a student by email:** an existing account with no academy joins this one; a new person
+    is emailed an invite. A student already in another academy can't be taken.
+  - Change a student's batch, or remove a student from the academy.
+  - **Batch detail:** add/remove students and assign/remove mentors.
+  - **Mentors:** the academy's mentors with their batches, plus invite a mentor.
+- **Mentor:** "Mentees" lists exactly the students in batches they're assigned to. Opening any other
+  student, from this academy or another, is "not found", enforced on the server and by RLS.
+- No readiness, performance or activity figure is shown until it comes from real data (Phase 8).
+
+**Acceptance (Phase 3):**
+- Student and mentor membership in batches comes from the database. Counts match.
+- An academy admin can't add, move or view students of another academy, even by calling the API
+  directly.
+- A mentor sees only their assigned batches' students; changing an id in the URL yields not-found.
+- Removing a student from an academy also removes them from its batches; their account is kept.
+
 ### 8a.4 Content Management (Phase 4–5)
 
 "Student content" means **platform learning content that students consume**, not managing students.
 
-- **Global content** (Super Admin): Psychology, GTO, Interview, Communication, Current Affairs,
-  practice exercises, assessments, session templates, study material, videos, documents, mock SSB
-  activities. Fields: title, description, category, type, difficulty, target role, visibility,
-  status (`draft · published · archived`), created_by, updated_by, created_at, updated_at. Published
-  content becomes available according to assignment, academy, batch or permission rules.
-- **Mentor content** (Mentor): teaching material, session templates, practice exercises, documents,
-  videos, assessments where permitted. Edited and archived only by its owner, published to assigned
-  batches/students. Kept separate from global content; a mentor can never modify global content.
+**Global content (Super Admin, Phase 4):** `/admin/content`.
+- **Fields:** title, description, category (Psychology · GTO · Interview · Communication · Current
+  Affairs · General), type (study material · video · document · article · practice exercise ·
+  assessment · session template · mock SSB activity), difficulty (easy · medium · hard), target role
+  (students · mentors · both), visibility (everyone · assigned only), status
+  (`draft · published · archived`), body text and/or an https link, created_by, updated_by,
+  created_at, updated_at, published_at.
+- Content is never deleted; it's archived. Only published content is ever visible to readers.
+- **Assignment:** content with "assigned only" visibility reaches only the academies or batches it's
+  assigned to.
+- **Readers:** a student sees published content targeted at students that is visible to everyone,
+  or assigned to their academy or their batch. A mentor sees the same for mentors, through their
+  academy or their assigned batches. Academy admins see what reaches their academy. This is
+  enforced by RLS, not only in the UI.
+
+**Acceptance (Phase 4):**
+- A Super Admin creates content as a draft, publishes it, and it appears in the right readers'
+  Library. Archiving removes it from readers.
+- Assigned-only content never appears for an academy or batch it isn't assigned to, even by id.
+- Every field is validated on the server; links must be https.
+- No content figure or list is hard-coded.
+
+**Follow-up (T083b):** move the existing practice banks, 5-day journey modules and resources (still
+`lib/mock/*`) onto this content model. Their runners need structured item formats (TAT images, WAT
+words, MCQs), so that's a separate, specified task.
+
+**Mentor content (Phase 5):** mentors create teaching material, session templates, practice
+exercises, documents, videos and assessments where permitted. They edit and archive only their
+own, and publish to their assigned batches/students. It's kept separate from global content; a
+mentor can never modify global content.
 
 ### 8a.5 Domain model
 

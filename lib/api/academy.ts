@@ -1,21 +1,11 @@
-// Typed API client for the Academy Admin domain (AGENTS.md §9) — read paths
-// only. Mutations are Server Actions in lib/actions/academy.ts (see
-// lib/actions/mentor.ts for why plain functions don't work here). Backed by
-// lib/mock/academy.ts pre-backend (status.md, 2026-09-19).
+// Read paths for the Academy dashboard and Reports only — still backed by the
+// in-memory sample data in lib/mock/academy.ts until Phase 9 (T088). Real
+// students, batches and mentors live in lib/server/academy-people and
+// lib/api/batches.ts.
 
-import {
-  BATCHES,
-  MENTORS,
-  SETTINGS,
-  STUDENTS,
-  getBatch,
-  getBatchName,
-  getMentorName,
-  getMockDashboardData,
-  getStudent,
-} from "@/lib/mock/academy";
+import { MENTORS, STUDENTS, getMockDashboardData } from "@/lib/mock/academy";
 import { getMockAnalytics } from "@/lib/mock/academy-analytics";
-import type { AcademyAnalytics, AcademyBatch, AcademyDashboardData, AcademyMentor, AcademySettings, AcademyStudent } from "@/types/academy";
+import type { AcademyAnalytics, AcademyDashboardData, AcademyMentor, AcademyStudent } from "@/types/academy";
 
 export interface ApiError {
   code: "validation_error" | "not_found";
@@ -42,28 +32,10 @@ export async function getStudents(): Promise<ApiResult<AcademyStudent[]>> {
   return { ok: true, data: STUDENTS };
 }
 
-export async function getStudentById(id: string): Promise<ApiResult<AcademyStudent>> {
-  const student = getStudent(id);
-  if (!student) return { ok: false, error: { code: "not_found", message: "Student not found." } };
-  return { ok: true, data: student };
-}
 
-export async function getBatches(): Promise<ApiResult<AcademyBatch[]>> {
-  return { ok: true, data: BATCHES };
-}
 
-export async function getBatchById(id: string): Promise<ApiResult<AcademyBatch>> {
-  const batch = getBatch(id);
-  if (!batch) return { ok: false, error: { code: "not_found", message: "Batch not found." } };
-  return { ok: true, data: batch };
-}
 
 export async function getMentors(): Promise<ApiResult<AcademyMentor[]>> {
   return { ok: true, data: MENTORS };
 }
 
-export async function getSettings(): Promise<ApiResult<AcademySettings>> {
-  return { ok: true, data: SETTINGS };
-}
-
-export { getBatchName, getMentorName };
