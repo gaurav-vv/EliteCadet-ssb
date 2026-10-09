@@ -592,18 +592,151 @@ batches, content or analytics.
   information, role and status changes with confirmation, and the account history.
 - Changing a user to Mentor or Academy Admin requires them to belong to an academy.
 
+### 8a.3b Academies (Phase 2)
+
+- **Academy record:** name (2–80 chars), description, logo URL, contact email, contact phone,
+  status (`active · suspended`), created/updated timestamps.
+- **Super Admin** (`/admin/academies`):
+  - List with search, status filter, pagination, and per-academy counts of admins, mentors and
+    students.
+  - Create and edit academies.
+  - Suspend or reactivate an academy, with confirmation.
+  - Manage members: add an existing account by email as Student, Mentor or Academy Admin; move
+    someone between academies; remove a student.
+  - A Mentor or Academy Admin can't be left without an academy: change their role first.
+  - A user's academy can also be changed from their User Management page.
+  - Every change is audited.
+- **Academy Admin** (`/academy/settings`): edits their own academy's name, description and contact
+  details. They can never change its status or reach another academy.
+- **Suspension:** while an academy is suspended, its admins, mentors and students are signed out on
+  their next request and can't log in. Super Admins are unaffected.
+
+**Acceptance (Phase 2):**
+- Academy counts and lists come from the database. A newly created academy appears immediately with
+  zero members.
+- Adding a member by email fails clearly for an unknown email, for a super admin, and when the
+  role/academy rules above would be broken.
+- An academy admin can edit only their own academy, and can't change its status, even by calling
+  the API directly.
+- Members of a suspended academy can't use the platform until it's reactivated.
+
+### 8a.3c Batches, Students and Mentor assignment (Phase 3)
+
+- **Batch membership** is first-class: `batch_students` (a student is in at most one batch at a
+  time) and `batch_mentors` (any number of mentors per batch). Both sides must belong to the
+  batch's academy and have the right role, which the database enforces.
+- **Academy Admin**, for their own academy only:
+  - **Students:** list with search, batch and status filters, sorting and pagination.
+  - **Add a student by email:** an existing account with no academy joins this one; a new person
+    is emailed an invite. A student already in another academy can't be taken.
+  - Change a student's batch, or remove a student from the academy.
+  - **Batch detail:** add/remove students and assign/remove mentors.
+  - **Mentors:** the academy's mentors with their batches, plus invite a mentor.
+- **Mentor:** "Mentees" lists exactly the students in batches they're assigned to. Opening any other
+  student, from this academy or another, is "not found", enforced on the server and by RLS.
+- No readiness, performance or activity figure is shown until it comes from real data (Phase 8).
+
+**Acceptance (Phase 3):**
+- Student and mentor membership in batches comes from the database. Counts match.
+- An academy admin can't add, move or view students of another academy, even by calling the API
+  directly.
+- A mentor sees only their assigned batches' students; changing an id in the URL yields not-found.
+- Removing a student from an academy also removes them from its batches; their account is kept.
+
 ### 8a.4 Content Management (Phase 4–5)
 
 "Student content" means **platform learning content that students consume**, not managing students.
 
-- **Global content** (Super Admin): Psychology, GTO, Interview, Communication, Current Affairs,
-  practice exercises, assessments, session templates, study material, videos, documents, mock SSB
-  activities. Fields: title, description, category, type, difficulty, target role, visibility,
-  status (`draft · published · archived`), created_by, updated_by, created_at, updated_at. Published
-  content becomes available according to assignment, academy, batch or permission rules.
-- **Mentor content** (Mentor): teaching material, session templates, practice exercises, documents,
-  videos, assessments where permitted. Edited and archived only by its owner, published to assigned
-  batches/students. Kept separate from global content; a mentor can never modify global content.
+**Global content (Super Admin, Phase 4):** `/admin/content`.
+- **Fields:** title, description, category (Psychology · GTO · Interview · Communication · Current
+  Affairs · General), type (study material · video · document · article · practice exercise ·
+  assessment · session template · mock SSB activity), difficulty (easy · medium · hard), target role
+  (students · mentors · both), visibility (everyone · assigned only), status
+  (`draft · published · archived`), body text and/or an https link, created_by, updated_by,
+  created_at, updated_at, published_at.
+- Content is never deleted; it's archived. Only published content is ever visible to readers.
+- **Assignment:** content with "assigned only" visibility reaches only the academies or batches it's
+  assigned to.
+- **Readers:** a student sees published content targeted at students that is visible to everyone,
+  or assigned to their academy or their batch. A mentor sees the same for mentors, through their
+  academy or their assigned batches. Academy admins see what reaches their academy. This is
+  enforced by RLS, not only in the UI.
+
+**Acceptance (Phase 4):**
+- A Super Admin creates content as a draft, publishes it, and it appears in the right readers'
+  Library. Archiving removes it from readers.
+- Assigned-only content never appears for an academy or batch it isn't assigned to, even by id.
+- Every field is validated on the server; links must be https.
+- No content figure or list is hard-coded.
+
+**Follow-up (T083b):** move the existing practice banks, 5-day journey modules and resources (still
+`lib/mock/*`) onto this content model. Their runners need structured item formats (TAT images, WAT
+words, MCQs), so that's a separate, specified task.
+
+**Mentor content (Phase 5, decided 2026-10-08):** an add-on to global content.
+- **My Content:** mentors create teaching material, session templates, practice exercises,
+  documents and videos (as links; uploads wait for storage, B5).
+  - It's owned by them; only they edit, publish or archive it. A mentor can never modify global
+    content, and Super Admins see mentor content but don't edit it.
+  - Mentor content is always "assigned only", for students, and only to batches the mentor is
+    assigned to. It then appears in those students' Library.
+- **Starter templates:** a Super Admin marks published global content as a *template*. Any mentor
+  can "Use this template", which copies it into their own content as a draft to edit and publish.
+  The original stays unchanged, and the copy remembers its source.
+- **Content requests (paid service):** a mentor can ask the platform team to create content for
+  them.
+  - Lifecycle: `requested → quoted → accepted → in_progress → delivered`, plus `declined` and
+    `cancelled`.
+  - A Super Admin quotes a fee in INR. The mentor accepts or declines it, and can cancel before
+    accepting.
+  - Delivery copies a platform content item into the mentor's My Content as a draft.
+  - The accepted fee is recorded as **owed**. The platform team deducts it from the mentor's
+    payout or invoice **outside the app**, then marks it settled. There's no automated billing or
+    payments (`AGENTS.md`, B6).
+  - Only mentors can request.
+
+**Acceptance (Phase 5):**
+- A mentor's content is invisible to students outside their assigned batches, and to other
+  mentors, even by id.
+- A mentor can't assign content to a batch they don't teach, or edit someone else's content.
+- "Use this template" creates an editable draft copy; the template itself is unchanged.
+- A request's status only moves along the lifecycle above. Only the requesting mentor can
+  accept, decline or cancel; only a Super Admin can quote, progress, deliver or settle.
+- A fee is shown in INR (Indian formatting) and is never charged automatically.
+
+
+### 8a.4b Session scheduling (Phase 6)
+
+- **Availability:** a mentor keeps weekly availability slots (weekday + start/end time). They're
+  shown to the mentor and their academy admin as a guide; scheduling outside them is allowed with
+  a visible note.
+- **Sessions:**
+  - A mentor schedules a session for **one batch they teach**: title, description, start and end
+    time, **online** (https meeting link required) or **offline** (location required).
+  - It goes either to the **whole batch** or to **selected students** of that batch.
+  - Status is `scheduled · completed · cancelled`. Cancelling needs a reason, which participants
+    see.
+- **No double-booking:** a mentor can't have two scheduled sessions that overlap. The database
+  enforces this.
+- **Calendars (agenda views):**
+  - **Mentor:** their sessions.
+  - **Batch:** a batch page shows that batch's upcoming sessions.
+  - **Student:** sessions for their batch, or ones they were selected for.
+  - **Academy admin:** all their academy's sessions.
+  - A session is visible to no one else; this is enforced by RLS.
+- **Times:** stored as UTC and shown in **IST (Asia/Kolkata)**, labelled "IST". This product serves
+  Indian SSB candidates; per-user time zones can come later.
+- **Notifications** ("you've been scheduled") arrive with the notification system in Phase 10.
+  Until then, the session appears in the student's Sessions page immediately.
+
+**Acceptance (Phase 6):**
+- A mentor can only schedule for, edit, cancel or complete sessions of batches they teach, and
+  only their own sessions.
+- Overlapping sessions for the same mentor are refused with a clear message.
+- A student sees only sessions for their batch, or ones they were selected for. Another batch's
+  session id is "not found".
+- Online sessions need an https link; offline sessions need a location; the end is after the
+  start; sessions are at most 8 hours.
 
 ### 8a.5 Domain model
 

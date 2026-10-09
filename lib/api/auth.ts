@@ -3,9 +3,12 @@
 // work lives in lib/auth/actions.ts as Server Actions.
 
 import { createClient } from "@/lib/supabase/client";
+import { blockedReason } from "@/lib/auth/blocked";
 import type { AuthResult, LoginInput, SignupInput } from "@/types/auth";
 
 export const SUSPENDED_MESSAGE = "This account has been suspended. Contact your academy or the platform team for help.";
+
+export const ACADEMY_SUSPENDED_MESSAGE = "Your academy's access is paused. Contact your academy or the platform team for help.";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -95,13 +98,21 @@ export async function logIn(input: LoginInput): Promise<AuthResult<{ role: strin
       return { ok: false, error: { code: "invalid_credentials", message: "Incorrect email or password." } };
     }
 
-    const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", data.user.id).single();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, status, academy:academies!profiles_academy_id_fkey(status)")
+      .eq("id", data.user.id)
+      .single();
 
-    // Suspended accounts are refused here too (the middleware also signs them
-    // out on any protected route), so they never land on a dashboard.
-    if (profile?.status === "suspended") {
+    // Suspended accounts (or members of a suspended academy) are refused here
+    // too — the middleware also signs them out — so they never see a dashboard.
+    const reason = blockedReason(profile);
+    if (reason) {
       await supabase.auth.signOut();
-      return { ok: false, error: { code: "account_suspended", message: SUSPENDED_MESSAGE } };
+      return {
+        ok: false,
+        error: { code: "account_suspended", message: reason === "academy_suspended" ? ACADEMY_SUSPENDED_MESSAGE : SUSPENDED_MESSAGE },
+      };
     }
 
     return { ok: true, data: { role: profile?.role ?? "student" } };
