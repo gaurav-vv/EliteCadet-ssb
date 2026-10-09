@@ -592,6 +592,57 @@ batches, content or analytics.
   information, role and status changes with confirmation, and the account history.
 - Changing a user to Mentor or Academy Admin requires them to belong to an academy.
 
+### 8a.3b Academies (Phase 2)
+
+- **Academy record:** name (2–80 chars), description, logo URL, contact email, contact phone,
+  status (`active · suspended`), created/updated timestamps.
+- **Super Admin** (`/admin/academies`):
+  - List with search, status filter, pagination, and per-academy counts of admins, mentors and
+    students.
+  - Create and edit academies.
+  - Suspend or reactivate an academy, with confirmation.
+  - Manage members: add an existing account by email as Student, Mentor or Academy Admin; move
+    someone between academies; remove a student.
+  - A Mentor or Academy Admin can't be left without an academy: change their role first.
+  - A user's academy can also be changed from their User Management page.
+  - Every change is audited.
+- **Academy Admin** (`/academy/settings`): edits their own academy's name, description and contact
+  details. They can never change its status or reach another academy.
+- **Suspension:** while an academy is suspended, its admins, mentors and students are signed out on
+  their next request and can't log in. Super Admins are unaffected.
+
+**Acceptance (Phase 2):**
+- Academy counts and lists come from the database. A newly created academy appears immediately with
+  zero members.
+- Adding a member by email fails clearly for an unknown email, for a super admin, and when the
+  role/academy rules above would be broken.
+- An academy admin can edit only their own academy, and can't change its status, even by calling
+  the API directly.
+- Members of a suspended academy can't use the platform until it's reactivated.
+
+### 8a.3c Batches, Students and Mentor assignment (Phase 3)
+
+- **Batch membership** is first-class: `batch_students` (a student is in at most one batch at a
+  time) and `batch_mentors` (any number of mentors per batch). Both sides must belong to the
+  batch's academy and have the right role, which the database enforces.
+- **Academy Admin**, for their own academy only:
+  - **Students:** list with search, batch and status filters, sorting and pagination.
+  - **Add a student by email:** an existing account with no academy joins this one; a new person
+    is emailed an invite. A student already in another academy can't be taken.
+  - Change a student's batch, or remove a student from the academy.
+  - **Batch detail:** add/remove students and assign/remove mentors.
+  - **Mentors:** the academy's mentors with their batches, plus invite a mentor.
+- **Mentor:** "Mentees" lists exactly the students in batches they're assigned to. Opening any other
+  student, from this academy or another, is "not found", enforced on the server and by RLS.
+- No readiness, performance or activity figure is shown until it comes from real data (Phase 8).
+
+**Acceptance (Phase 3):**
+- Student and mentor membership in batches comes from the database. Counts match.
+- An academy admin can't add, move or view students of another academy, even by calling the API
+  directly.
+- A mentor sees only their assigned batches' students; changing an id in the URL yields not-found.
+- Removing a student from an academy also removes them from its batches; their account is kept.
+
 ### 8a.4 Content Management (Phase 4–5)
 
 "Student content" means **platform learning content that students consume**, not managing students.

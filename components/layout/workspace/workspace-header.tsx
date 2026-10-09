@@ -13,13 +13,18 @@ import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } 
 import { EmptyState } from "@/components/ui/empty-state";
 import { logoutAction } from "@/lib/auth/actions";
 
-interface AcademyHeaderProps {
-  academyName: string;
-  adminName: string;
+interface WorkspaceHeaderProps {
+  // Main line of the account button (the academy name for Academy, the
+  // person's own name elsewhere), with the role label under it.
+  displayName: string;
+  // Used for the avatar initials and the account menu's accessible name.
+  userName: string;
   roleLabel: string;
   searchPlaceholder: string;
+  searchLabel: string;
   profileHref: string;
-  // Hamburger + drawer, shown below md (see AcademyMobileNav).
+  profileLabel: string;
+  // Hamburger + drawer, shown below md (see WorkspaceMobileNav).
   mobileNav: React.ReactNode;
 }
 
@@ -29,14 +34,14 @@ function initialsOf(name: string): string {
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-export function AcademyHeader({ academyName, adminName, roleLabel, searchPlaceholder, profileHref, mobileNav }: AcademyHeaderProps) {
+export function WorkspaceHeader({ displayName, userName, roleLabel, searchPlaceholder, searchLabel, profileHref, profileLabel, mobileNav }: WorkspaceHeaderProps) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-hairline bg-white/90 px-4 backdrop-blur-sm sm:px-6">
       {mobileNav}
 
       <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-pill border border-hairline bg-white px-4 focus-within:border-brand-accent focus-within:ring-2 focus-within:ring-brand-accent/25 sm:max-w-md">
         <Search aria-hidden="true" size={16} className="shrink-0 text-ink-secondary" />
-        <span className="sr-only">Search students, batches and mentors</span>
+        <span className="sr-only">{searchLabel}</span>
         <Input
           type="search"
           placeholder={searchPlaceholder}
@@ -67,17 +72,17 @@ export function AcademyHeader({ academyName, adminName, roleLabel, searchPlaceho
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label={`Account menu for ${adminName}`}
+              aria-label={`Account menu for ${userName}`}
               className="flex min-h-11 items-center gap-2.5 rounded-pill py-1 pr-2 pl-1 text-left transition-colors hover:bg-black/5"
             >
               <span
                 aria-hidden="true"
                 className="flex size-9 items-center justify-center rounded-full bg-(--academy-navy) text-[13px] font-semibold text-white"
               >
-                {initialsOf(adminName)}
+                {initialsOf(userName)}
               </span>
               <span className="hidden flex-col leading-tight md:flex">
-                <span className="text-sm font-semibold text-ink">{academyName}</span>
+                <span className="text-sm font-semibold text-ink">{displayName}</span>
                 <span className="text-[12px] text-ink-secondary">{roleLabel}</span>
               </span>
               <ChevronDown aria-hidden="true" size={14} className="hidden text-ink-secondary md:block" />
@@ -85,7 +90,7 @@ export function AcademyHeader({ academyName, adminName, roleLabel, searchPlaceho
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link href={profileHref}>Academy settings</Link>
+              <Link href={profileHref}>{profileLabel}</Link>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => logoutAction()}>Log out</DropdownMenuItem>
           </DropdownMenuContent>
