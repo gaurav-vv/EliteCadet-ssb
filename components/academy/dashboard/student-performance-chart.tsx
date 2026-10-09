@@ -1,105 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { LineChart as LineChartIcon } from "lucide-react";
 import { ChartCard } from "@/components/academy/shared/chart-card";
-import { DemoBadge } from "@/components/academy/shared/demo-badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { AnalyticsSource, PerformanceTrendPoint } from "@/types/academy";
 
-interface StudentPerformanceChartProps {
-  data: PerformanceTrendPoint[];
-  source: AnalyticsSource;
+interface Point {
+  month: string;
+  avgPct: number;
+  count: number;
 }
 
-const RANGES = [
-  { months: 3, label: "Last 3 Months" },
-  { months: 6, label: "Last 6 Months" },
-] as const;
-
-// One line per question: "is performance improving over time?". Three series
-// at most; each also has its own dash pattern so it is distinguishable
-// without colour.
-export function StudentPerformanceChart({ data, source }: StudentPerformanceChartProps) {
-  const [months, setMonths] = useState<number>(6);
-  const visible = data.slice(-months);
-
-  const select = (
-    <label className="shrink-0">
-      <span className="sr-only">Time range</span>
-      <select
-        value={months}
-        onChange={(e) => setMonths(Number(e.target.value))}
-        className="h-9 rounded-control border border-hairline bg-white px-3 text-[13px] font-medium text-ink"
-      >
-        {RANGES.map((r) => (
-          <option key={r.months} value={r.months}>
-            {r.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-
+// One question: "are reviewed scores improving month by month?" One series,
+// so no legend — the title names it.
+export function StudentPerformanceChart({ data }: { data: Point[] }) {
   return (
-    <ChartCard title="Student Performance Overview" headerExtra={select} badge={source === "demo" ? <DemoBadge /> : undefined} className="md:col-span-2 xl:col-span-1">
-      {visible.length === 0 ? (
-        <EmptyState
-          icon={<LineChartIcon aria-hidden="true" size={22} />}
-          title="No performance data yet"
-          description="Scores appear here once students complete assessments."
-        />
+    <ChartCard title="Average Score by Month" description="Mentor-reviewed assessments, academy-wide." className="md:col-span-2 xl:col-span-1">
+      {data.length === 0 ? (
+        <EmptyState icon={<LineChartIcon aria-hidden="true" size={22} />} title="No reviewed scores yet" description="The trend appears once mentors review assessments." />
       ) : (
-        <div
-          role="img"
-          aria-label={`Performance by month: ${visible.map((p) => `${p.month} overall ${p.overall}`).join(", ")}`}
-          className="h-80 w-full"
-        >
+        <div role="img" aria-label={`Average score by month: ${data.map((p) => `${p.month} ${p.avgPct}% from ${p.count} reviews`).join(", ")}`} className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={visible} margin={{ top: 8, right: 12, bottom: 0, left: -20 }}>
+            <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -20 }}>
               <CartesianGrid vertical={false} stroke="var(--hairline)" />
               <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "var(--ink-secondary)", fontSize: 12 }} />
-              <YAxis
-                domain={[0, 100]}
-                ticks={[0, 20, 40, 60, 80, 100]}
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: "var(--ink-secondary)", fontSize: 12 }}
-              />
+              <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit="%" tickLine={false} axisLine={false} tick={{ fill: "var(--ink-secondary)", fontSize: 12 }} />
               <Tooltip
-                contentStyle={{ borderRadius: 12, border: "1px solid var(--hairline)", boxShadow: "var(--shadow-md)", fontSize: 13 }}
+                cursor={{ stroke: "var(--hairline)" }}
+                contentStyle={{ borderRadius: 12, border: "1px solid var(--hairline)", boxShadow: "var(--shadow-md)", fontSize: 13, color: "var(--ink)" }}
+                formatter={(value, _name, item) => [`${value}% (${(item?.payload as Point | undefined)?.count ?? 0} reviews)`, "Average"]}
               />
-              <Legend iconType="plainline" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-              <Line
-                name="Overall"
-                dataKey="overall"
-                type="monotone"
-                stroke="var(--academy-chart-overall)"
-                strokeWidth={2.5}
-                dot={{ r: 3 }}
-                isAnimationActive={false}
-              />
-              <Line
-                name="TAT/WAT/SRT"
-                dataKey="tatWatSrt"
-                type="monotone"
-                stroke="var(--academy-chart-tat)"
-                strokeWidth={2.5}
-                strokeDasharray="7 4"
-                dot={{ r: 3 }}
-                isAnimationActive={false}
-              />
-              <Line
-                name="PPDT & GD"
-                dataKey="ppdtGd"
-                type="monotone"
-                stroke="var(--academy-chart-ppdt)"
-                strokeWidth={2.5}
-                strokeDasharray="2 4"
-                dot={{ r: 3 }}
-                isAnimationActive={false}
-              />
+              <Line dataKey="avgPct" type="monotone" stroke="var(--academy-chart-overall)" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "white" }} activeDot={{ r: 5 }} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

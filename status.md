@@ -176,11 +176,11 @@ Nothing is `VERIFIED`. Everything below is `UNVERIFIED` unless marked `BLOCKED` 
 
 ### Student
 Authentication `VERIFIED` (real Supabase, T013/T014) · Onboarding `VERIFIED` (mock/local-only
-persistence) · Dashboard `VERIFIED` (mock data) · Practice Zone `VERIFIED` (Psychology TAT/WAT/SRT/SDT,
+persistence) · Dashboard `UNVERIFIED` live (real data since T088; unit-tested, needs 0004–0012 applied) · Practice Zone `VERIFIED` (Psychology TAT/WAT/SRT/SDT,
 standard SSB timing per B4; Interview is an explicit stub — no activities are specced for it yet) ·
 Practice submission `VERIFIED` (idempotency-keyed mock submission, retry-safe) · AI feedback `BLOCKED`
-(B3 — AI provider not yet decided) · AI failure handling `BLOCKED` (same) · Progress `VERIFIED` (mock
-data, zero/populated states) · Resources `VERIFIED` (mock content, list/detail/read-state) · Day 2
+(B3 — AI provider not yet decided) · AI failure handling `BLOCKED` (same) · Progress `UNVERIFIED` live (real
+data since T087 — reviewed scores, attendance, Library completion; unit-tested, needs 0012 applied) · Resources `VERIFIED` (mock content, list/detail/read-state) · Day 2
 Resources `VERIFIED` — curated, human-verified external resource library (TAT/WAT/SRT/SDT/Full Day 2;
 `lib/mock/day2-resources.ts`, sourced from `docs/day2-final-curated-resources.md`) restructured 2026-
 09-22 into a hub-and-spoke IA: `/student/resources/day-2` is orientation-only (hero, TAT→WAT→SRT→SDT→
@@ -193,17 +193,17 @@ group filter (`components/student/day2/`, `lib/day2/categories.ts`); real auth-g
 errors; mock content, localStorage progress tracking, same pattern as Resources)
 
 ### Mentor
-Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `VERIFIED` (mock data) · Mentees
+Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `UNVERIFIED` live (real data since T088) · Mentees
 `VERIFIED` (mock data, no real assignment scoping yet) · Mentee detail `VERIFIED` (404 on unknown id;
 no real ownership check without auth) · Evaluations `VERIFIED` (Server Action, idempotent, draft
 recoverable) · Basic sessions `VERIFIED` (create/cancel via Server Action) · Profile `VERIFIED`
 (localStorage-persisted)
 
 ### Academy Admin
-Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `VERIFIED` (mock data, alerts,
-attention list) · Students `VERIFIED` (add, status, batch reassignment via Server Actions) · Batches
+Authentication `VERIFIED` (real Supabase, T013/T014) · Dashboard `UNVERIFIED` live (real data since
+T088: tasks, needs attention, trend, by area, batches, sessions) · Students `VERIFIED` (add, status, batch reassignment via Server Actions) · Batches
 `VERIFIED` (create, member add/remove, mentor assignment) · Mentors `VERIFIED` (invite, invited vs.
-active distinction) · Reports `VERIFIED` (readiness distribution, batch performance, activity, mentor
+active distinction) · Reports `UNVERIFIED` live (real data since T088: score bands, by area, mentor
 workload) · Settings `VERIFIED` (Server Action, server-side mock persistence)
 
 ---
@@ -291,11 +291,20 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-09-24 | Academy dashboard keeps its existing data contract (`getDashboardData`/`getStudents`/`getMentors` in `lib/api/academy.ts`, backed by in-memory `lib/mock/academy.ts`). **Correction to the brief:** this data is the isolated pre-backend mock, not Supabase — only auth/profile/academy name come from Supabase. Widgets with no data source (performance trend line, assessment radar, upcoming sessions, KPI month-over-month deltas) were deliberately **not built** rather than fabricated (`AGENTS.md` §8) | The existing contract has no time series, assessment-category or session-schedule data. Adding them is an API-contract change that needs approval (§19) |
 | 2026-10-03 | Supersedes the 2026-09-24 "not built" note: at user request the dashboard now matches the reference layout, and the trend line, assessment radar and upcoming sessions **are built**, fed by `getAnalytics()` → isolated `lib/mock/academy-analytics.ts` with `source: "demo"`. Each such panel shows a visible "Demo data" badge. The reference's "Activity Completion" KPI is shown as the real "Active Students" share; "Avg. Performance" is the real average readiness % | `AGENTS.md` §8 allows isolated, clearly-labelled mock data shaped like the API response while the backend is missing. `source` lets the UI drop the badge automatically once real tables exist |
 | 2026-10-04 | **Batches are the first Academy domain on real Supabase.** New migration `supabase/migrations/0003_batches.sql` (table `batches`: academy_id, name, mentor_id → profiles, status enum active/archived, start_date, created_at; unique name per academy; RLS for the academy admin; `current_admin_academy_id()` / `mentor_in_academy()` helpers; a new `profiles_select_academy_admin` policy so admins can read their academy's mentors). Reads/writes use the admin's own session (anon key + RLS), never the service-role key. **No delete policy:** batches are archived, so future student→batch links can't be orphaned. The Batches page no longer shares data with the dashboard/Students/batch-detail pages, which still read the in-memory batches (`lib/mock/academy.ts`) until students move to Postgres | User chose "write the migration, then build on it". Student counts are intentionally not shown: there is no `students` table, and the in-memory students reference in-memory batch ids, so any count would be fake |
-
----
-
 | 2026-10-07 | **Platform re-architected around four roles** from the user's brief (`specs.md` §8a): `super_admin` added to `user_role` (migration `0004_super_admin_role.sql`, run alone because a new enum value can't be used in the same transaction); `profiles` extended into the central users table (email, phone, status, last_login_at, updated_at) with 1:1 `student/mentor/academy_admin/super_admin_profiles` and an append-only `audit_log` (`0005_users_rbac.sql`). User Management is kept separate from Content Management. Backend modules live in this app under `lib/server/<module>/`, with Postgres RLS as the second line of defence. Delivered as ten phases (T080–T089), one branch and PR each. The short-lived "per-area grants" design (an `admin_grants` table, never applied to any database) was dropped before merge | The user's brief makes Super Admin a real role: mentors own their content in `/mentor`, academies manage their own data in `/academy`, and `/admin` is the platform workspace. The user chose to extend `profiles` rather than rename it, keep backend modules in the Next.js app on Supabase, and ship one PR per phase |
 | 2026-10-07 | **Two security holes on `main` closed in Phase 1.** (1) The `profiles_update_own` RLS policy let any user rewrite every column of their own row, including `role` and `academy_id`. A `before update` trigger now rejects privileged-column changes from anyone except an active super admin (never on their own role/status) and trusted server contexts. (2) The signup trigger trusted `role`/`academy_id` from browser-supplied user metadata, so anyone could self-register as a mentor of any academy. Now: self-signup creates only student or academy_admin; mentor only with `auth.users.invited_at` set (a real invite); any role only from service-role-only `app_metadata`; `super_admin` never from signup | `AGENTS.md` §10: never trust a role supplied by the browser. Fixed before `super_admin` exists, because with that role, hole (1) would have been a one-request path to platform takeover |
+| 2026-10-07 | **One navy workspace shell for every role** (T076). The Academy shell (2026-09-24) was generalised into `components/layout/workspace/` and is now used by Student, Mentor and Academy, with Super Admin to follow in PR #8. The scoped CSS classes were renamed `.academy-*` → `.workspace-*`; the `--academy-*` colour tokens keep their names. `AGENTS.md` §7.3 records the decision | The user approved applying their reference image's dark navy sidebar to every workspace. One shell keeps the roles visually identical apart from their navigation and role label (`specs.md` §8a.1), instead of the glass shell for Student/Mentor next to a navy shell for Academy |
+| 2026-10-08 | **Academies become a managed domain** (T081, migration `0006_academies.sql`). Academy profile fields + `active/suspended` status. Super admins create, edit, suspend and manage members; academy admins edit only their own academy's details, never its status (RLS + guard trigger). Membership stays only in `profiles.academy_id`. A suspended academy signs out all its non-super-admin members (middleware + login, via the shared pure `lib/auth/blocked.ts`). Mentors/academy admins can't be removed from an academy without a role change first. Academy settings no longer write the in-memory `SETTINGS` mock: `getSettings`, `updateSettingsAction` and the client-side `updateAcademyName` were removed in favour of the server-side `updateMyAcademyAction` | Brief Phase 2 (`specs.md` §8a.3b). One membership column avoids two sources of truth. Server-side scoping (the academy id comes from the session, never the request) is the academy-isolation boundary (`AGENTS.md` §10) |
+| 2026-10-08 | **Batch membership is first-class** (T082, `0007_batch_membership.sql`). `batch_students` (unique per student) and `batch_mentors` (many per batch) replace `batches.mentor_id`, which is dropped after copying. A trigger enforces role + same academy. Mentors read only their batches, those students and co-mentors (`is_batch_mentor` / `is_batch_peer`). Academy admins add or remove academy students only through SECURITY DEFINER functions that set a transaction-local `app.trusted_change` flag, the one sanctioned bypass of the 0005 profile guard; `set_config` isn't reachable through the API. New students can be invited (service role used only to send the email). The Academy Students, student detail, batch detail and Mentors pages, and the Mentor's Mentees, now read Postgres. Their mock components, actions and the `student-list` helper were removed | Brief Phase 3 (`specs.md` §8a.3c): "Academy → Batch → Students → Assigned Mentors". Membership in one place per relation avoids two sources of truth. Session-derived scope plus RLS closes the IDOR class for students and mentees (ISO-01–05) |
+| 2026-10-08 | **Global learning content** (T083, `0008_contents.sql`). `contents` carries every field in the brief plus body/link. Status moves draft → published → archived, never deleted. `owner_type`/`owner_id` already leave room for mentor content (Phase 5) in the same table. `content_assignments` targets one academy or one batch. Readers are governed only by `can_read_content()` in RLS (published, for their role, visible to everyone or assigned to their academy/batch); the service doesn't re-implement it. Bodies render as plain text, never HTML. Moving the existing practice/journey/resource mocks onto it is a separate task (T083b) because their runners need a structured item model | Brief Phase 4 (`specs.md` §8a.4). One reading rule in the database means the Library can't leak by a UI bug. Deferring T083b avoids breaking working practice flows with an unspecified item format |
+| 2026-10-08 | **Mentor content, starter templates and paid content requests** (T084, `0009_mentor_content.sql`), per the user's 2026-10-08 direction. Mentor content shares the `contents` table (`owner_type = 'mentor'`); a trigger pins it to assigned-only/students, and RLS limits sharing to batches the mentor teaches. Mentors never modify platform content. Starter templates: platform content flagged `is_template`, copied into the mentor's own draft (`template_source_id`). Content requests: `requested → quoted → accepted → in_progress → delivered` (+ declined/cancelled). Mentor transitions go through SECURITY DEFINER functions; staff transitions are super-admin-only. Delivery copies a platform item into the mentor's My Content. The accepted fee is recorded as owed and settled outside the app, then marked settled; there's no automated billing (AGENTS.md, B6) | User chose: templates are copied then edited; fees are tracked and settled manually; only mentors can request. One content table keeps a single reader rule (`can_read_content`) for platform and mentor content alike |
+| 2026-10-08 | **Session scheduling** (T085, `0010_sessions.sql`). One batch and one mentor (who must teach it) per session; whole batch or selected students of that batch; online needs an https link, offline a location; cancel needs a reason. **No double-booking** via a btree_gist exclusion constraint on `(mentor_id, tstzrange)` for scheduled sessions, mapped to a clear message. `can_see_session()` is the single visibility rule. Times are stored in UTC and entered and shown in **IST** ("IST"-labelled) | Brief Phase 6 (`specs.md` §8a.4b). The audience is Indian SSB candidates, so IST avoids hydration-unsafe client time-zone formatting; per-user time zones can come later. A DB constraint, not just an app check, means two concurrent requests can't double-book |
+| 2026-10-08 | **Assessments, attempts and mentor feedback** (T086, `0011_assessments.sql`). Mentor-created per batch; questions are locked once opened. One attempt per student, submitted once then locked, accepted only while open and not overdue. One feedback per attempt (upsert on `attempt_id`, so a double submit is idempotent): `in_review` is a recoverable staff-only draft, `reviewed` is final, locked, needs score + strengths + improvement areas, and only then reaches the student with the evaluator and date. Triggers enforce the lifecycle in the database, not only in the app. Mentor feedback is never presented as an SSB outcome; AI feedback stays blocked (B3) | Brief Phase 7 + `specs.md` §7.5 (draft recoverable, idempotent submit, evaluator + timestamp on the student record) |
+| 2026-10-08 | **Progress is derived, not stored** (T087, `0012_progress.sql`). Only two new source tables: `session_attendance` (mentor-marked, only after the session starts, only participants; excused counts neither way) and `content_progress` (student-marked Library completion). Scores come from mentor-reviewed feedback only; practice runners are not counted (they have no reviewed score). Summaries are security-invoker views (`student_scores`, `student_progress`), so every reader's RLS applies and there is one source of truth. No value is invented: with no data the UI says so. Needs-attention and recommendations are plain rules, each shown with its reason (average below 50%, no submission in 14 days while assessments are open, attendance below 50%) | Brief Phase 8 + `AGENTS.md` §8 (no fabricated data) + `specs.md` §8a.4d |
+| 2026-10-08 | **Dashboards are read-only summaries over real data** (T088, no migration). One server function per role (`lib/server/dashboards`) reuses the progress, sessions, assessments and people services, so every figure matches the page it links to. **No readiness score**: "average reviewed score" replaces it until a readiness formula is defined. **Today's Mission and the practice streak are hidden** until practice is stored (T083b). The sample-data dashboards, the `getAnalytics` "Demo data" panels and the "Load/Clear demo data" controls are removed; this supersedes the 2026-09-19 demo-data and 2026-10-03 analytics decisions above | User-approved 2026-10-08 (both recommendations) + `AGENTS.md` §8 (no fabricated data) |
+| 2026-10-08 | **Notifications come from database triggers; analytics from one guarded SQL function** (T089, `0013_notifications_analytics.sql`). Events write `notifications` rows inside the same transaction as the change: sessions scheduled or cancelled, assessments opened, submissions, reviews, batch membership, content requests. No code path can forget one, and there is no insert policy, so clients can't forge one. Recipients can only set `read_at` (column grant). Each event notifies a person once (`ref_id` de-duplication), except content-request status changes. Hrefs are same-site paths, checked in the DB and the service. Platform analytics is a SECURITY DEFINER function that refuses everyone but a super admin, so aggregates don't widen any table's RLS. The bell's badge is rendered by the layout and its list is fetched when it opens. There is no realtime push yet | Brief Phase 10 + `AGENTS.md` §10 (server-side authorization) + §15 (no infrastructure without measured need: realtime deferred) |
+
+---
 
 ## 9. Technical Debt
 
@@ -1380,13 +1389,252 @@ What changed:
 What remains:
 - Run 0004, then 0005, in the Supabase SQL Editor; bootstrap the first super admin (SQL in the 0005 header)
 - Live check with real accounts: role change, suspend → signed out → can't log in, reactivate, audit entries, non-super user refused by RLS when calling the API directly
-- Decide whether the reference image's dark navy sidebar applies to every workspace (design-system change, needs approval)
 
 Blocker:
 - Needs the migrations applied to verify against live data
 
 Next task:
+- T076 (same day, below)
+
+Date: 2026-10-07
+Task: T076 — One workspace shell for every role
+Status: Complete (verified locally)
+
+What changed:
+- `components/academy/layout/academy-{brand,navigation,mobile-nav,sidebar-footer,header}.tsx` moved to `components/layout/workspace/workspace-*.tsx` with generic props (workspace label, role label, display/context names, search and profile labels); new `WorkspaceLayout`; `lib/navigation/workspace.ts` holds the nav item type and active-link rule
+- `AcademyLayout` is now a thin configuration of `WorkspaceLayout`; `app/student/layout.tsx` and `app/mentor/layout.tsx` switched from the glass `AppShell` to it
+- PR #8 merged into this branch: `/admin` now uses `WorkspaceLayout` (Super Admin wordmark; Academies/Content/Analytics shown as "Soon"), and the old glass `AppShell`/`Sidebar`/`TopHeader`/`MobileTabBar` are deleted (no remaining users)
+- `app/globals.css`: `.academy-app/.academy-sidebar/.academy-nav-item` → `.workspace-*`, comment updated; `AGENTS.md` §7.3 decision note
+- Verified: lint, typecheck, tests (171) and build clean. The real Student, Mentor and Academy layouts and dashboards were rendered through a temporary harness (deleted): navy sidebar with the role in the wordmark, role label in the header, mobile drawer opens with the right links, no horizontal overflow at 375px, no server errors
+
+What remains:
+- Student/Mentor dashboards still greet with mock names ("Aditya", "Kavita") from `lib/mock/*`. Pre-existing; removed when those dashboards move to real data (T088)
+
+Blocker:
+- None
+
+Next task:
 - T081 — Phase 2: Academies + Academy Admin
+
+Date: 2026-10-08
+Task: T081 — Phase 2: Academies + Academy Admin
+Status: Complete in code and tests. NOT yet run against a live database (migration 0006 must be applied)
+
+What changed:
+- Migration `0006_academies.sql` (see Decisions Register)
+- `lib/server/academies/{validation,repository,service}.ts`, `lib/actions/academies.ts`; `checkAcademyChange` rule in `lib/server/users/validation.ts`; new permissions `academies.manage`, `academy.update_own`
+- Super Admin: `/admin/academies` (search, status filter, sort, pagination, member counts, create dialog) and `/admin/academies/[id]` (details, edit, suspend/reactivate, add member by email with role, remove student, history); "Academies" nav item live; "Change academy" on user detail
+- Academy Admin: `/academy/settings` reads and writes the real academy (name, description, contact email/phone, logo link) plus their own name
+- Suspension: `lib/auth/blocked.ts` shared by middleware and login; `academy_suspended` login message
+- Shared `ConfirmActionDialog` (takes a bound Server Action)
+- Tests: 261 Vitest tests pass (new: academies validation/service, blocked reason, academy-change rule, middleware and login academy-suspension cases)
+- UI reviewed locally with sample data through a temporary harness (deleted); screenshots in `docs/screenshots/phase-2/`
+
+What remains:
+- Apply 0006 after 0004/0005; live check: create academy → add an admin, mentor, student → academy admin edits settings → suspend → members signed out → reactivate
+- Logo upload (needs storage, B5); academy-level dashboards move to real data in later phases
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T082 — Phase 3: Batches + Students + Mentor assignment
+
+Date: 2026-10-08
+Task: T082 — Phase 3: Batches + Students + Mentor assignment
+Status: Complete in code and tests. NOT yet run against a live database (migration 0007 must be applied)
+
+What changed:
+- Migration `0007_batch_membership.sql` (see Decisions Register)
+- Batches: multi-mentor model (`lib/api/batches.ts` reads `batch_overview`; `lib/actions/batches.ts`: add/remove mentor, set student batch); batch form no longer picks a single mentor; table shows mentors and student counts; real batch detail page
+- New `lib/server/academy-people` (validation, repository, service) and `lib/actions/academy-people.ts`: academy students list/detail/add-by-email-or-invite/remove, academy mentors list/invite, mentor's own mentees
+- Pages on real data: `/academy/students`, `/academy/students/[id]`, `/academy/batches/[id]`, `/academy/mentors`, `/mentor/mentees`, `/mentor/mentees/[id]`
+- Removed mock paths: `components/academy/{batch-actions,add-existing-student-to-batch,student-actions}.tsx`, `lib/academy/student-list.ts` (+ test), mock student/batch/invite actions in `lib/actions/academy.ts`, mock mentee reads in `lib/api/mentor.ts`, the `markMentorActive` bridge
+- Shared `ConfirmActionDialog` moved to `components/shared/`
+- Tests: 275 Vitest tests pass; screenshots in `docs/screenshots/phase-3/`
+- Docs note: this entry, the T082 task entry and the ISO test-case updates were added in a follow-up commit. The first Phase 3 commit's doc step didn't run because it was chained after a failing cleanup command
+
+What remains:
+- Apply 0007 after 0004–0006; live check: add/invite students, assign 2 mentors to a batch, move a student between batches, mentor sees only their batches' students (try another id → not found)
+- Still sample data (by phase): Academy dashboard + Reports (T088), Mentor dashboard (T088), evaluations (T086), sessions (T085). Their mentee pickers use sample mentees until then
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T083 — Phase 4: Global content management
+
+Date: 2026-10-08
+Task: T083 — Phase 4: Global content management
+Status: Complete in code and tests. NOT yet run against a live database (migration 0008 must be applied)
+
+What changed:
+- Migration `0008_contents.sql` (see Decisions Register)
+- `lib/server/content/{validation,repository,service}.ts`, `lib/actions/content.ts`; permission `content.manage`
+- Super Admin: `/admin/content` (category tabs with counts, search, type/difficulty/status filters, pagination), `/admin/content/new`, `/admin/content/[id]` (edit, publish/unpublish/archive/restore with confirmation, assignments); nav "Content Library" live
+- Readers: `/student/library`, `/mentor/library`, `/academy/library` (+ item pages) via the shared `components/content/library-view.tsx`; nav items added
+- Tests: 292 Vitest tests pass; screenshots in `docs/screenshots/phase-4/`
+
+What remains:
+- Apply 0008 after 0004–0007; live check: create → publish → appears in a student's Library; assigned-only content shows only for the assigned academy/batch; archive removes it
+- T083b: move practice banks / journey modules / resources onto content (needs an item model)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T084 — Phase 5: Mentor content management
+
+Date: 2026-10-08
+Task: T084 — Phase 5: Mentor content, starter templates and content requests
+Status: Complete in code and tests. NOT yet run against a live database (migration 0009 must be applied)
+
+What changed:
+- Migration `0009_mentor_content.sql` (see Decisions Register)
+- `lib/server/content/mentor-service.ts` (own content, share with own batches, templates, copy), `lib/server/content/requests.ts` (request lifecycle, quote/start/deliver/settle), `lib/actions/mentor-content.ts`, staff actions in `lib/actions/content.ts`; content repository generalised to an explicit owner (platform / mentor / RLS-only readers)
+- Mentor: `/mentor/content` (My Content), `/mentor/content/new`, `/mentor/content/[id]` (edit, publish, share with batches), `/mentor/content/templates`, `/mentor/content/requests`; nav "My Content"
+- Super Admin: "Offer as a starter template" on platform content (marked in the list), `/admin/content-requests` (filter, quote in INR, start, deliver, mark settled); nav "Content Requests"
+- Tests: 313 Vitest tests pass; screenshots in `docs/screenshots/phase-5/`
+
+What remains:
+- Apply 0009 after 0004–0008; live check: mentor creates + shares with their batch → their student sees it, a student of another batch doesn't; template copy; request → quote → accept (fee owed) → deliver → settle
+- Payouts/earnings themselves aren't in the app (settlement is manual by design)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T085 — Phase 6: Session scheduling
+
+Date: 2026-10-08
+Task: T085 — Phase 6: Session scheduling
+Status: Complete in code and tests. NOT yet run against a live database (migration 0010 must be applied)
+
+What changed:
+- Migration `0010_sessions.sql` (see Decisions Register)
+- `lib/server/sessions/{validation,service}.ts`, `lib/actions/sessions.ts`
+- Mentor: `/mentor/sessions` (agenda by IST day, filters), `/mentor/sessions/new`, `/mentor/sessions/[id]` (edit, cancel with reason, mark completed), `/mentor/sessions/availability`
+- Student: `/student/sessions` (nav "Sessions"); Academy: `/academy/sessions` (nav item now live); batch detail shows upcoming sessions
+- Removed the sample-data mentor sessions UI (`components/mentor/sessions-view.tsx`) and its mock actions (`createSessionAction`/`cancelSessionAction`) and read (`getSessions`)
+- Tests: 330 Vitest tests pass; screenshots in `docs/screenshots/phase-6/`
+
+What remains:
+- Apply 0010 after 0004–0009 (it enables `btree_gist`); live check: schedule for a batch → its students see it, other batches don't; overlapping second session refused; cancel shows the reason to students
+- Notifications for scheduled/cancelled sessions (Phase 10); attendance (Phase 7/8)
+- The Mentor dashboard's "today's schedule" and the Student dashboard's "upcoming session" still read sample data until T088
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T086 — Phase 7: Assessments + Feedback
+
+Date: 2026-10-08
+Task: T086 — Phase 7: Assessments + Feedback
+Status: Complete in code and tests. NOT yet run against a live database (migration 0011 must be applied)
+
+What changed:
+- Migration `0011_assessments.sql` (see Decisions Register)
+- `lib/server/assessments/{validation,service}.ts`, `lib/actions/assessments.ts`
+- Mentor: `/mentor/assessments` (+ new, detail with open/close/reopen and submissions), `/mentor/evaluations` (pending / in review / reviewed), `/mentor/evaluations/[attemptId]` (answers + save draft / submit review); mentee detail now lists the student's submissions and scores
+- Student: `/student/assessments` (+ detail: answer with drafts, submit once, reviewed feedback); Academy: `/academy/assessments` (nav live)
+- Removed the sample-data evaluations: `app/mentor/evaluations/new`, `components/mentor/evaluation-form.tsx`, `submitEvaluationAction`, `getEvaluations`/`getMenteeOptions`; `lib/actions/mentor.ts` keeps only the dashboard demo-data controls
+- Tests: 345 Vitest tests pass; screenshots in `docs/screenshots/phase-7/`
+
+What remains:
+- Apply 0011 after 0004–0010; live check: mentor creates + opens → student drafts, submits (second submit refused) → mentor saves a draft review, leaves, comes back (recovered), submits → student sees score + feedback; another batch's mentor gets "not found"
+- Session-level evaluations (feedback on a session rather than an assessment) are not built; add if needed
+- Progress built on these scores is Phase 8 (T087)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T087 — Phase 8: Progress tracking
+
+Date: 2026-10-08
+Task: T087 — Phase 8: Progress tracking
+Status: Complete in code and tests. NOT yet run against a live database (migration 0012 must be applied)
+
+What changed:
+- Migration `0012_progress.sql` (see Decisions Register)
+- `lib/server/progress/{compute,service}.ts`, `lib/actions/progress.ts`, `components/progress/*`
+- Student: `/student/progress` on real data (stats, score trend chart + table view, averages by area, strength/weak area, recent feedback, next steps with reasons); "Mark as done" on `/student/library/[id]`
+- Mentor: Avg Score and Attendance columns on `/mentor/mentees`, progress section on the mentee page, attendance marking on `/mentor/sessions/[id]` once a session has started
+- Academy: `/academy/performance` (totals, needs attention with reasons, per batch); nav item now live
+- Removed `lib/api/progress.ts` and `lib/mock/progress.ts`
+- Tests: 362 Vitest tests pass; screenshots in `docs/screenshots/phase-8/`
+
+What remains:
+- Apply 0012 after 0004–0011; live check: mentor marks attendance after a session starts (refused before), reviews an assessment → student trend, mentee columns and academy Performance update; a student marks a Library item done
+- Dashboards still show sample widgets until Phase 9 (T088)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T088 — Phase 9: Role-specific dashboards
+
+Date: 2026-10-08
+Task: T088 — Phase 9: Role-specific dashboards
+Status: Complete in code and tests. NOT yet run against a live database (needs 0004–0012 applied)
+
+What changed:
+- `lib/server/dashboards/{compute,service}.ts`, `types/dashboards.ts`
+- Student dashboard: stats, Do next (with reasons), next session, recent submissions/feedback
+- Mentor dashboard: stats, reviews waiting, today's sessions (IST), needs attention, mentees by score
+- Academy dashboard: KPIs and tasks from real counts, average score by month, scores by area, recent submissions, batch averages, upcoming sessions; Reports: score bands, by area, mentor workload
+- `getAcademyPerformance` now also returns its per-student rows and score points so the dashboard reuses them
+- Removed: `lib/mock/{student,mentor,academy,academy-analytics}.ts`, `lib/api/{mentor,academy}.ts`, the student `getDashboardData`, `lib/actions/{mentor,academy}.ts`, `components/shared/demo-data-controls.tsx`, `components/academy/shared/demo-badge.tsx`, `components/academy/dashboard/assessment-radar.tsx`, `lib/academy/readiness.ts`, `types/mentor.ts`, the dead sample-data types in `types/{academy,student}.ts`, and `academy-isolation.test.ts` (its "known gap" is closed; isolation is covered by the service tests)
+- Tests: 369 Vitest tests pass; screenshots in `docs/screenshots/phase-9/`
+
+What remains:
+- Apply 0004–0012; live check: each dashboard's figures match Performance, Evaluations, Sessions and Mentees for the same account; another role is refused
+- Practice runners, Resources and the SSB journey still use local sample content (T083b)
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- T089 — Phase 10: Analytics + Notifications
+
+Date: 2026-10-08
+Task: T089 — Phase 10: Analytics + Notifications
+Status: Complete in code and tests. NOT yet run against a live database (migration 0013 must be applied)
+
+What changed:
+- Migration `0013_notifications_analytics.sql` (see Decisions Register)
+- `lib/server/notifications/service.ts`, `lib/server/analytics/service.ts`, `lib/actions/notifications.ts`, `types/{notifications,analytics}.ts`
+- Header bell in every workspace (`components/layout/workspace/notification-bell.tsx`): unread badge, list fetched on open, mark one or all read; Notifications page per role (`/student|/mentor|/academy|/admin/notifications`). Academy nav Notifications now live
+- Super Admin `/admin/analytics` (nav now live): platform totals, 30/90/365-day activity, per academy, by month, published content
+- Tests: 380 Vitest tests pass; screenshots in `docs/screenshots/phase-10/`
+
+What remains:
+- Apply 0013 after 0004–0012; live check: schedule a session → batch students get one notification; cancel → students + academy admins; open an assessment → students; submit → mentor; review → student; another account cannot read or mark them; a non-super-admin calling `platform_analytics` gets an error
+- Realtime push (the badge updates on navigation/refresh, not live) and email delivery are not built
+- All ten brief phases are now in code; practice/resources moving onto content (T083b) is the remaining planned item
+
+Blocker:
+- Needs the migrations applied to verify against live data
+
+Next task:
+- Apply migrations 0004–0013 and run the live checks; then T083b
+
+Date: 2026-10-08
+Task: Live check of migrations 0001–0013 (T080–T089)
+Status: Database layer VERIFIED on a local Postgres 17 (no Supabase project credentials available locally)
+
+What changed:
+- `supabase/tests/{supabase-stub.sql,workflow-check.sql,run-workflow-check.sh}`: a reusable check. It applies all 13 migrations in order, each as one transaction like the SQL Editor, to a throwaway database with a stand-in for Supabase's roles and `auth` schema. Then it runs the brief's whole workflow as each real user under RLS: super admin publishes → academy admin builds a batch → mentor schedules, marks attendance, opens an assessment → student submits → mentor reviews → progress, notifications and analytics
+- Result: all 13 migrations apply cleanly; 60/60 checks pass. These cover cross-academy isolation (batches, sessions, assessments, scores, progress), signup role not trusted from the browser, double-booking, attendance rules, submit-once and locked reviews, draft reviews hidden from students, each notification to exactly the right people once, private notifications, and super-admin-only analytics
+- Fix found by the check: 0013 announced a whole-batch session that had already started; it now notifies only for future sessions, like selected-student sessions
+
+What remains:
+- Running the app itself against a real Supabase project (GoTrue/PostgREST, invites, email) — needs the project credentials in `.env.local`
+- Apply 0004–0013 to the real project (0004 on its own), then smoke-test each role in the browser
+
+Next task:
+- Real-project smoke test; then T083b
 
 ## 14. North Star
 

@@ -28,20 +28,3 @@ export async function updateFullName(fullName: string): Promise<{ ok: boolean; m
 
   return { ok: true };
 }
-
-// Requires supabase/migrations/0002_academies_update_policy.sql to be run —
-// without it, RLS silently rejects the update (no policy = no access).
-export async function updateAcademyName(academyId: string, name: string): Promise<{ ok: boolean; message?: string }> {
-  if (!name.trim()) {
-    return { ok: false, message: "Academy name is required." };
-  }
-
-  const supabase = createClient();
-  const { error } = await supabase.from("academies").update({ name: name.trim() }).eq("id", academyId);
-
-  if (error) {
-    return { ok: false, message: "We couldn't update your academy name. Please try again." };
-  }
-
-  return { ok: true };
-}
