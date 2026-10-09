@@ -230,9 +230,9 @@ export interface BatchRecord {
   // ISO date (yyyy-mm-dd) or null when no start date was set.
   startDate: string | null;
   createdAt: string;
-  mentorId: string | null;
-  // Joined from profiles; null when the batch has no mentor.
-  mentorName: string | null;
+  // From batch_mentors (any number), ordered by name.
+  mentors: BatchMentorOption[];
+  studentCount: number;
 }
 
 export interface BatchMentorOption {
@@ -270,6 +270,22 @@ export interface BatchSummary {
 // What the create/edit form submits (validated by lib/academy/batch-validation.ts).
 export interface BatchFormInput {
   name: string;
-  mentorId: string | null;
   startDate: string | null;
+}
+
+// One student row in a batch roster / the academy's student list
+// (public.academy_students view, supabase/migrations/0007_batch_membership.sql).
+export interface BatchStudent {
+  id: string;
+  fullName: string;
+  email: string | null;
+}
+
+export interface BatchDetail {
+  batch: BatchRecord;
+  students: BatchStudent[];
+  // Academy students not in any batch — candidates to add.
+  availableStudents: BatchStudent[];
+  // Academy mentors not yet on this batch — candidates to assign.
+  availableMentors: BatchMentorOption[];
 }

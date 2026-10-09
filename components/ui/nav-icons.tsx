@@ -34,6 +34,7 @@ import {
   Gauge,
   TriangleAlert,
   ShieldCheck,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -78,6 +79,7 @@ export const navIcons = {
   attention: TriangleAlert,
   access: ShieldCheck,
   users: Users,
+  content: FileText,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof navIcons;
