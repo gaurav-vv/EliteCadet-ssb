@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { BankPracticeRunner } from "@/components/practice/bank-practice-runner";
+import { JourneyFinalSummary } from "@/components/practice/journey-final-summary";
 import { SsbBankTestSession } from "@/components/practice/ssb-bank-test-session";
 import { SelfAssessmentChecklist } from "@/components/student/self-assessment-checklist";
-import { JourneyFinalSummary } from "@/components/practice/journey-final-summary";
-import { getDayModules, getDays, getSsbModuleDetail } from "@/lib/api/ssb-journey";
-import { getAllModules } from "@/lib/mock/ssb-journey";
-import type { SsbDayId } from "@/types/ssb-journey";
+import { getDay, getModuleDetail, isDayId } from "@/lib/practice/journey";
+import { getMyJourneyProgress } from "@/lib/server/practice/journey-progress";
+import { getBank, getMyAnswers } from "@/lib/server/practice/service";
+import type { GuidedPracticeItem, McqItem } from "@/types/ssb-journey";
 
 export async function generateMetadata({
   params,
@@ -15,8 +17,7 @@ export async function generateMetadata({
   params: Promise<{ day: string; module: string }>;
 }): Promise<Metadata> {
   const { day, module: moduleId } = await params;
-  const result = await getSsbModuleDetail(day as SsbDayId, moduleId);
-  return { title: result.data?.title ?? "Practice" };
+  return { title: (isDayId(day) && getModuleDetail(day, moduleId)?.title) || "Practice" };
 }
 
 export default async function SsbModulePage({
@@ -25,18 +26,10 @@ export default async function SsbModulePage({
   params: Promise<{ day: string; module: string }>;
 }) {
   const { day, module: moduleId } = await params;
-  const dayId = day as SsbDayId;
-
-  const [daysResult, modulesResult, detailResult] = await Promise.all([
-    getDays(),
-    getDayModules(dayId),
-    getSsbModuleDetail(dayId, moduleId),
-  ]);
-
-  const dayMeta = daysResult.data?.find((d) => d.id === dayId);
-  if (!dayMeta || !modulesResult.ok || !detailResult.ok || !detailResult.data) notFound();
-
-  const mod = detailResult.data;
+  const dayMeta = getDay(day);
+  const mod = isDayId(day) ? getModuleDetail(day, moduleId) : undefined;
+  if (!dayMeta || !mod) notFound();
+  const dayId = dayMeta.id;
   // Modules with an `href` (e.g. Day 2's Test cards, Day 4's Personal
   // Interview) are only ever linked to directly from the day page — this
   // route still resolves for them so a bookmarked/typed URL redirects to the
@@ -88,32 +81,49 @@ export default async function SsbModulePage({
     );
   }
 
-  if (mod.kind === "bank" && mod.bank?.mode === "practice") {
-    return (
-      <BankPracticeRunner
-        dayId={dayId}
-        moduleId={mod.id}
-        backHref={backHref}
-        backLabel={backLabel}
-        context={mod.context}
-        mcqItems={mod.mcqItems}
-        responseItems={mod.responseItems}
-        selfReview={mod.selfReview}
-      />
-    );
-  }
+  if (mod.kind === "bank" && mod.bank) {
+    const forTest = mod.bank.mode === "test";
+    const [bank, answers] = await Promise.all([getBank(mod.bank.slug, { forTest }), forTest ? null : getMyAnswers(mod.bank.slug)]);
+    if (!bank.ok && bank.error?.code === "not_found") notFound();
+    if (!bank.ok || !bank.data || (answers && (!answers.ok || !answers.data))) {
+      return (
+        <div className="flex flex-col gap-4 pb-10">
+          <Link href={backHref} className="text-xs text-brand-accent hover:underline">
+            ← {backLabel}
+          </Link>
+          <RetryErrorState message={bank.error?.message ?? answers?.error?.message ?? "We couldn't load these questions. Please try again."} />
+        </div>
+      );
+    }
+    const isMcq = bank.data.kind === "mcq";
+    const mcqItems = isMcq ? (bank.data.items as McqItem[]) : undefined;
+    const responseItems = isMcq ? undefined : (bank.data.items as GuidedPracticeItem[]);
 
-  if (mod.kind === "bank" && mod.bank?.mode === "test") {
+    if (!forTest) {
+      return (
+        <BankPracticeRunner
+          slug={mod.bank.slug}
+          backHref={backHref}
+          backLabel={backLabel}
+          context={mod.context}
+          mcqItems={mcqItems}
+          responseItems={responseItems}
+          initialAnswers={answers?.data ?? {}}
+          selfReview={mod.selfReview}
+        />
+      );
+    }
     return (
       <SsbBankTestSession
+        slug={mod.bank.slug}
         title={mod.title}
         description={mod.description}
         context={mod.context}
         backHref={backHref}
         backLabel={backLabel}
         itemKind={mod.bank.itemKind}
-        mcqItems={mod.mcqItems}
-        responseItems={mod.responseItems}
+        mcqItems={mcqItems}
+        responseItems={responseItems}
         carouselTiming={mod.carouselTiming}
       />
     );
@@ -136,16 +146,7 @@ export default async function SsbModulePage({
   }
 
   if (mod.kind === "summary") {
-    const allModules = getAllModules().filter((m) => m.kind === "bank" && m.bank?.mode === "practice");
-    const daysWithModules = (daysResult.data ?? []).map((d) => ({
-      dayId: d.id,
-      dayNumber: d.dayNumber,
-      title: d.title,
-      modules: allModules
-        .filter((m) => m.dayId === d.id)
-        .map((m) => ({ moduleId: m.id, itemIds: (m.mcqItems ?? m.responseItems ?? []).map((i) => i.id) })),
-    }));
-
+    const progress = await getMyJourneyProgress();
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-10">
         <Link href={backHref} className="text-xs text-brand-accent hover:underline">
@@ -156,7 +157,11 @@ export default async function SsbModulePage({
           <p className="text-[14px] text-ink-secondary">{mod.description}</p>
           {mod.context && <p className="mt-2 text-[14px] leading-relaxed text-ink-secondary">{mod.context}</p>}
         </div>
-        <JourneyFinalSummary days={daysWithModules} />
+        {progress.ok && progress.data ? (
+          <JourneyFinalSummary overall={progress.data.overall} days={progress.data.days} />
+        ) : (
+          <RetryErrorState message={progress.error?.message ?? "We couldn't load your progress. Please try again."} />
+        )}
       </div>
     );
   }

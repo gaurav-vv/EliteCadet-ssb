@@ -1,35 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { navIcons } from "@/components/ui/nav-icons";
 import { ModuleProgressBadge } from "@/components/practice/module-progress-badge";
-import { getDayModules, getDays } from "@/lib/api/ssb-journey";
-import type { SsbDayId } from "@/types/ssb-journey";
+import { navIcons } from "@/components/ui/nav-icons";
+import { getDay, getModulesForDay, isDayId, SSB_DAYS } from "@/lib/practice/journey";
+import { getMyBankProgress } from "@/lib/server/practice/service";
 
-export async function generateStaticParams() {
-  const result = await getDays();
-  return (result.data ?? []).map((day) => ({ day: day.id }));
+export function generateStaticParams() {
+  return SSB_DAYS.map((day) => ({ day: day.id }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ day: string }>;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ day: string }> }): Promise<Metadata> {
   const { day } = await params;
-  const daysResult = await getDays();
-  const dayMeta = daysResult.data?.find((d) => d.id === day);
+  const dayMeta = getDay(day);
   return { title: dayMeta ? `Day ${dayMeta.dayNumber}` : "Practice" };
 }
 
 export default async function SsbDayPage({ params }: { params: Promise<{ day: string }> }) {
   const { day } = await params;
-  const daysResult = await getDays();
-  const dayMeta = daysResult.data?.find((d) => d.id === day);
-  if (!dayMeta) notFound();
-
-  const modulesResult = await getDayModules(day as SsbDayId);
-  if (!modulesResult.ok || !modulesResult.data) notFound();
+  const dayMeta = getDay(day);
+  if (!dayMeta || !isDayId(day)) notFound();
+  const modules = getModulesForDay(day);
+  // Real counts from the banks (and the student's done answers); a failed
+  // read just hides the badges rather than showing a wrong number.
+  const progress = await getMyBankProgress(modules.flatMap((m) => (m.bank ? [m.bank.slug] : [])));
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -43,15 +37,12 @@ export default async function SsbDayPage({ params }: { params: Promise<{ day: st
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {modulesResult.data.map((module) => {
+        {modules.map((module) => {
           const Icon = navIcons[module.icon];
           const href = module.href ?? `/student/practice/${day}/${module.id}`;
+          const bankProgress = module.bank ? progress.data?.[module.bank.slug] : undefined;
           return (
-            <Link
-              key={module.id}
-              href={href}
-              className="glass-hover-lift glass-regular flex flex-col gap-3 rounded-card px-5 py-5 no-underline"
-            >
+            <Link key={module.id} href={href} className="glass-hover-lift glass-regular flex flex-col gap-3 rounded-card px-5 py-5 no-underline">
               <span className="glass-thin flex size-10 shrink-0 items-center justify-center rounded-full text-brand-accent">
                 <Icon aria-hidden="true" size={18} />
               </span>
@@ -59,17 +50,8 @@ export default async function SsbDayPage({ params }: { params: Promise<{ day: st
                 <span className="text-[15px] font-semibold text-ink">{module.title}</span>
                 <span className="text-[13px] text-ink-secondary">{module.description}</span>
               </div>
-              {module.bank && (module.bank.itemIds?.length ?? 0) > 0 && (
-                <ModuleProgressBadge
-                  dayId={day}
-                  moduleId={module.id}
-                  itemIds={module.bank.itemIds ?? []}
-                  mode={module.bank.mode}
-                />
-              )}
-              {module.durationLabel && (
-                <span className="text-xs whitespace-nowrap text-ink-secondary">{module.durationLabel}</span>
-              )}
+              {module.bank && bankProgress && bankProgress.total > 0 && <ModuleProgressBadge progress={bankProgress} mode={module.bank.mode} />}
+              {module.durationLabel && <span className="text-xs whitespace-nowrap text-ink-secondary">{module.durationLabel}</span>}
             </Link>
           );
         })}

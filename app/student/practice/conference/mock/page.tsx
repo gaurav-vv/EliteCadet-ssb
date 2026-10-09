@@ -1,28 +1,40 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import Link from "next/link";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { MockSession } from "@/components/practice/mock-session";
-import { getSsbModuleDetail } from "@/lib/api/ssb-journey";
+import { getModuleDetail } from "@/lib/practice/journey";
+import { getBank, getMyLatestMock } from "@/lib/server/practice/service";
+import type { GuidedPracticeItem } from "@/types/ssb-journey";
 
 export const metadata: Metadata = { title: "Mock conference" };
 
-// Linked from Day 5's "Mock Conference" card via its module `href`. The
-// walkthrough text comes from that module; the questions from Day 5's
-// Conference Questions bank.
+// Linked from Day 5's "Mock Conference" card. The walkthrough text comes from
+// that module; the questions from the conference bank.
 export default async function MockConferencePage() {
-  const [walkthrough, bank] = await Promise.all([
-    getSsbModuleDetail("day-5", "mock-conference"),
-    getSsbModuleDetail("day-5", "conference-questions"),
-  ]);
-  if (!walkthrough.ok || !walkthrough.data || !bank.ok || !bank.data) notFound();
+  const walkthrough = getModuleDetail("day-5", "mock-conference");
+  const questionsModule = getModuleDetail("day-5", "conference-questions");
+  const [bank, last] = await Promise.all([getBank("conference"), getMyLatestMock("conference")]);
+  if (!bank.ok || !bank.data || !last.ok) {
+    return (
+      <div className="flex flex-col gap-4 pb-10">
+        <Link href="/student/practice/day-5" className="text-xs text-brand-accent hover:underline">
+          ← Day 5
+        </Link>
+        <RetryErrorState message={bank.error?.message ?? last.error?.message ?? "We couldn't load the mock conference. Please try again."} />
+      </div>
+    );
+  }
 
   return (
     <MockSession
       kind="conference"
+      slug="conference"
+      initialLast={last.data ?? null}
       title="Mock conference"
-      intro={walkthrough.data.info?.overview ?? walkthrough.data.description}
-      tips={walkthrough.data.info?.tips ?? []}
-      questions={bank.data.responseItems ?? []}
-      selfReview={bank.data.selfReview ?? []}
+      intro={walkthrough?.info?.overview ?? walkthrough?.description ?? ""}
+      tips={walkthrough?.info?.tips ?? []}
+      questions={bank.data.items as GuidedPracticeItem[]}
+      selfReview={questionsModule?.selfReview ?? []}
       backHref="/student/practice/day-5"
       backLabel="Day 5"
     />

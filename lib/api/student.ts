@@ -1,11 +1,7 @@
-// Typed API client for the student domain (AGENTS.md §9) — the only place
-// student data is fetched from. Currently backed by lib/mock/student.ts
-// (pre-auth, pre-backend build-out — see status.md → Decisions, 2026-09-18).
-// Swapping in a real backend later means changing the bodies of these
-// functions only; no caller changes.
+// Student onboarding validation and submission. The dashboard reads real data
+// from lib/server/dashboards (Phase 9, T088).
 
-import { getMockDashboardData } from "@/lib/mock/student";
-import type { OnboardingInput, StudentDashboardData } from "@/types/student";
+import type { OnboardingInput } from "@/types/student";
 
 export interface ApiError {
   code: "validation_error" | "network_error" | "server_error";
@@ -45,10 +41,4 @@ export async function submitOnboarding(input: OnboardingInput): Promise<ApiResul
   // No backend yet — persisted client-side in components/student/onboarding-form.tsx
   // via localStorage. Real submission (POST /api/students/onboarding) lands with T013/T014.
   return { ok: true, data: null };
-}
-
-export async function getDashboardData(
-  variant: "empty" | "active" = "empty",
-): Promise<ApiResult<StudentDashboardData>> {
-  return { ok: true, data: getMockDashboardData(variant) };
 }

@@ -1,4 +1,4 @@
-// MOCK CONTENT — isolated per AGENTS.md §8, same rationale as lib/mock/practice.ts.
+// MOCK CONTENT — isolated per AGENTS.md §8: placeholder Resources articles, not user data (still in code; see specs.md §8a.4g).
 // A real content/CMS pipeline replaces this file only; lib/api/resources.ts
 // and every component stay the same.
 
