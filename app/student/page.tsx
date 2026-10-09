@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { navIcons } from "@/components/ui/nav-icons";
@@ -8,6 +9,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { getDashboardData } from "@/lib/api/student";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
+import { getDashboardNews } from "@/lib/api/news";
+import { NewsTicker } from "@/components/student/news-ticker";
+import { LatestNewsPanel } from "@/components/student/latest-news-panel";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -23,7 +27,11 @@ export default async function StudentDashboardPage({
   const { preview } = await searchParams;
   const variant = preview === "active" ? "active" : "empty";
 
-  const [result, { profile }] = await Promise.all([getDashboardData(variant), getCurrentUserAndProfile()]);
+  const [result, { profile }, news] = await Promise.all([
+    getDashboardData(variant),
+    getCurrentUserAndProfile(),
+    getDashboardNews(),
+  ]);
 
   if (!result.ok || !result.data) {
     return <ErrorState message="We couldn't load your dashboard. Please try again." />;
@@ -34,9 +42,21 @@ export default async function StudentDashboardPage({
   const MissionIcon = navIcons.mission;
 
   return (
-    <div className="flex flex-col gap-8 pb-10">
+    <div className="flex flex-col gap-6 pb-10">
+      <NewsTicker articles={news.importantUpdates} />
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-8">
       <div>
-        <h1 className="text-[28px] leading-tight font-bold text-ink sm:text-[32px]">Welcome back, {firstName}</h1>
+        <h1 className="flex items-center gap-2 text-[28px] leading-tight font-bold text-ink sm:text-[32px]">
+          Welcome back, {firstName}
+          <Image
+            src="/images/student-dashboard/waving-hand.jpg"
+            alt=""
+            width={32}
+            height={32}
+            className="size-8 shrink-0 object-contain mix-blend-multiply"
+          />
+        </h1>
         {variant === "active" && (
           <p className="mt-1 text-[14px] text-ink-secondary">
             The activity and progress below is sample demo data, not yet your real practice history.
@@ -157,6 +177,9 @@ export default async function StudentDashboardPage({
           />
         )}
       </section>
+        </div>
+        <LatestNewsPanel articles={news.latestArticles} />
+      </div>
     </div>
   );
 }
