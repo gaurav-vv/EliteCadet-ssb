@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: vi.fn() }));
 
-import { logIn, SUSPENDED_MESSAGE } from "@/lib/api/auth";
+import { ACADEMY_SUSPENDED_MESSAGE, logIn, SUSPENDED_MESSAGE } from "@/lib/api/auth";
 import { createClient } from "@/lib/supabase/client";
 
-function fakeClient(profile: { role: string; status: string } | null) {
+function fakeClient(profile: { role: string; status: string; academy?: { status: string } | null } | null) {
   const signOut = vi.fn().mockResolvedValue({ error: null });
   const single = vi.fn().mockResolvedValue({ data: profile });
   vi.mocked(createClient).mockReturnValue({
@@ -28,5 +28,11 @@ describe("logIn and account status", () => {
     const { signOut } = fakeClient({ role: "super_admin", status: "active" });
     expect(await logIn({ email: "a@b.co", password: "password1" })).toEqual({ ok: true, data: { role: "super_admin" } });
     expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("refuses a member of a suspended academy with the academy message", async () => {
+    const { signOut } = fakeClient({ role: "mentor", status: "active", academy: { status: "suspended" } });
+    expect(await logIn({ email: "a@b.co", password: "password1" })).toEqual({ ok: false, error: { code: "account_suspended", message: ACADEMY_SUSPENDED_MESSAGE } });
+    expect(signOut).toHaveBeenCalled();
   });
 });

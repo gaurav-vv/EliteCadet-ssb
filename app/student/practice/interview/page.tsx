@@ -1,29 +1,38 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { BankPracticeRunner } from "@/components/practice/bank-practice-runner";
-import { getSsbModuleDetail } from "@/lib/api/ssb-journey";
+import { Button } from "@/components/ui/button";
+import { getModuleDetail } from "@/lib/practice/journey";
+import { getBank, getMyAnswers } from "@/lib/server/practice/service";
+import type { GuidedPracticeItem } from "@/types/ssb-journey";
 
 export const metadata: Metadata = { title: "Interview" };
 
-// Linked from Day 4 ("Personal Interview") of the 5-Day SSB Practice Journey
-// (T039) via SsbModuleSummary.href, rather than duplicating this route under
-// /student/practice/day-4/personal-interview.
+// Linked from Day 4 ("Personal Interview") via the module's href.
 export default async function InterviewPracticePage() {
-  const result = await getSsbModuleDetail("day-4", "personal-interview");
-  if (!result.ok || !result.data) notFound();
-  const mod = result.data;
+  const mod = getModuleDetail("day-4", "personal-interview");
+  const [bank, answers] = await Promise.all([getBank("interview"), getMyAnswers("interview")]);
+  if (!bank.ok || !bank.data || !answers.ok || !answers.data) {
+    return (
+      <div className="flex flex-col gap-4 pb-10">
+        <Link href="/student/practice/day-4" className="text-xs text-brand-accent hover:underline">
+          ← Day 4
+        </Link>
+        <RetryErrorState message={bank.error?.message ?? answers.error?.message ?? "We couldn't load the interview questions. Please try again."} />
+      </div>
+    );
+  }
 
   return (
     <BankPracticeRunner
-      dayId="day-4"
-      moduleId="personal-interview"
+      slug="interview"
       backHref="/student/practice/day-4"
       backLabel="Day 4"
-      context={mod.context}
-      responseItems={mod.responseItems}
-      selfReview={mod.selfReview}
+      context={mod?.context}
+      responseItems={bank.data.items as GuidedPracticeItem[]}
+      initialAnswers={answers.data}
+      selfReview={mod?.selfReview}
       actions={
         <>
           <Button asChild size="sm">

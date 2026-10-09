@@ -1,40 +1,33 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getActivityDetail } from "@/lib/api/practice";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { PracticeSession } from "@/components/practice/practice-session";
-import type { PsychologyTestType } from "@/types/practice";
+import { isPsychologyTest, PSYCHOLOGY_ACTIVITIES } from "@/lib/practice/activities";
+import { getBank } from "@/lib/server/practice/service";
 
-const VALID_TESTS: PsychologyTestType[] = ["tat", "wat", "srt", "sdt"];
-
-function isValidTest(value: string): value is PsychologyTestType {
-  return (VALID_TESTS as string[]).includes(value);
+export async function generateMetadata({ params }: { params: Promise<{ test: string }> }): Promise<Metadata> {
+  const { test } = await params;
+  return { title: isPsychologyTest(test) ? test.toUpperCase() : "Practice" };
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ test: string }>;
-}): Promise<Metadata> {
+export default async function PsychologyTestPage({ params }: { params: Promise<{ test: string }> }) {
   const { test } = await params;
-  return { title: isValidTest(test) ? test.toUpperCase() : "Practice" };
-}
+  const summary = PSYCHOLOGY_ACTIVITIES.find((a) => a.testType === test);
+  if (!summary || !isPsychologyTest(test)) notFound();
 
-export default async function PsychologyTestPage({
-  params,
-}: {
-  params: Promise<{ test: string }>;
-}) {
-  const { test } = await params;
-  if (!isValidTest(test)) {
-    notFound();
+  const bank = await getBank(test, { forTest: true });
+  if (!bank.ok && bank.error?.code === "not_found") notFound();
+  if (!bank.ok || !bank.data) {
+    return (
+      <div className="flex flex-col gap-4 pb-10">
+        <Link href="/student/practice/psychology" className="text-xs text-brand-accent hover:underline">
+          ← Psychology
+        </Link>
+        <RetryErrorState message={bank.error?.message ?? "We couldn't load this test. Please try again."} />
+      </div>
+    );
   }
 
-  const result = await getActivityDetail(test);
-  if (!result.ok || !result.data) {
-    notFound();
-  }
-
-  return (
-    <PracticeSession testType={test} summary={result.data.summary} items={result.data.items} />
-  );
+  return <PracticeSession testType={test} summary={summary} items={bank.data.items} />;
 }

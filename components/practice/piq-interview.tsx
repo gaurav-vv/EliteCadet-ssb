@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import { BankPracticeRunner } from "@/components/practice/bank-practice-runner";
+import { readPiqAnswers, savePiqAnswer } from "@/lib/student/piq-answers";
 import { PIQ_FIELDS, PIQ_MAX_LENGTH, buildPiqQuestions, validatePiq, type PiqInput } from "@/lib/practice/piq-questions";
 import { readPiq, writePiq } from "@/lib/student/piq-storage";
 
@@ -114,8 +115,10 @@ export function PiqInterview({ selfReview }: PiqInterviewProps) {
       </div>
       <BankPracticeRunner
         key={questions.map((q) => q.id).join(",")}
-        dayId="day-4"
-        moduleId="piq-interview"
+        slug="interview"
+        initialAnswers={readPiqAnswers()}
+        onSave={async (id, patch) => savePiqAnswer(id, patch)}
+        saveNote="Answers to your PIQ questions are saved on this device, like your PIQ form."
         backHref="/student/practice/interview"
         backLabel="Interview"
         responseItems={questions}
