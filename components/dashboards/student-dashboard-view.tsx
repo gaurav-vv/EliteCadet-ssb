@@ -1,10 +1,13 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CalendarClock, History, ListChecks } from "lucide-react";
 import { ProgressStats } from "@/components/progress/progress-views";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPanel, ListRow } from "@/components/ui/list-panel";
-import { PageHeader } from "@/components/ui/page-header";
+import { LatestNewsPanel } from "@/components/student/latest-news-panel";
+import { NewsTicker } from "@/components/student/news-ticker";
 import { formatIstDay, formatIstTimeRange } from "@/lib/server/sessions/validation";
+import type { DashboardNews } from "@/lib/api/news";
 import type { StudentDashboard } from "@/types/dashboards";
 
 function Section({ title, link, children }: { title: string; link?: { href: string; label: string }; children: React.ReactNode }) {
@@ -21,12 +24,22 @@ function Section({ title, link, children }: { title: string; link?: { href: stri
 
 // Real data only (specs.md §8a.4e): no readiness score and no practice streak
 // until those have a defined, stored source (status.md Decisions, T088).
+// Defence/SSB news (#7): the Important News ticker on top and the Latest
+// Articles panel beside the dashboard on wide screens.
 
-export function StudentDashboardView({ d }: { d: StudentDashboard }) {
-
+export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: DashboardNews }) {
   return (
-    <div className="flex flex-col gap-8 pb-10">
-      <PageHeader title={`Welcome back, ${d.firstName}`} subtitle="Your next steps and progress, from your mentor's reviews and your sessions." />
+    <div className="flex flex-col gap-6 pb-10">
+      {news && <NewsTicker articles={news.importantUpdates} />}
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-8">
+          <div>
+            <h1 className="flex items-center gap-2 text-[28px] leading-tight font-bold text-ink sm:text-[32px]">
+              Welcome back, {d.firstName}
+              <Image src="/images/student-dashboard/waving-hand.jpg" alt="" width={32} height={32} className="size-8 shrink-0 object-contain mix-blend-multiply" />
+            </h1>
+            <p className="mt-1 text-[14px] text-ink-secondary sm:text-[15px]">Your next steps and progress, from your mentor&apos;s reviews and your sessions.</p>
+          </div>
       <ProgressStats summary={d.summary} />
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -85,6 +98,9 @@ export function StudentDashboardView({ d }: { d: StudentDashboard }) {
           </ListPanel>
         )}
       </Section>
+        </div>
+        {news && <LatestNewsPanel articles={news.latestArticles} />}
+      </div>
     </div>
   );
 }
