@@ -550,6 +550,19 @@ regression" also needs a branch-protection rule requiring the CI checks on `main
 
 ---
 
+## T076 — One workspace shell for every role — P1 — `[x]`
+**Why:** User request 2026-10-07: every role should get the reference image's dark navy sidebar,
+not only Academy.
+**Requirements:** generalise the Academy shell into `components/layout/workspace/` (brand,
+navigation, mobile drawer, header, sidebar footer, `WorkspaceLayout`). Student, Mentor and Academy
+use it now; Super Admin adopts it when T080 (PR #8) is updated. Rename the scoped CSS classes
+`.academy-app/-sidebar/-nav-item` to `.workspace-*`.
+**Acceptance:** each workspace shows the navy sidebar with its role in the wordmark and the role
+label in the header. The mobile drawer works, there is no horizontal overflow at 375px, and Academy
+is visually unchanged. Lint, typecheck, tests and build pass.
+**Done with PR #8 merged in:** `/admin` uses `WorkspaceLayout`, and the old glass
+`components/layout/{app-shell,sidebar,top-header,mobile-tab-bar}.tsx` are deleted.
+
 ## T070 — Design system consistency pass — P1 — `[ ]`
 **Updated 2026-09-19:** the design system itself changed (Glass Capsule → Apple-Inspired Glass UI v3,
 `AGENTS.md` §7, see `status.md` → Decisions). The core migration (tokens, shell, primary dashboards)
@@ -594,21 +607,83 @@ role/status changes and history.
 `users-repository.test.ts`, `login-suspended.test.ts`, `middleware-role.test.ts`, `redirect.test.ts`;
 integration — `middleware-session.test.ts`; e2e — `/admin` logged-out redirects.
 
-## T081 — Phase 2: Academies + Academy Admin — P0 — `[ ]`
-Super Admin academy management (list, create, edit, status, logo/description/contact), academy
-admin assignment, and assigning a user to an academy (unblocks role changes to mentor/academy admin).
-Academy Admin sees and edits only their own academy.
+## T081 — Phase 2: Academies + Academy Admin — P0 — `[-]`
+**Spec:** `specs.md` §8a.3b. **Depends on:** T080. **Branch:** `feat/phase-2-academies` (stacked on
+T076/T080).
+**Requirements:** migration `0006_academies.sql` (academy profile + status, super-admin
+insert/update, academy-admin update of their own academy, status/owner guard trigger,
+`academy_member_counts` security-invoker view). `lib/server/academies` (validation, repository,
+service). Super Admin `/admin/academies` list and detail: create, edit, suspend/reactivate, members
+(add by email with role, remove students), history. "Change academy" on user detail. Academy Admin
+settings read and write the real academy. Members of a suspended academy are signed out and can't
+log in.
+**Acceptance:** `specs.md` §8a.3b (Phase 2 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0006 and a
+live check with real accounts.
+**Tests:** unit — `academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts`,
+`users-validation.test.ts` (`checkAcademyChange`), `rbac.test.ts`, `login-suspended.test.ts`;
+integration — `middleware-session.test.ts` (academy suspension).
 
-## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[ ]`
-`batch_students`, `batch_mentors`; a real `students` model replacing `lib/mock/academy.ts`; add/remove
-students; assign/remove mentors; mentors see only assigned batches and students. Builds on T075.
+## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[-]`
+**Spec:** `specs.md` §8a.3c. **Depends on:** T081. **Branch:** `feat/phase-3-batches` (stacked on
+T081).
+**Requirements:**
+- Migration `0007_batch_membership.sql`: `batch_students` (one batch per student) and
+  `batch_mentors` (many per batch) replace `batches.mentor_id`, with existing assignments copied.
+  A role/academy integrity trigger, mentor-scoped RLS, the `batch_overview` and `academy_students`
+  views, `academy_add_student` / `academy_remove_student`, and invited students joining their
+  academy.
+- Academy Admin: Students (real list, filters, add by email or invite, change batch, remove),
+  student detail, batch detail (assign/remove mentors, add/remove students), and Mentors (real
+  list and invite).
+- Mentor: Mentees and mentee detail scoped to their own batches.
+**Acceptance:** `specs.md` §8a.3c (Phase 3 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0007 and a
+live check.
+**Tests:** unit — `academy-people-validation.test.ts`, `academy-people-service.test.ts`,
+`batches-supabase.test.ts` (membership actions), `academy-batch-logic.test.ts`.
 
-## T083 — Phase 4: Global content management — P1 — `[ ]`
-`contents`, `content_assignments`; Super Admin content library (categories, filters, draft/
-published/archived) replacing the matching `lib/mock/*` sources.
+## T083 — Phase 4: Global content management — P1 — `[-]`
+**Spec:** `specs.md` §8a.4. **Depends on:** T082. **Branch:** `feat/phase-4-content` (stacked on T082).
+**Requirements:**
+- Migration `0008_contents.sql`: `contents` (all brief fields, draft/published/archived, never
+  deleted, https-only links) and `content_assignments` (one academy or one batch each).
+  `can_read_content()` is the single reader rule, enforced by RLS.
+- `lib/server/content`, plus the Super Admin Content Library: category tabs with counts, filters,
+  create/edit, publish/unpublish/archive/restore, academy/batch assignments.
+- A Library for students, mentors and academy admins showing only what RLS allows.
+**Acceptance:** `specs.md` §8a.4 (Phase 4 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0008 and a
+live check.
+**Tests:** unit — `content-validation.test.ts`, `content-service.test.ts`, `rbac.test.ts`.
 
-## T084 — Phase 5: Mentor content management — P1 — `[ ]`
-Mentor-owned content, publishable to assigned batches/students; never edits global content.
+## T083b — Move practice banks, journey modules and resources onto `contents` — P1 — `[ ]`
+**Depends on:** T083. **Why:** `lib/mock/{practice,ssb-journey,resources,day2-resources}.ts` are still
+hard-coded. Their runners need structured items (TAT images, WAT words, MCQ options and answers,
+interview questions with guidance), so this needs a specified item model, e.g. a `content_items`
+table with a typed JSON payload validated per content type, before the runners can read from
+Postgres. Spec that model in `specs.md` first.
+
+## T084 — Phase 5: Mentor content, starter templates and content requests — P1 — `[-]`
+**Spec:** `specs.md` §8a.4 (Mentor content, decided 2026-10-08). **Depends on:** T083.
+**Branch:** `feat/phase-5-mentor-content` (stacked on T083).
+**Requirements:**
+- Migration `0009_mentor_content.sql`: mentor-owned rows in `contents`, pinned to
+  assigned/student by trigger. Mentor RLS covers own read/insert/update and sharing only with
+  batches the mentor teaches. `is_template` and `template_source_id` for platform starter
+  templates. `content_requests`, with `respond_to_content_quote`, `cancel_content_request` and
+  `deliver_content_request` enforcing the lifecycle.
+- Mentor: My Content (create/edit/publish/archive, share with own batches), Starter templates
+  ("Use this template" copies into My Content), and Content requests (request, accept/decline a
+  quote, cancel, open delivered content).
+- Super Admin: "Offer as a starter template" on platform content, and Content Requests (quote in
+  INR, mark in progress, deliver, mark fee settled).
+- Fees are recorded and settled outside the app; there's no automated billing.
+**Acceptance:** `specs.md` §8a.4 (Phase 5 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0009 and a
+live check.
+**Tests:** unit — `mentor-content-service.test.ts`, `content-requests-service.test.ts`,
+`content-requests-validation.test.ts`, `content-service.test.ts`.
 
 ## T085 — Phase 6: Session scheduling — P1 — `[ ]`
 Mentor availability and sessions (batch/students, date, time, online/offline, link) feeding mentor,

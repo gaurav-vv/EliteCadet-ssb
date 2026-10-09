@@ -1,60 +1,65 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SearchX, Users } from "lucide-react";
+import { Pagination } from "@/components/academy/shared/pagination";
+import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
+import { StudentTable } from "@/components/academy/students/student-table";
+import { StudentToolbar } from "@/components/academy/students/student-toolbar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { getMentees } from "@/lib/api/mentor";
+import { PageHeader } from "@/components/ui/page-header";
+import { getMyMentees } from "@/lib/server/academy-people/service";
+import { buildStudentQuery, hasActiveStudentFilters, parseStudentParams } from "@/lib/server/academy-people/validation";
 
 export const metadata: Metadata = { title: "Mentees" };
 
-const STATUS_LABEL: Record<string, string> = {
-  none: "Not evaluated",
-  pending: "Evaluation pending",
-  in_review: "In review",
-  reviewed: "Reviewed",
-};
+// Exactly the students in the batches this mentor is assigned to — scoped on
+// the server and by RLS (supabase/migrations/0007_batch_membership.sql).
+export default async function MenteesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = parseStudentParams(await searchParams);
+  const result = await getMyMentees(params);
 
-function formatDate(iso: string | null) {
-  if (!iso) return "No activity yet";
-  return `Active ${new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
-}
+  if (!result.ok || !result.data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="Mentees" subtitle="Students in the batches you're assigned to." />
+        <RetryErrorState message={result.error?.message ?? "We couldn't load your mentees. Please try again."} />
+      </div>
+    );
+  }
 
-export default async function MenteesPage() {
-  const result = await getMentees();
-  const mentees = result.data ?? [];
+  const { list, batches } = result.data;
+  const subtitle =
+    batches.length === 0 ? "Students in the batches you're assigned to." : `Your batches: ${batches.map((b) => b.name).join(", ")}.`;
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <div>
-        <h1 className="text-[28px] font-bold text-ink">Mentees</h1>
-        <p className="text-sm text-ink-secondary">{mentees.length} students assigned to you.</p>
-      </div>
+      <PageHeader title="Mentees" subtitle={subtitle} />
 
-      {mentees.length === 0 ? (
-        <EmptyState title="No mentees yet" description="Students assigned to you will appear here." />
+      {batches.length === 0 ? (
+        <div className="glass-regular rounded-card">
+          <EmptyState icon={<Users aria-hidden="true" size={22} />} title="You're not on a batch yet" description="Your academy admin assigns mentors to batches; their students will appear here." />
+        </div>
+      ) : list.total === 0 && !hasActiveStudentFilters(params) ? (
+        <div className="glass-regular rounded-card">
+          <EmptyState icon={<Users aria-hidden="true" size={22} />} title="No students in your batches yet" description="Students your academy admin adds to your batches will appear here." />
+        </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {mentees.map((mentee) => (
-            <li key={mentee.id}>
-              <Link
-                href={`/mentor/mentees/${mentee.id}`}
-                className="glass-regular flex flex-col gap-2 px-5 py-4 no-underline hover:-translate-y-0.5 hover:scale-[1.01] sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-sm font-medium text-ink">{mentee.fullName}</p>
-                  <p className="text-xs text-ink-secondary">
-                    {mentee.batch} · {formatDate(mentee.lastActivityAt)}
-                  </p>
-                  {mentee.weakAreas.length > 0 && (
-                    <p className="text-xs text-ink-secondary">Weak areas: {mentee.weakAreas.join(", ")}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-ink">{mentee.overallScore ?? "—"}</span>
-                  <span className="text-xs text-ink-secondary">{STATUS_LABEL[mentee.evaluationStatus]}</span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <section aria-label="Mentee list" className="flex flex-col gap-4">
+          <StudentToolbar params={params} batches={batches} searchLabel="Search mentees by name or email" />
+          <div className="glass-regular rounded-card p-2 sm:p-4">
+            {list.total === 0 ? (
+              <EmptyState
+                icon={<SearchX aria-hidden="true" size={22} />}
+                title="No mentees match your filters"
+                description="Try a different search or clear the filters."
+                action={<Link href="/mentor/mentees" className="text-[13px] font-medium text-brand-accent hover:underline">Clear filters</Link>}
+              />
+            ) : (
+              <StudentTable rows={list.rows} batches={batches} hrefBase="/mentor/mentees" showActions={false} />
+            )}
+            <Pagination page={list.page} pageCount={list.pageCount} pageSize={list.pageSize} total={list.total} buildHref={(page) => `/mentor/mentees${buildStudentQuery({ ...params, page })}`} noun={{ one: "mentee", many: "mentees" }} />
+          </div>
+        </section>
       )}
     </div>
   );

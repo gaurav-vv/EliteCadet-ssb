@@ -48,7 +48,7 @@ export default async function BatchesPage({
       <PageHeader
         title="Batches"
         subtitle="Manage academy batches, students and mentors."
-        primaryAction={<CreateBatchDialog mentors={mentors} />}
+        primaryAction={<CreateBatchDialog />}
       />
 
       <BatchStats summary={summary} />
@@ -59,7 +59,7 @@ export default async function BatchesPage({
             icon={<Layers aria-hidden="true" size={22} />}
             title="No batches yet"
             description="Create your first batch to start organising students under a mentor."
-            action={<CreateBatchDialog mentors={mentors} variant="inline" />}
+            action={<CreateBatchDialog variant="inline" />}
           />
         </div>
       ) : (
@@ -79,7 +79,7 @@ export default async function BatchesPage({
                 }
               />
             ) : (
-              <BatchTable rows={result.rows} mentors={mentors} />
+              <BatchTable rows={result.rows} />
             )}
             <Pagination
               page={result.page}
