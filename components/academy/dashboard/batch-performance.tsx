@@ -3,8 +3,16 @@ import { ChartCard } from "@/components/academy/shared/chart-card";
 import { DataTable } from "@/components/academy/shared/data-table";
 import { ProgressBar } from "@/components/academy/shared/progress-bar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { readinessBand } from "@/lib/academy/readiness";
-import type { BatchPerformanceRow, DashboardIconTone } from "@/types/academy";
+import type { DashboardIconTone } from "@/types/academy";
+import type { AcademyDashboard } from "@/types/dashboards";
+
+// Score bands for the bar; colour is always paired with the % and this label.
+function scoreBand(value: number): { label: string; tone: DashboardIconTone } {
+  if (value >= 80) return { label: "Strong", tone: "success" };
+  if (value >= 65) return { label: "Good", tone: "info" };
+  if (value >= 50) return { label: "Fair", tone: "warning" };
+  return { label: "Low", tone: "danger" };
+}
 
 // Identity colours for batch badges — like avatar colours, they only help the
 // eye tell rows apart; performance is carried by the bar colour + % + label.
@@ -15,7 +23,7 @@ function batchInitials(name: string): string {
   return (words[0]?.slice(0, 2) ?? "B").toUpperCase();
 }
 
-export function BatchPerformance({ batches }: { batches: BatchPerformanceRow[] }) {
+export function BatchPerformance({ batches }: { batches: AcademyDashboard["batches"] }) {
   const toneById = new Map(batches.map((b, i) => [b.batchId, BADGE_TONES[i % BADGE_TONES.length]]));
 
   return (
@@ -51,19 +59,12 @@ export function BatchPerformance({ batches }: { batches: BatchPerformanceRow[] }
             },
             { key: "students", header: "Students", cell: (b) => b.studentCount },
             {
-              key: "readiness",
-              header: "Progress",
+              key: "score",
+              header: "Avg Score",
               cell: (b) => {
-                if (b.averageReadiness === null) return <ProgressBar value={null} label={`${b.name} average readiness`} />;
-                const band = readinessBand(b.averageReadiness);
-                return (
-                  <ProgressBar
-                    value={b.averageReadiness}
-                    tone={band.tone}
-                    statusLabel={band.label}
-                    label={`${b.name} average readiness`}
-                  />
-                );
+                if (b.avgScorePct === null) return <ProgressBar value={null} label={`${b.name} average score`} emptyLabel="No reviews yet" />;
+                const band = scoreBand(b.avgScorePct);
+                return <ProgressBar value={b.avgScorePct} tone={band.tone} statusLabel={band.label} label={`${b.name} average score`} />;
               },
             },
           ]}

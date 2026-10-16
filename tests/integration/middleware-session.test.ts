@@ -12,8 +12,8 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: vi.fn() }));
 
 const mockedCreateClient = vi.mocked(createServerClient);
 
-function fakeSupabase(user: { id: string } | null, profileRole: string | null, status = "active") {
-  const single = vi.fn().mockResolvedValue({ data: profileRole ? { role: profileRole, status } : null });
+function fakeSupabase(user: { id: string } | null, profileRole: string | null, status = "active", academyStatus: string | null = null) {
+  const single = vi.fn().mockResolvedValue({ data: profileRole ? { role: profileRole, status, academy: academyStatus ? { status: academyStatus } : null } : null });
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
@@ -130,5 +130,18 @@ describe("updateSession — /admin (super_admin workspace) and account status", 
   it("suspends a super admin too", async () => {
     fakeSupabase({ id: "u1" }, "super_admin", "suspended");
     expect(redirectTarget(await updateSession(request("/admin")))?.searchParams.get("reason")).toBe("account_suspended");
+  });
+
+  it.each(["student", "mentor", "academy_admin"])("signs out a %s whose academy is suspended", async (role) => {
+    const { signOut } = fakeSupabase({ id: "u1" }, role, "active", "suspended");
+    const path = role === "student" ? "/student" : role === "mentor" ? "/mentor" : "/academy";
+    const target = redirectTarget(await updateSession(request(path)));
+    expect(signOut).toHaveBeenCalled();
+    expect(target?.searchParams.get("reason")).toBe("academy_suspended");
+  });
+
+  it("does not block a super admin because of an academy's status", async () => {
+    fakeSupabase({ id: "u1" }, "super_admin", "active", "suspended");
+    expect(redirectTarget(await updateSession(request("/admin")))).toBeNull();
   });
 });

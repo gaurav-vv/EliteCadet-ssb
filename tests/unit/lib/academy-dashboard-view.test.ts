@@ -1,83 +1,68 @@
 import { describe, expect, it } from "vitest";
 import { buildDashboardViewModel } from "@/lib/academy/dashboard-view";
-import type { AcademyDashboardData, AcademyMentor, AcademyStudent } from "@/types/academy";
+import type { AcademyDashboard } from "@/types/dashboards";
 
-const baseData: AcademyDashboardData = {
+const empty: AcademyDashboard = {
   academyName: "Test Academy",
-  totalStudents: 3,
-  activeBatches: 1,
-  totalMentors: 2,
-  averageReadiness: 70,
-  batchPerformance: [],
-  mentorOverview: [],
-  attentionStudents: [{ studentId: "s3", fullName: "C", reason: "Marked inactive." }],
-  alerts: [{ message: "Batch C has no mentor assigned." }, { message: "1 mentor invitation pending acceptance." }],
+  totalStudents: 0,
+  studentsInBatch: 0,
+  activeBatches: 0,
+  batchesWithoutMentor: 0,
+  mentorCount: 0,
+  pendingInvites: 0,
+  summary: { reviewedCount: 0, avgScorePct: null, sessionsPresent: 0, sessionsAbsent: 0, attendancePct: null, contentCompleted: 0, lastSubmissionAt: null },
+  pendingReviews: 0,
+  sessionsNext7Days: 0,
+  monthlyScores: [],
+  categories: [],
+  scoreBuckets: [],
+  batches: [],
+  attention: [],
+  recentActivity: [],
+  upcomingSessions: [],
+  mentors: [],
+  activeStudents14Days: 0,
 };
 
-const students: AcademyStudent[] = [
-  { id: "s1", fullName: "A", batchId: null, mentorId: null, status: "active", readiness: 80, lastActivityAt: "2026-09-17T09:00:00.000Z" },
-  { id: "s2", fullName: "B", batchId: null, mentorId: null, status: "active", readiness: 45, lastActivityAt: null },
-  { id: "s3", fullName: "C", batchId: null, mentorId: null, status: "inactive", readiness: 60, lastActivityAt: "2026-08-29T09:00:00.000Z" },
-];
+const busy: AcademyDashboard = {
+  ...empty,
+  totalStudents: 5,
+  studentsInBatch: 3,
+  activeBatches: 2,
+  batchesWithoutMentor: 1,
+  mentorCount: 2,
+  pendingInvites: 1,
+  summary: { ...empty.summary, reviewedCount: 4, avgScorePct: 61.5, sessionsPresent: 3, sessionsAbsent: 1, attendancePct: 75 },
+  pendingReviews: 2,
+  sessionsNext7Days: 3,
+  attention: [{ studentId: "s1", name: "A", batchName: null, reason: "Average score 40% (below 50%)" }],
+};
 
-const mentors: AcademyMentor[] = [
-  { id: "m1", fullName: "M1", email: "m1@example.com", status: "active", sessionsThisWeek: 1, pendingEvaluations: 2 },
-  { id: "m2", fullName: "M2", email: "m2@example.com", status: "invited", sessionsThisWeek: 0, pendingEvaluations: 0 },
-];
-
-describe("buildDashboardViewModel", () => {
-  it("derives metrics from real counts without inventing deltas", () => {
-    const { metrics } = buildDashboardViewModel(baseData, students, mentors);
-    expect(metrics.map((m) => m.id)).toEqual(["students", "batches", "mentors", "active-students", "readiness"]);
-    expect(metrics.map((m) => m.value)).toEqual(["3", "1", "2", "67%", "70%"]);
-    expect(metrics.find((m) => m.id === "mentors")?.detail).toBe("1 invite pending");
+describe("academy dashboard view model — real values only", () => {
+  it("shows dashes, not numbers, when there is nothing to measure", () => {
+    const { metrics, tasks } = buildDashboardViewModel(empty);
+    expect(metrics.map((m) => m.value)).toEqual(["0", "0", "0", "—", "—"]);
+    expect(metrics.find((m) => m.id === "score")?.detail).toBe("No reviewed assessments yet");
+    expect(tasks).toEqual([]);
   });
 
-  it("builds tasks from pending evaluations, attention students and alerts", () => {
-    const { tasks } = buildDashboardViewModel(baseData, students, mentors);
-    expect(tasks.map((t) => t.id)).toEqual([
-      "pending-evaluations",
-      "sessions-week",
-      "inactive-students",
-      "low-performance",
-      "alert-0",
-      "alert-1",
+  it("derives metric values and details from the counts", () => {
+    const { metrics } = buildDashboardViewModel(busy);
+    expect(metrics.map((m) => m.value)).toEqual(["5", "2", "2", "61.5%", "75%"]);
+    expect(metrics.find((m) => m.id === "batches")?.detail).toBe("1 batch without a mentor");
+    expect(metrics.find((m) => m.id === "attendance")?.detail).toBe("3 present of 4 marked");
+  });
+
+  it("lists actionable tasks, most urgent first, each linking to where it's fixed", () => {
+    const { tasks } = buildDashboardViewModel(busy);
+    expect(tasks.map((t) => [t.id, t.href])).toEqual([
+      ["attention", "/academy/performance"],
+      ["pending-reviews", "/academy/assessments"],
+      ["no-mentor", "/academy/batches"],
+      ["no-batch", "/academy/students?batch=none"],
+      ["invites", "/academy/mentors"],
+      ["sessions", "/academy/sessions"],
     ]);
-  });
-
-  it("counts only active students below the readiness threshold as low performers", () => {
-    const { tasks } = buildDashboardViewModel(baseData, students, mentors);
-    // s1 (80) and s3 (inactive) are excluded; only s2 is active, scored and below 60.
-    expect(tasks.find((t) => t.id === "low-performance")?.description).toContain("1 student");
-  });
-
-  it("returns no tasks and an em dash readiness for an empty academy", () => {
-    const empty = { ...baseData, totalStudents: 0, activeBatches: 0, totalMentors: 0, averageReadiness: null, attentionStudents: [], alerts: [] };
-    const vm = buildDashboardViewModel(empty, [], []);
-    expect(vm.tasks).toEqual([]);
-    expect(vm.activity).toEqual([]);
-    expect(vm.metrics.find((m) => m.id === "readiness")?.value).toBe("—");
-  });
-
-  it("orders activity newest first and skips students with no activity", () => {
-    const { activity } = buildDashboardViewModel(baseData, students, mentors);
-    expect(activity.map((a) => a.studentId)).toEqual(["s1", "s3"]);
-  });
-});
-
-describe("readinessBand", () => {
-  it("maps readiness to a labelled band at each threshold", async () => {
-    const { readinessBand } = await import("@/lib/academy/readiness");
-    expect([85, 80, 79, 70, 69, 65, 64, 60, 59].map((v) => readinessBand(v).label)).toEqual([
-      "Excellent",
-      "Excellent",
-      "Good",
-      "Good",
-      "On track",
-      "On track",
-      "Needs focus",
-      "Needs focus",
-      "At risk",
-    ]);
+    expect(tasks.find((t) => t.id === "no-batch")?.description).toBe("2 students not in a batch yet");
   });
 });

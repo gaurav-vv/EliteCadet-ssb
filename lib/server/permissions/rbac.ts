@@ -13,11 +13,14 @@ export type Permission =
   | "users.change_role"
   | "users.change_status"
   | "academies.read_all"
+  | "academies.manage"
+  | "academy.update_own"
+  | "content.manage"
   | "audit.read";
 
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  super_admin: ["users.read", "users.change_role", "users.change_status", "academies.read_all", "audit.read"],
-  academy_admin: [],
+  super_admin: ["users.read", "users.change_role", "users.change_status", "academies.read_all", "academies.manage", "content.manage", "audit.read"],
+  academy_admin: ["academy.update_own"],
   mentor: [],
   student: [],
 };

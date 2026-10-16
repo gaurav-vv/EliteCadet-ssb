@@ -9,27 +9,24 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createBatchAction, updateBatchAction } from "@/lib/actions/batches";
 import { BATCH_NAME_MAX, validateBatchInput, type BatchFieldErrors } from "@/lib/academy/batch-validation";
-import type { BatchMentorOption, BatchRecord } from "@/types/academy";
+import type { BatchRecord } from "@/types/academy";
 
 const TOAST_MS = 5000;
 
 interface BatchFormProps {
   batch?: BatchRecord;
-  mentors: BatchMentorOption[];
   onCancel: () => void;
   onSaved: (message: string) => void;
 }
 
 // Mounted only while the dialog is open, so its state always starts from the
 // batch's current values (edit) or empty (create) — no reset logic needed.
-function BatchForm({ batch, mentors, onCancel, onSaved }: BatchFormProps) {
+function BatchForm({ batch, onCancel, onSaved }: BatchFormProps) {
   const router = useRouter();
   const isEdit = Boolean(batch);
   const [name, setName] = useState(batch?.name ?? "");
-  const [mentorId, setMentorId] = useState(batch?.mentorId ?? "none");
   const [startDate, setStartDate] = useState(batch?.startDate ?? "");
   const [errors, setErrors] = useState<BatchFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -40,7 +37,7 @@ function BatchForm({ batch, mentors, onCancel, onSaved }: BatchFormProps) {
     event.preventDefault();
     if (submitting.current) return;
 
-    const input = { name, mentorId: mentorId === "none" ? null : mentorId, startDate: startDate || null };
+    const input = { name, startDate: startDate || null };
     const parsed = validateBatchInput(input);
     setFormError(null);
     if (!parsed.ok) {
@@ -74,7 +71,7 @@ function BatchForm({ batch, mentors, onCancel, onSaved }: BatchFormProps) {
       <DialogHeader>
         <DialogTitle className="text-[18px] font-semibold text-ink">{isEdit ? "Edit Batch" : "Create Batch"}</DialogTitle>
         <DialogDescription>
-          {isEdit ? "Update the batch's name, mentor or start date." : "Add a batch to organise students under a mentor."}
+          {isEdit ? "Update the batch's name or start date." : "Add a batch, then assign its mentors and students from the batch page."}
         </DialogDescription>
       </DialogHeader>
 
@@ -105,29 +102,6 @@ function BatchForm({ batch, mentors, onCancel, onSaved }: BatchFormProps) {
             {errors.name}
           </p>
         )}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="batch-mentor">Mentor (optional)</Label>
-        <Select value={mentorId} onValueChange={setMentorId} disabled={saving}>
-          <SelectTrigger id="batch-mentor" className="h-11 w-full" aria-invalid={errors.mentorId ? true : undefined}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No mentor</SelectItem>
-            {mentors.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.mentorId && (
-          <p role="alert" className="text-[12px] text-(--academy-danger-text)">
-            {errors.mentorId}
-          </p>
-        )}
-        {mentors.length === 0 && <p className="text-[12px] text-ink-secondary">No mentors in your academy yet. Invite one from the Mentors page.</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -162,12 +136,11 @@ function BatchForm({ batch, mentors, onCancel, onSaved }: BatchFormProps) {
 }
 
 interface CreateBatchDialogProps {
-  mentors: BatchMentorOption[];
   variant?: "primary" | "inline";
 }
 
 // "+ Create Batch" button that opens the form in a dialog.
-export function CreateBatchDialog({ mentors, variant = "primary" }: CreateBatchDialogProps) {
+export function CreateBatchDialog({ variant = "primary" }: CreateBatchDialogProps) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -191,7 +164,7 @@ export function CreateBatchDialog({ mentors, variant = "primary" }: CreateBatchD
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
-          <BatchForm mentors={mentors} onCancel={() => setOpen(false)} onSaved={saved} />
+          <BatchForm onCancel={() => setOpen(false)} onSaved={saved} />
         </DialogContent>
       </Dialog>
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
@@ -201,20 +174,18 @@ export function CreateBatchDialog({ mentors, variant = "primary" }: CreateBatchD
 
 interface EditBatchDialogProps {
   batch: BatchRecord;
-  mentors: BatchMentorOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (message: string) => void;
 }
 
 // Controlled by the row's actions menu.
-export function EditBatchDialog({ batch, mentors, open, onOpenChange, onSaved }: EditBatchDialogProps) {
+export function EditBatchDialog({ batch, open, onOpenChange, onSaved }: EditBatchDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <BatchForm
           batch={batch}
-          mentors={mentors}
           onCancel={() => onOpenChange(false)}
           onSaved={(message) => {
             onOpenChange(false);

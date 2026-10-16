@@ -4,14 +4,17 @@
 // key is never used. Mutations live in lib/actions/batches.ts.
 
 import { escapeLikePattern, BATCH_PAGE_SIZE } from "@/lib/academy/batch-list";
+import { isUuid } from "@/lib/academy/batch-validation";
 import { getCurrentUserAndProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type {
+  BatchDetail,
   BatchListParams,
   BatchListResult,
   BatchMentorOption,
   BatchRecord,
   BatchStatus,
+  BatchStudent,
   BatchSummary,
 } from "@/types/academy";
 
@@ -35,7 +38,8 @@ export function toBatchApiError(error: { code?: string; message?: string }): Bat
   return { code: "server_error", message: "We couldn't load your batches. Please try again." };
 }
 
-const SELECT = "id, name, status, start_date, created_at, mentor_id, mentor:profiles!batches_mentor_id_fkey(full_name)";
+// public.batch_overview (0007): one row per batch with its mentors and student count.
+const SELECT = "id, name, status, start_date, created_at, mentors, student_count";
 
 function isStatus(value: unknown): value is BatchStatus {
   return value === "active" || value === "archived";
@@ -48,12 +52,10 @@ export function toBatchRecord(row: unknown): BatchRecord | null {
   const r = row as Record<string, unknown>;
   if (typeof r.id !== "string" || typeof r.name !== "string" || typeof r.created_at !== "string" || !isStatus(r.status)) return null;
 
-  // Many-to-one embeds arrive as an object; tolerate a one-element array too.
-  const embedded = Array.isArray(r.mentor) ? r.mentor[0] : r.mentor;
-  const mentorName =
-    typeof embedded === "object" && embedded !== null && typeof (embedded as Record<string, unknown>).full_name === "string"
-      ? ((embedded as Record<string, unknown>).full_name as string)
-      : null;
+  const mentors = (Array.isArray(r.mentors) ? r.mentors : []).flatMap((m) => {
+    const o = typeof m === "object" && m !== null ? (m as Record<string, unknown>) : {};
+    return typeof o.id === "string" ? [{ id: o.id, name: typeof o.name === "string" && o.name ? o.name : "Unnamed mentor" }] : [];
+  });
 
   return {
     id: r.id,
@@ -61,9 +63,16 @@ export function toBatchRecord(row: unknown): BatchRecord | null {
     status: r.status,
     startDate: typeof r.start_date === "string" ? r.start_date : null,
     createdAt: r.created_at,
-    mentorId: typeof r.mentor_id === "string" ? r.mentor_id : null,
-    mentorName,
+    mentors,
+    studentCount: Number(r.student_count) || 0,
   };
+}
+
+export function toBatchStudent(row: unknown): BatchStudent | null {
+  if (typeof row !== "object" || row === null) return null;
+  const r = row as Record<string, unknown>;
+  if (typeof r.id !== "string") return null;
+  return { id: r.id, fullName: typeof r.full_name === "string" ? r.full_name : "", email: typeof r.email === "string" ? r.email : null };
 }
 
 async function getAdminContext(): Promise<{ academyId: string } | null> {
@@ -82,10 +91,10 @@ export async function getBatchList(params: BatchListParams): Promise<BatchApiRes
   const supabase = await createClient();
 
   async function fetchPage(page: number) {
-    let query = supabase.from("batches").select(SELECT, { count: "exact" }).eq("academy_id", admin!.academyId);
+    let query = supabase.from("batch_overview").select(SELECT, { count: "exact" }).eq("academy_id", admin!.academyId);
     if (params.status !== "all") query = query.eq("status", params.status);
-    if (params.mentor === "none") query = query.is("mentor_id", null);
-    else if (params.mentor !== "all") query = query.eq("mentor_id", params.mentor);
+    if (params.mentor === "none") query = query.eq("mentor_count", 0);
+    else if (params.mentor !== "all") query = query.contains("mentor_ids", [params.mentor]);
     if (params.q) query = query.ilike("name", `%${escapeLikePattern(params.q)}%`);
 
     query =
@@ -125,11 +134,11 @@ export async function getBatchSummary(): Promise<BatchApiResult<BatchSummary>> {
   if (!admin) return { ok: false, error: UNAUTHORIZED };
   const supabase = await createClient();
 
-  const base = () => supabase.from("batches").select("id", { count: "exact", head: true }).eq("academy_id", admin.academyId);
+  const base = () => supabase.from("batch_overview").select("id", { count: "exact", head: true }).eq("academy_id", admin.academyId);
   const [all, active, noMentor] = await Promise.all([
     base(),
     base().eq("status", "active"),
-    base().eq("status", "active").is("mentor_id", null),
+    base().eq("status", "active").eq("mentor_count", 0),
   ]);
 
   const failed = all.error ?? active.error ?? noMentor.error;
@@ -156,4 +165,50 @@ export async function getBatchMentorOptions(): Promise<BatchApiResult<BatchMento
     typeof p.id === "string" ? [{ id: p.id, name: typeof p.full_name === "string" && p.full_name ? p.full_name : "Unnamed mentor" }] : [],
   );
   return { ok: true, data: options };
+}
+
+// One batch with its roster, plus the academy's unassigned students and the
+// mentors not yet on it. Everything is scoped to the admin's academy (RLS and
+// the explicit academy filter), so another academy's batch id is "not found".
+export async function getBatchDetail(id: string): Promise<BatchApiResult<BatchDetail> & { notFound?: boolean }> {
+  const admin = await getAdminContext();
+  if (!admin) return { ok: false, error: UNAUTHORIZED };
+  if (!isUuid(id)) return { ok: false, notFound: true };
+  const supabase = await createClient();
+
+  const { data: row, error } = await supabase.from("batch_overview").select(SELECT).eq("id", id).eq("academy_id", admin.academyId).maybeSingle();
+  if (error) return { ok: false, error: toBatchApiError(error) };
+  const batch = row ? toBatchRecord(row) : null;
+  if (!batch) return { ok: false, notFound: true };
+
+  const students = () => supabase.from("academy_students").select("id, full_name, email").eq("academy_id", admin.academyId).order("full_name", { ascending: true });
+  const [members, available, mentors] = await Promise.all([
+    students().eq("batch_id", id),
+    students().is("batch_id", null).limit(500),
+    getBatchMentorOptions(),
+  ]);
+  const failed = members.error ?? available.error;
+  if (failed) return { ok: false, error: toBatchApiError(failed) };
+  if (!mentors.ok) return { ok: false, error: mentors.error };
+
+  const onBatch = new Set(batch.mentors.map((m) => m.id));
+  return {
+    ok: true,
+    data: {
+      batch,
+      students: (members.data ?? []).map(toBatchStudent).filter((s): s is BatchStudent => s !== null),
+      availableStudents: (available.data ?? []).map(toBatchStudent).filter((s): s is BatchStudent => s !== null),
+      availableMentors: (mentors.data ?? []).filter((m) => !onBatch.has(m.id)),
+    },
+  };
+}
+
+// Active batches in the admin's academy (id + name), for batch pickers/filters.
+export async function getAcademyBatchOptions(): Promise<BatchApiResult<{ id: string; name: string }[]>> {
+  const admin = await getAdminContext();
+  if (!admin) return { ok: false, error: UNAUTHORIZED };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("batches").select("id, name").eq("academy_id", admin.academyId).eq("status", "active").order("name", { ascending: true }).limit(500);
+  if (error) return { ok: false, error: toBatchApiError(error) };
+  return { ok: true, data: (data ?? []).flatMap((b) => (typeof b.id === "string" && typeof b.name === "string" ? [{ id: b.id, name: b.name }] : [])) };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildUserListQuery,
+  checkAcademyChange,
   checkRoleChange,
   checkStatusChange,
   hasActiveUserFilters,
@@ -90,5 +91,24 @@ describe("checkStatusChange", () => {
     expect(checkStatusChange({ actorId: A, targetId: A, currentStatus: "active", newStatus: "suspended" }).ok).toBe(false);
     expect(checkStatusChange({ actorId: A, targetId: B, currentStatus: "active", newStatus: "active" }).ok).toBe(false);
     expect(checkStatusChange({ actorId: A, targetId: B, currentStatus: "active", newStatus: "deleted" }).ok).toBe(false);
+  });
+});
+
+describe("checkAcademyChange", () => {
+  const AC = "33333333-3333-4333-8333-333333333333";
+  it("moves a student in, out, or between academies", () => {
+    expect(checkAcademyChange({ role: "student", currentAcademyId: null, newAcademyId: AC })).toEqual({ ok: true, academyId: AC });
+    expect(checkAcademyChange({ role: "student", currentAcademyId: AC, newAcademyId: "" })).toEqual({ ok: true, academyId: null });
+  });
+
+  it("keeps mentors and academy admins in an academy, and super admins out", () => {
+    expect(checkAcademyChange({ role: "mentor", currentAcademyId: AC, newAcademyId: null }).ok).toBe(false);
+    expect(checkAcademyChange({ role: "academy_admin", currentAcademyId: AC, newAcademyId: "" }).ok).toBe(false);
+    expect(checkAcademyChange({ role: "super_admin", currentAcademyId: null, newAcademyId: AC }).ok).toBe(false);
+  });
+
+  it("rejects a malformed id and a no-op", () => {
+    expect(checkAcademyChange({ role: "student", currentAcademyId: null, newAcademyId: "x" }).ok).toBe(false);
+    expect(checkAcademyChange({ role: "student", currentAcademyId: AC, newAcademyId: AC }).ok).toBe(false);
   });
 });

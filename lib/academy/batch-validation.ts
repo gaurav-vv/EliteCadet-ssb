@@ -19,7 +19,6 @@ export function isIsoDate(value: string): boolean {
 
 export interface BatchFieldErrors {
   name?: string;
-  mentorId?: string;
   startDate?: string;
 }
 
@@ -28,18 +27,16 @@ export type BatchValidation = { ok: true; value: BatchFormInput } | { ok: false;
 // Single source of truth for batch input rules: the dialog uses it for instant
 // feedback and the server actions run it again before touching the database
 // (never trust the browser). The database enforces the same limits.
-export function validateBatchInput(raw: { name: string; mentorId: string | null; startDate: string | null }): BatchValidation {
+export function validateBatchInput(raw: { name: string; startDate: string | null }): BatchValidation {
   const errors: BatchFieldErrors = {};
   const name = raw.name.trim().replace(/\s+/g, " ");
   const startDate = raw.startDate?.trim() ? raw.startDate.trim() : null;
-  const mentorId = raw.mentorId && raw.mentorId !== "none" ? raw.mentorId : null;
 
   if (name.length < BATCH_NAME_MIN) errors.name = `Enter a batch name (at least ${BATCH_NAME_MIN} characters).`;
   else if (name.length > BATCH_NAME_MAX) errors.name = `Batch name must be ${BATCH_NAME_MAX} characters or fewer.`;
 
-  if (mentorId && !isUuid(mentorId)) errors.mentorId = "Select a valid mentor.";
   if (startDate && !isIsoDate(startDate)) errors.startDate = "Enter a valid start date.";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { name, mentorId, startDate } };
+  return { ok: true, value: { name, startDate } };
 }

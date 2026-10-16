@@ -4,11 +4,12 @@ import { ACADEMY_NAVIGATION } from "@/lib/academy/navigation";
 interface AcademyLayoutProps {
   academyName: string;
   adminName: string;
+  unreadCount?: number;
   children: React.ReactNode;
 }
 
 // Academy's configuration of the shared workspace shell.
-export function AcademyLayout({ academyName, adminName, children }: AcademyLayoutProps) {
+export function AcademyLayout({ academyName, adminName, unreadCount, children }: AcademyLayoutProps) {
   return (
     <WorkspaceLayout
       workspaceLabel="Academy"
@@ -21,6 +22,7 @@ export function AcademyLayout({ academyName, adminName, children }: AcademyLayou
       searchLabel="Search students, batches and mentors"
       profileHref="/academy/settings"
       profileLabel="Academy settings"
+      unreadCount={unreadCount}
     >
       {children}
     </WorkspaceLayout>

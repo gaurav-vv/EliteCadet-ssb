@@ -1,8 +1,5 @@
-// 5-Day SSB Practice Journey domain types (T039). Working API contract per
-// AGENTS.md §9 — lib/api/ssb-journey.ts is written against these shapes so a
-// real backend/content pipeline can replace lib/mock/ssb-journey.ts without
-// touching components. Reuses types/practice.ts's PracticeItem shape for
-// free-text bank content instead of redefining it.
+// 5-Day SSB Practice Journey domain types (T039, T083b). The structure lives
+// in lib/practice/journey.ts; question banks come from Postgres by slug.
 
 import type { NavIconName } from "@/components/ui/nav-icons";
 import type { PracticeItem } from "@/types/practice";
@@ -35,8 +32,8 @@ export type SsbBankMode = "practice" | "test";
 export interface SsbBankMeta {
   itemKind: SsbBankItemKind;
   mode: SsbBankMode;
-  /** Real item ids from the actual dummy content bank — only present for banks without an `href` override, since those render this app's own progress-tracked UI. Used to compute "X of N done" without shipping the full item content to the list page. */
-  itemIds?: string[];
+  /** The practice bank (practice_banks.slug, 0014) this module's questions come from. */
+  slug: string;
 }
 
 export interface SsbModuleSummary {
@@ -62,7 +59,8 @@ export interface McqItem {
   id: string;
   prompt: string;
   options: McqOption[];
-  correctOptionId: string;
+  /** Sent only for self-paced practice; timed tests are scored on the server. */
+  correctOptionId?: string;
 }
 
 /** Preparation advice for one question — never a selection prediction (AGENTS.md §11). */
@@ -92,8 +90,6 @@ export interface SsbInfoContent {
 export interface SsbModuleDetail extends SsbModuleSummary {
   reading?: SsbReadingContent;
   info?: SsbInfoContent;
-  mcqItems?: McqItem[];
-  responseItems?: GuidedPracticeItem[];
   /** Free-text practice banks only: checklist the student ticks after answering each question. */
   selfReview?: string[];
   /** Only set for the one response-kind test module (PPDT) — every other response test reuses an existing dedicated route via `href` instead. */

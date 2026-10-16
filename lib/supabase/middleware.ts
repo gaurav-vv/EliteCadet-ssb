@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { blockedReason } from "@/lib/auth/blocked";
 import type { Role } from "@/types/auth";
 
 // Exported for unit testing (tests/unit/lib/middleware-role.test.ts) — the
@@ -53,16 +54,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).single();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, status, academy:academies!profiles_academy_id_fkey(status)")
+    .eq("id", user.id)
+    .single();
   const actualRole = profile?.role as Role | undefined;
+  const reason = blockedReason(profile);
 
-  // A suspended account is signed out on its next request, whatever the route.
-  if (profile?.status === "suspended") {
+  // A suspended account, or any non-super-admin member of a suspended
+  // academy, is signed out on its next request, whatever the route.
+  if (reason) {
     await supabase.auth.signOut();
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";
-    redirectUrl.searchParams.set("reason", "account_suspended");
+    redirectUrl.searchParams.set("reason", reason);
     const redirect = NextResponse.redirect(redirectUrl);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return redirect;

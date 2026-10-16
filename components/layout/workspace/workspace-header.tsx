@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -9,8 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
-import { EmptyState } from "@/components/ui/empty-state";
+import { NotificationBell } from "@/components/layout/workspace/notification-bell";
 import { logoutAction } from "@/lib/auth/actions";
 
 interface WorkspaceHeaderProps {
@@ -26,6 +25,8 @@ interface WorkspaceHeaderProps {
   profileLabel: string;
   // Hamburger + drawer, shown below md (see WorkspaceMobileNav).
   mobileNav: React.ReactNode;
+  unreadCount: number;
+  notificationsHref: string;
 }
 
 function initialsOf(name: string): string {
@@ -34,7 +35,7 @@ function initialsOf(name: string): string {
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-export function WorkspaceHeader({ displayName, userName, roleLabel, searchPlaceholder, searchLabel, profileHref, profileLabel, mobileNav }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ displayName, userName, roleLabel, searchPlaceholder, searchLabel, profileHref, profileLabel, mobileNav, unreadCount, notificationsHref }: WorkspaceHeaderProps) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-hairline bg-white/90 px-4 backdrop-blur-sm sm:px-6">
       {mobileNav}
@@ -50,23 +51,7 @@ export function WorkspaceHeader({ displayName, userName, roleLabel, searchPlaceh
       </label>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="flex size-11 items-center justify-center rounded-pill text-ink-secondary transition-colors hover:bg-black/5 hover:text-ink"
-            >
-              <Bell aria-hidden="true" size={19} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-72 rounded-card border border-hairline bg-white p-4 shadow-md">
-            <PopoverHeader className="px-0 pt-0">
-              <PopoverTitle>Notifications</PopoverTitle>
-            </PopoverHeader>
-            <EmptyState title="You're all caught up" description="No notifications yet." />
-          </PopoverContent>
-        </Popover>
+        <NotificationBell unreadCount={unreadCount} allHref={notificationsHref} />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

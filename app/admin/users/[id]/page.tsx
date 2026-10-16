@@ -3,10 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
+import { UserAcademyAction } from "@/components/admin/users/user-academy-action";
 import { UserAccountActions } from "@/components/admin/users/user-account-actions";
 import { RoleTag, UserStatusTag } from "@/components/admin/users/user-tags";
 import { DetailHeader } from "@/components/ui/detail-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getAcademyOptions } from "@/lib/server/academies/service";
 import { getUserDetail } from "@/lib/server/users/service";
 import { formatDay } from "@/lib/utils/format-date";
 
@@ -23,7 +25,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 
 export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const result = await getUserDetail(id);
+  const [result, academies] = await Promise.all([getUserDetail(id), getAcademyOptions()]);
 
   if (!result.ok && result.error?.code === "not_found") notFound();
 
@@ -55,7 +57,15 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
               />
 
               <section aria-label="Account details" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <InfoCard label="Academy">{user.academyName ?? <span className="text-ink-secondary">Not part of an academy</span>}</InfoCard>
+                <InfoCard label="Academy">
+                  {user.academyId ? (
+                    <Link href={`/admin/academies/${user.academyId}`} className="text-ink">
+                      {user.academyName ?? "View academy"}
+                    </Link>
+                  ) : (
+                    <span className="text-ink-secondary">Not part of an academy</span>
+                  )}
+                </InfoCard>
                 <InfoCard label="Phone">{user.phone ?? <span className="text-ink-secondary">Not provided</span>}</InfoCard>
                 <InfoCard label="Last login">{formatDay(user.lastLoginAt) ?? <span className="text-ink-secondary">Never</span>}</InfoCard>
                 <InfoCard label="Joined">{formatDay(user.createdAt)}</InfoCard>
@@ -71,7 +81,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
                     This is your own account. Another super admin has to change your role or status, so the platform can never be left without one.
                   </p>
                 ) : (
-                  <UserAccountActions userId={user.id} name={name} role={user.role} status={user.status} />
+                  <div className="flex flex-col gap-3">
+                    <UserAccountActions userId={user.id} name={name} role={user.role} status={user.status} />
+                    {user.role !== "super_admin" && academies.ok && academies.data && (
+                      <UserAcademyAction userId={user.id} name={name} currentAcademyId={user.academyId} options={academies.data} />
+                    )}
+                  </div>
                 )}
               </section>
 

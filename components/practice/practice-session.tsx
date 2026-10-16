@@ -7,12 +7,13 @@ import { ErrorState } from "@/components/ui/error-state";
 import { CarouselRunner } from "@/components/practice/carousel-runner";
 import { BudgetRunner } from "@/components/practice/budget-runner";
 import { PRACTICE_TIMING } from "@/lib/practice/config";
-import { submitPractice } from "@/lib/api/practice";
-import type { PracticeActivitySummary, PracticeItem, PsychologyTestType } from "@/types/practice";
+import { submitAttemptAction } from "@/lib/actions/practice";
+import type { PsychologyActivity } from "@/lib/practice/activities";
+import type { PracticeItem, PsychologyTestType } from "@/types/practice";
 
 interface PracticeSessionProps {
   testType: PsychologyTestType;
-  summary: PracticeActivitySummary;
+  summary: PsychologyActivity;
   items: PracticeItem[];
 }
 
@@ -44,12 +45,12 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
     setPhase("submitting");
     setErrorMessage(null);
 
-    const result = await submitPractice(
-      {
-        testType,
-        responses: Object.entries(finalResponses).map(([itemId, response]) => ({ itemId, response })),
-      },
+    // Every item is sent (blank if unanswered), so the record shows the whole test.
+    const result = await submitAttemptAction(
+      testType,
+      "test",
       idempotencyKey,
+      items.map((item) => ({ key: item.id, response: finalResponses[item.id] ?? "" })),
     );
 
     if (!result.ok) {
@@ -81,7 +82,7 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
         <div className="glass-regular flex flex-col gap-3 px-6 py-6">
           <p className="text-sm text-ink">{summary.description}</p>
           <ul className="flex flex-col gap-1 text-sm text-ink-secondary">
-            <li>{summary.itemCount} items</li>
+            <li>{items.length} items</li>
             <li>{summary.durationLabel}</li>
             <li>Once started, the timer runs automatically — read the instructions fully before you begin.</li>
             <li>Leaving mid-activity will prompt a warning; your progress up to that point is not saved.</li>
@@ -128,8 +129,8 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
       <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10">
         <h1 className="text-xl font-semibold text-ink">Submitted</h1>
         <p className="text-sm text-ink-secondary">
-          Your {summary.title.split(" —")[0]} responses were recorded. AI feedback isn&apos;t available yet
-          (tracked as T034) — your mentor will be able to review this once mentor tools are built.
+          Your {summary.title.split(" —")[0]} responses are saved to your account, and your mentor can read them. AI
+          feedback isn&apos;t available yet (T034).
         </p>
         <Button asChild size="sm">
           <Link href="/student/practice/psychology">Back to Psychology</Link>
