@@ -3,18 +3,19 @@ import { LogOut } from "lucide-react";
 import { getBrandImage } from "@/lib/academy/brand-images";
 import { logoutAction } from "@/lib/auth/actions";
 
-interface AcademySidebarFooterProps {
-  academyName: string;
-  adminName: string;
+interface WorkspaceSidebarFooterProps {
+  // Signed-in person, then their context (academy name, or the role).
+  userName: string;
+  contextName: string;
   // Collapses with the icon rail between md and lg.
   collapsible?: boolean;
 }
 
-// Page-agnostic: motivational card + academy identity + sign-out on every
-// Academy page. The card shows the image you place at
+// Page-agnostic: motivational card + who is signed in + sign-out, on every
+// workspace page. The card shows the image you place at
 // public/academy/sidebar-card.(jpg|png|webp); without one it falls back to a
 // plain text card. Compact on short viewports so it never pushes content off.
-export function AcademySidebarFooter({ academyName, adminName, collapsible = false }: AcademySidebarFooterProps) {
+export function WorkspaceSidebarFooter({ userName, contextName, collapsible = false }: WorkspaceSidebarFooterProps) {
   const image = getBrandImage("sidebar-card");
   const hideOnRail = collapsible ? "max-lg:hidden" : "";
 
@@ -39,8 +40,8 @@ export function AcademySidebarFooter({ academyName, adminName, collapsible = fal
 
       <div className={`flex items-center gap-3 border-t border-(--academy-navy-line) pt-2 ${collapsible ? "max-lg:flex-col" : ""}`}>
         <div className={`min-w-0 flex-1 ${hideOnRail}`}>
-          <p className="truncate text-[13px] font-medium text-white">{adminName}</p>
-          <p className="truncate text-[12px] text-white/60">{academyName}</p>
+          <p className="truncate text-[13px] font-medium text-white">{userName}</p>
+          <p className="truncate text-[12px] text-white/60">{contextName}</p>
         </div>
         <form action={logoutAction}>
           <button

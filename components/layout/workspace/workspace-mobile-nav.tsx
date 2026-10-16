@@ -3,19 +3,20 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { AcademyBrand } from "@/components/academy/layout/academy-brand";
-import { AcademyNavigation } from "@/components/academy/layout/academy-navigation";
-import type { AcademyNavItem } from "@/lib/academy/navigation";
+import { WorkspaceBrand } from "@/components/layout/workspace/workspace-brand";
+import { WorkspaceNavigation } from "@/components/layout/workspace/workspace-navigation";
+import type { WorkspaceNavItem } from "@/lib/navigation/workspace";
 
-interface AcademyMobileNavProps {
-  items: AcademyNavItem[];
-  // Server-rendered AcademySidebarFooter, passed through so the drawer and the
-  // desktop sidebar share one footer implementation.
+interface WorkspaceMobileNavProps {
+  items: WorkspaceNavItem[];
+  workspaceLabel: string;
+  // Server-rendered WorkspaceSidebarFooter, passed through so the drawer and
+  // the desktop sidebar share one footer implementation.
   footer: React.ReactNode;
 }
 
 // Below md the sidebar becomes a left drawer opened from the header.
-export function AcademyMobileNav({ items, footer }: AcademyMobileNavProps) {
+export function WorkspaceMobileNav({ items, workspaceLabel, footer }: WorkspaceMobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -33,11 +34,11 @@ export function AcademyMobileNav({ items, footer }: AcademyMobileNavProps) {
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
-          className="academy-app academy-sidebar fixed inset-y-0 left-0 z-50 flex w-[288px] max-w-[85vw] flex-col gap-6 overflow-y-auto p-4 outline-none data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left"
+          className="workspace-app workspace-sidebar fixed inset-y-0 left-0 z-50 flex w-[288px] max-w-[85vw] flex-col gap-6 overflow-y-auto p-4 outline-none data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left"
         >
-          <DialogPrimitive.Title className="sr-only">Academy navigation</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="sr-only">{workspaceLabel} navigation</DialogPrimitive.Title>
           <div className="flex items-center justify-between gap-2">
-            <AcademyBrand />
+            <WorkspaceBrand href={items[0]?.href ?? "/"} workspaceLabel={workspaceLabel} />
             <DialogPrimitive.Close
               aria-label="Close navigation menu"
               className="flex size-11 items-center justify-center rounded-button text-white/70 hover:bg-white/10 hover:text-white"
@@ -46,7 +47,7 @@ export function AcademyMobileNav({ items, footer }: AcademyMobileNavProps) {
             </DialogPrimitive.Close>
           </div>
           <div className="flex-1">
-            <AcademyNavigation items={items} variant="full" onNavigate={() => setOpen(false)} />
+            <WorkspaceNavigation items={items} label={workspaceLabel} variant="full" onNavigate={() => setOpen(false)} />
           </div>
           {footer}
         </DialogPrimitive.Content>
