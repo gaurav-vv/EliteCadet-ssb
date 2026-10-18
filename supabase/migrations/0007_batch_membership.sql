@@ -15,6 +15,27 @@
 --    (0005). The functions only ever touch the caller's own academy.
 
 -- ---------------------------------------------------------------------------
+-- 0. Legacy academy_students TABLE (added 2026-10-18)
+-- ---------------------------------------------------------------------------
+-- Some databases (production included) ran a superseded branch migration
+-- (commit 6b2ee12, "0004_academy_students") that created a name-only
+-- academy_students TABLE. Section 5 below creates a VIEW with that name, so the
+-- table is renamed out of the way — every row, constraint, policy and trigger
+-- is kept — and taken off the API. A no-op on databases that never had it.
+do $$
+begin
+  if (select relkind from pg_class where oid = to_regclass('public.academy_students')) = 'r' then
+    if to_regclass('public.academy_students_legacy') is not null then
+      raise exception 'public.academy_students_legacy already exists; resolve it before running 0007.';
+    end if;
+    alter table public.academy_students rename to academy_students_legacy;
+    revoke all on table public.academy_students_legacy from anon, authenticated;
+    raise notice '0007: legacy table public.academy_students renamed to academy_students_legacy (data kept).';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- 1. Tables
 -- ---------------------------------------------------------------------------
 

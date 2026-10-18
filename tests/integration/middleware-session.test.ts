@@ -12,9 +12,18 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: vi.fn() }));
 
 const mockedCreateClient = vi.mocked(createServerClient);
 
-function fakeSupabase(user: { id: string } | null, profileRole: string | null, status = "active", academyStatus: string | null = null) {
-  const single = vi.fn().mockResolvedValue({ data: profileRole ? { role: profileRole, status, academy: academyStatus ? { status: academyStatus } : null } : null });
-  const eq = vi.fn(() => ({ single }));
+function fakeSupabase(
+  user: { id: string } | null,
+  profileRole: string | null,
+  status = "active",
+  academyStatus: string | null = null,
+  queryError: { code: string; message: string } | null = null,
+) {
+  const maybeSingle = vi.fn().mockResolvedValue({
+    data: queryError || !profileRole ? null : { role: profileRole, status, academy: academyStatus ? { status: academyStatus } : null },
+    error: queryError,
+  });
+  const eq = vi.fn(() => ({ maybeSingle }));
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
   const signOut = vi.fn().mockResolvedValue({ error: null });
@@ -35,6 +44,8 @@ function redirectTarget(res: Response): URL | null {
 }
 
 beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
   mockedCreateClient.mockReset();
 });
 
@@ -78,10 +89,38 @@ describe("updateSession", () => {
     expect(target?.search).toBe("");
   });
 
-  it("sends a logged-in user with no profile row to /forbidden", async () => {
-    fakeSupabase({ id: "u1" }, null);
-    const res = await updateSession(request("/student"));
-    expect(redirectTarget(res)?.pathname).toBe("/forbidden");
+  it("signs out a logged-in user with no profile row and explains why (not /forbidden)", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, null);
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("reason")).toBe("profile_missing");
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it("treats a failed profile query (e.g. a migration not applied) as an outage, not a permission denial", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, "student", "active", null, { code: "42703", message: "column profiles.status does not exist" });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const target = redirectTarget(await updateSession(request("/student/practice")));
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("reason")).toBe("account_unavailable");
+    expect(target?.searchParams.get("next")).toBe("/student/practice");
+    // Kept signed in so a retry works once the database recovers.
+    expect(signOut).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it("sends a profile with an unrecognised role to /forbidden", async () => {
+    fakeSupabase({ id: "u1" }, "janitor");
+    expect(redirectTarget(await updateSession(request("/student")))?.pathname).toBe("/forbidden");
+  });
+
+  it("never redirects /login, /reset-password or /auth/callback (no loops)", async () => {
+    for (const path of ["/login?reason=account_unavailable", "/reset-password", "/auth/callback", "/forgot-password", "/forbidden"]) {
+      const { from } = fakeSupabase({ id: "u1" }, null, "active", null, { code: "42703", message: "x" });
+      expect(redirectTarget(await updateSession(request(path)))).toBeNull();
+      expect(from).not.toHaveBeenCalled();
+    }
   });
 
   it("ignores a role supplied by the browser in the query string", async () => {

@@ -210,8 +210,11 @@ workload) · Settings `VERIFIED` (Server Action, server-side mock persistence)
 
 ## 6. Known Bugs
 
-**None recorded.** This is not a claim that none exist — no code has been inspected. The first real
-bug list comes out of T001, T060 and T065.
+| Found | Bug | State |
+|---|---|---|
+| 2026-10-18 | **P0 security (production):** production still runs the 0001 `handle_new_user` trigger and the 0001 `profiles_update_own` policy, which trust a browser-sent role. Any visitor can sign up — or update their own profile — as `mentor`/`academy_admin`/`super_admin` (0004 already added that enum value). Fixed by 0005 (+0007). | `BROKEN` in production until 0005 is applied (T090) |
+| 2026-10-18 | Login/signup → `/forbidden`: profile query fails on missing 0005/0006 columns and was treated as "no role". | Code fixed locally (T090); production needs migrations |
+| 2026-10-18 | `/dev-preview/*` HTTP 500 "supabaseKey is required"; preview password was committed to the repo. | Fixed locally (T090) |
 
 ---
 
@@ -1656,6 +1659,81 @@ What remains:
 
 Next task:
 - Real-project smoke test across all roles
+
+```text
+Date: 2026-10-18
+Task: T090 — Auth flow repair + production migration catch-up
+Status: In Progress (local code verified; production NOT yet changed)
+
+What changed:
+- Root cause found by read-only PostgREST probes: production has 0001–0004 only. profiles lacks
+  email/status/updated_at/last_login_at; academies lacks status/description; batch_students,
+  batch_mentors, contents, sessions, … don't exist. public.academy_students is a TABLE left over from
+  a superseded branch migration (6b2ee12 "0004_academy_students": id, academy_id, batch_id,
+  full_name, status, created_at, updated_at) — it blocks 0007's view of the same name.
+- lib/auth/account.ts (new): one profile-access read for proxy + login; failure ≠ missing profile.
+- lib/supabase/middleware.ts, lib/server/auth/guard.ts, lib/auth/session.ts: query errors →
+  /login?reason=account_unavailable (kept signed in, logged); missing profile → signed out,
+  reason=profile_missing; only a real role mismatch → /forbidden.
+- lib/api/auth.ts: logIn never defaults to "student"; signUp handles email confirmation;
+  requestPasswordReset returns via /auth/callback and reports failures instead of always "sent";
+  updatePassword maps expired session / same / weak password, signs out after success;
+  establishRecoverySession for the reset page.
+- lib/auth/redirect.ts: roleForPath moved here; safeNextPath + postLoginPath (no open redirect,
+  no cross-role next, no auth-page loops). app/auth/callback: safe next; failed recovery →
+  /forgot-password?reason=link_invalid.
+- lib/supabase/admin.ts: AdminClientConfigError (names only), no fallback, browser guard.
+  app/dev-preview: opt-in DEV_PREVIEW_ENABLED, DEV_PREVIEW_PASSWORD from env (the committed
+  password is removed), 404/503/409 with actionable text, verifies the account's real role.
+- middleware.ts → proxy.ts. .env.example added (.gitignore allows it).
+- lib/supabase/env.ts: browser/server/proxy clients fail with the missing variable's NAME, not
+  supabase-js's bare "supabaseUrl is required".
+- supabase/snippets/audit_self_granted_roles.sql: read-only list of mentor/super_admin accounts with
+  no trusted source (pre-0005 self-escalations are not rewritten by the catch-up).
+- Verified locally (2026-10-18): catch-up applied to a simulated production DB (0001–0004 + legacy
+  academy_students table + pre-0005 users) — legacy rows kept, view created; workflow-check passes
+  on a clean DB; anon-key escalation probes (signup metadata, profile update, updateUser) all stay
+  student; 461 Vitest, lint, typecheck, build, and all 20 Playwright cases (incl. local auth flows
+  and every role page) pass. Production itself NOT touched or verified.
+
+What remains:
+- Apply supabase/catchup/production_catchup_0005_0015.sql to production (needs approval), then run
+  the audit snippet.
+- Supabase dashboard: Redirect URLs, custom SMTP, optional token_hash recovery template.
+- Rotate/delete any existing preview.*@ssbacademy.dev accounts in production.
+
+Blocker:
+- Production migration approval; SMTP credentials.
+
+Next task:
+- T090 production steps, then live verification of login/signup/reset.
+```
+
+```text
+Date: 2026-10-18
+Task: T091 — EliteCadet landing page to the user's reference image
+Status: Done locally (production DB untouched)
+
+Decision: the public site (landing, site header/footer, /request-demo) follows the user's reference
+image elitecadet-landing-reference.png instead of Glass UI v3 — user's explicit request, same
+precedent as .workspace-app. Tokens are scoped to .site-public in app/globals.css.
+
+What changed:
+- app/(public)/page.tsx rebuilt in the reference's section order; photos in public/images/landing/
+  are crops of the reference image (low resolution — replace with licensed high-res photos).
+- Stats strip shows platform facts, not usage figures (no verified numbers exist).
+- Header/footer restyled; mobile disclosure menu; How It Works + About anchors added.
+- /request-demo: real form → Server Action → demo_requests (0016: anyone may insert, only super
+  admin may read; no admin UI yet — read in Supabase Studio). No rate limiting beyond validation.
+- /signup?as=academy preselects the academy option (role is still decided server-side).
+- "Join as a Mentor" → /request-demo?interest=mentor (mentors are invited by academies).
+- Verified: 470 Vitest, 24 Playwright (incl. tests/e2e/landing.spec.ts), lint, typecheck, build;
+  screenshots at 390/768/1024/1280/1440 px, no horizontal overflow.
+
+What remains:
+- Production: run supabase/migrations/0016_demo_requests.sql after the 0005–0015 catch-up.
+- Super-admin view of demo requests; rate limiting on the public form.
+```
 
 ## 14. North Star
 

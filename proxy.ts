@@ -1,7 +1,9 @@
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
+// Next.js 16 renamed the `middleware` file convention to `proxy`; behaviour is
+// unchanged (session refresh + route→role check in lib/supabase/middleware.ts).
+export async function proxy(request: NextRequest) {
   return updateSession(request);
 }
 

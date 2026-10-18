@@ -22,10 +22,13 @@ export async function getActor(): Promise<Actor | null> {
 
 // For pages and layouts: redirects instead of rendering anything.
 export async function requireRole(role: Role): Promise<Actor> {
-  const actor = await getActor();
-  if (!actor) redirect("/login?reason=login_required");
-  if (actor.profile.role !== role) redirect("/forbidden");
-  return actor;
+  const { user, profile, profileError } = await getCurrentUserAndProfile();
+  if (!user) redirect("/login?reason=login_required");
+  // A failed lookup is an outage, not a permission decision — never /forbidden.
+  if (profileError) redirect("/login?reason=account_unavailable");
+  if (!profile || profile.status !== "active") redirect("/login?reason=login_required");
+  if (profile.role !== role) redirect("/forbidden");
+  return { id: user.id, email: user.email, profile };
 }
 
 export type GuardFailure = { ok: false; error: { code: "unauthorized"; message: string } };

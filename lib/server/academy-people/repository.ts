@@ -3,7 +3,7 @@
 // service-role client is used ONLY to send an invite email (inviteByEmail),
 // which the anon key cannot do.
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { AdminClientConfigError, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizeSearch } from "@/lib/server/users/validation";
 import { STUDENT_PAGE_SIZE } from "@/lib/server/academy-people/validation";
@@ -97,7 +97,14 @@ export async function removeStudent(id: string): Promise<DbResult<null>> {
 // Service role, server-side only: the signup trigger (0007) trusts role +
 // academy_id from an INVITE (invited_at is set), never from a browser signup.
 export async function inviteByEmail(input: { email: string; fullName: string; role: "student" | "mentor"; academyId: string; redirectTo: string }): Promise<DbResult<{ id: string }>> {
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    if (!(error instanceof AdminClientConfigError)) throw error;
+    console.error("[invite] admin client unavailable", { missing: error.missing });
+    return { data: null, error: { code: "admin_unavailable", message: error.message } };
+  }
   const { data, error } = await admin.auth.admin.inviteUserByEmail(input.email, {
     data: { full_name: input.fullName, role: input.role, academy_id: input.academyId },
     redirectTo: input.redirectTo,
@@ -110,7 +117,7 @@ export async function findMentors(academyId: string): Promise<DbResult<AcademyMe
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email, status, last_login_at, batch_mentors(batch:batches(id, name))")
+    .select("id, full_name, email, status, last_login_at, batch_mentors!batch_mentors_mentor_id_fkey(batch:batches(id, name))")
     .eq("academy_id", academyId)
     .eq("role", "mentor")
     .order("full_name", { ascending: true })

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { logIn } from "@/lib/api/auth";
-import { dashboardPathForRole } from "@/lib/auth/redirect";
+import { postLoginPath } from "@/lib/auth/redirect";
 
 const REASON_MESSAGES: Record<string, string> = {
   login_required: "Please log in to continue.",
@@ -16,6 +16,8 @@ const REASON_MESSAGES: Record<string, string> = {
   password_updated: "Your password has been updated. Please log in.",
   account_suspended: "This account has been suspended. Contact your academy or the platform team for help.",
   academy_suspended: "Your academy's access is paused. Contact your academy or the platform team for help.",
+  account_unavailable: "We couldn't load your account right now. Please try again in a few minutes.",
+  profile_missing: "Your account isn't fully set up. Contact your academy or the platform team for help.",
 };
 
 interface LoginFormProps {
@@ -43,8 +45,9 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
       return;
     }
 
-    const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : dashboardPathForRole(result.data!.role);
-    router.push(target);
+    // A `next` the role can't open (or an unsafe one) falls back to the
+    // role's dashboard, so login never bounces straight to /forbidden.
+    router.push(postLoginPath(result.data!.role, redirectTo));
     router.refresh();
   }
 

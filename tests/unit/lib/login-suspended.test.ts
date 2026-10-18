@@ -8,10 +8,10 @@ import { createClient } from "@/lib/supabase/client";
 
 function fakeClient(profile: { role: string; status: string; academy?: { status: string } | null } | null) {
   const signOut = vi.fn().mockResolvedValue({ error: null });
-  const single = vi.fn().mockResolvedValue({ data: profile });
+  const maybeSingle = vi.fn().mockResolvedValue({ data: profile, error: null });
   vi.mocked(createClient).mockReturnValue({
     auth: { signInWithPassword: vi.fn().mockResolvedValue({ data: { user: { id: "u1" } }, error: null }), signOut },
-    from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ single })) })) })),
+    from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) })),
   } as unknown as ReturnType<typeof createClient>);
   return { signOut };
 }

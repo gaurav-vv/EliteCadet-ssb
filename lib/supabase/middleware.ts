@@ -1,28 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { blockedReason } from "@/lib/auth/blocked";
-import type { Role } from "@/types/auth";
+import { loadAccountAccess } from "@/lib/auth/account";
+import { roleForPath } from "@/lib/auth/redirect";
+import { publicSupabaseEnv } from "@/lib/supabase/env";
 
-// Exported for unit testing (tests/unit/lib/middleware-role.test.ts) — the
-// route→role mapping is the entire authorization surface of the middleware,
-// so it's tested directly rather than only indirectly through updateSession.
-export function roleForPath(pathname: string): Role | null {
-  // Anchored, unlike the older prefixes below (see the KNOWN GAP test).
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return "super_admin";
-  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/") || pathname.startsWith("/student")) {
-    return "student";
-  }
-  if (pathname.startsWith("/mentor")) return "mentor";
-  if (pathname.startsWith("/academy")) return "academy_admin";
-  return null;
-}
+// Re-exported for the existing unit tests (tests/unit/lib/middleware-role.test.ts);
+// the mapping itself lives in lib/auth/redirect.ts so the login form shares it.
+export { roleForPath };
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  const { url, anonKey } = publicSupabaseEnv();
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {
@@ -46,41 +38,49 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  if (!user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set("next", request.nextUrl.pathname);
-    redirectUrl.searchParams.set("reason", "login_required");
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status, academy:academies!profiles_academy_id_fkey(status)")
-    .eq("id", user.id)
-    .single();
-  const actualRole = profile?.role as Role | undefined;
-  const reason = blockedReason(profile);
-
-  // A suspended account, or any non-super-admin member of a suspended
-  // academy, is signed out on its next request, whatever the route.
-  if (reason) {
-    await supabase.auth.signOut();
+  const toLogin = (reason: string, keepNext: boolean) => {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";
+    if (keepNext) redirectUrl.searchParams.set("next", request.nextUrl.pathname);
     redirectUrl.searchParams.set("reason", reason);
     const redirect = NextResponse.redirect(redirectUrl);
+    // Carry any refreshed/cleared auth cookies onto the redirect.
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return redirect;
+  };
+
+  if (!user) {
+    return toLogin("login_required", true);
   }
 
-  if (!actualRole || actualRole !== requiredRole) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/forbidden";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+  const access = await loadAccountAccess(supabase, user.id);
+
+  switch (access.kind) {
+    case "lookup_failed":
+      // An outage or schema mismatch, not a permission decision: never
+      // /forbidden. The session is kept so a retry works once it recovers;
+      // /login is public, so this cannot loop.
+      console.error("[auth] profile lookup failed in proxy", { code: access.code, message: access.message });
+      return toLogin("account_unavailable", true);
+    case "missing_profile":
+      console.error("[auth] signed-in user has no profile row", { userId: user.id });
+      await supabase.auth.signOut();
+      return toLogin("profile_missing", false);
+    case "blocked":
+      // A suspended account, or any non-super-admin member of a suspended
+      // academy, is signed out on its next request, whatever the route.
+      await supabase.auth.signOut();
+      return toLogin(access.reason, false);
+    case "unknown_role":
+      break;
+    case "ok":
+      if (access.role === requiredRole) return response;
+      break;
   }
 
-  return response;
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = "/forbidden";
+  redirectUrl.search = "";
+  return NextResponse.redirect(redirectUrl);
 }
