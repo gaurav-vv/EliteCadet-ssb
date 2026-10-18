@@ -818,6 +818,40 @@ live check.
 
 ---
 
+## T090 — Auth flow repair + production migration catch-up — P0 — `[-]`
+**Spec:** `specs.md` §8a (auth/RBAC), `AGENTS.md` §10–§12. **Depends on:** T080–T089 migrations.
+**Why:** production Supabase is at 0001–0004 only (0005+ never applied), so every profile read that
+selects `status`/`email`/`academies.status` fails; the code treated that failure as "no role" and sent
+users to `/forbidden`. Password reset links did not return through `/auth/callback`; dev-preview
+crashed without a service-role key and used a password committed to the repo.
+**Requirements:**
+- Profile lookups distinguish query failure (`account_unavailable`, retryable, never `/forbidden`)
+  from a missing profile (`profile_missing`, signed out) — proxy, login and page guard.
+- Login honours `next` only when safe and openable by the role; auth callback rejects off-site `next`.
+- Signup handles "Confirm email" (no session) with a confirmation screen and an `emailRedirectTo`.
+- Reset flow: link → `/auth/callback?next=/reset-password` (PKCE) or `token_hash`; reset page
+  verifies the recovery session (also hash tokens from invites) and offers a new link when invalid.
+- `createAdminClient()` fails with a named config error, never a fallback key; dev-preview is
+  opt-in (`DEV_PREVIEW_ENABLED`), password from env, 503/409 explanations instead of HTTP 500.
+- `middleware.ts` → `proxy.ts` (Next 16 convention).
+- Production: apply 0005–0014 after the legacy `academy_students` table is resolved (user approval).
+**Acceptance:** tests in `auth-api`, `auth-redirect`, `auth-callback`, `dev-preview-route`,
+`admin-client`, `auth-flow-forms`, `middleware-session`, `login-form`; lint, typecheck, build pass;
+live login, signup, reset email and migrations verified against production.
+**Status:** local code + tests done (2026-10-18); catch-up verified on a simulated production DB. Production migration plan written, awaiting
+approval. Reset email delivery not verified (needs custom SMTP + URL allowlist).
+
+---
+
+## T091 — Landing page to reference image + demo requests — P1 — `[x]`
+**Why:** user-supplied design (`elitecadet-landing-reference.png`); Request Demo had no flow.
+**Acceptance:** page matches the reference's layout/order; every link resolves; demo form stores a row
+(insert-only RLS); no invented statistics; responsive with no horizontal overflow; lint, typecheck,
+tests, build pass. **Follow-ups:** T092 super-admin demo-request list + form rate limiting; replace
+cropped reference photos with licensed high-resolution images.
+
+---
+
 # Post-MVP Backlog
 
 ## P1

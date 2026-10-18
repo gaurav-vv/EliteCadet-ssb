@@ -54,6 +54,27 @@ describe("LoginForm", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/student/practice"));
   });
 
+  it.each([
+    ["/student/practice", "mentor", "/mentor"],
+    ["//evil.com", "student", "/student"],
+    ["/login", "academy_admin", "/academy"],
+  ])("ignores next=%s for a %s and opens their dashboard (%s)", async (next, role, expected) => {
+    mockedLogIn.mockResolvedValue({ ok: true, data: { role } });
+    const user = userEvent.setup();
+    render(<LoginForm redirectTo={next} />);
+
+    await user.type(screen.getByLabelText(/email/i), "cadet@example.com");
+    await user.type(screen.getByLabelText(/password/i), "correcthorse");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith(expected));
+  });
+
+  it("explains why the proxy sent the user back here when their account couldn't load", () => {
+    render(<LoginForm reason="account_unavailable" />);
+    expect(screen.getByText(/couldn't load your account/i)).toBeInTheDocument();
+  });
+
   it("displays the server's error message and does not navigate on failed login", async () => {
     mockedLogIn.mockResolvedValue({ ok: false, error: { code: "invalid_credentials", message: "Incorrect email or password." } });
     const user = userEvent.setup();

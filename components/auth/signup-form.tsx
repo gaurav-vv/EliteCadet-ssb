@@ -13,14 +13,16 @@ import type { Role } from "@/types/auth";
 
 type SignupRole = Extract<Role, "student" | "academy_admin">;
 
-export function SignupForm() {
+// initialRole only preselects the toggle (e.g. /signup?as=academy from the
+// landing page); the server still decides the role (0005 handle_new_user).
+export function SignupForm({ initialRole = "student" }: { initialRole?: SignupRole } = {}) {
   const router = useRouter();
-  const [role, setRole] = useState<SignupRole>("student");
+  const [role, setRole] = useState<SignupRole>(initialRole);
   const [fullName, setFullName] = useState("");
   const [academyName, setAcademyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "error" | "confirm">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -42,9 +44,28 @@ export function SignupForm() {
       return;
     }
 
+    if (result.data?.needsConfirmation) {
+      setStatus("confirm");
+      return;
+    }
+
     const target = role === "academy_admin" ? "/academy" : "/onboarding";
     router.push(target);
     router.refresh();
+  }
+
+  if (status === "confirm") {
+    return (
+      <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10 text-center">
+        <h1 className="text-xl font-semibold text-ink">Confirm your email</h1>
+        <p className="text-sm text-ink-secondary">
+          We&apos;ve sent a link to {email}. Open it to activate your account, then you&apos;ll be signed in.
+        </p>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/login">Back to login</Link>
+        </Button>
+      </div>
+    );
   }
 
   return (

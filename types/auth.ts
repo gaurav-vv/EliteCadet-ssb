@@ -36,6 +36,13 @@ export type AuthErrorCode =
   | "validation_error"
   | "network_error"
   | "account_suspended"
+  | "account_unavailable"
+  | "profile_missing"
+  | "email_not_confirmed"
+  | "rate_limited"
+  | "link_expired"
+  | "same_password"
+  | "weak_password"
   | "unknown_error";
 
 export interface AuthResult<T> {

@@ -583,3 +583,122 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Public site (landing page, site header/footer, request-demo) — built to the
+ * user's reference image elitecadet-landing-reference.png on 2026-10-18 at
+ * their explicit request (status.md, Decisions). Same precedent as
+ * .workspace-app: scoped to the .site-public wrapper the public layout
+ * renders, so workspaces keep their own material. Colours are sampled from
+ * the reference: dark navy text/buttons, restrained blue, green and gold
+ * heading accents, pale blue / warm neutral panels, small radii.
+ */
+.site-public {
+  --site-navy: #0b1a38;
+  --site-navy-hover: #172a52;
+  --site-text: #1f2b40;
+  --site-muted: #5f6f87;
+  --site-line: #e3e7ee;
+  --site-bg: #ffffff;
+  --site-bg-soft: #f9fafc;
+  --site-card: #f2f6fa;
+  --site-panel-blue: #e8f1fc;
+  --site-panel-warm: #f6ede3;
+  --site-accent-blue: #0b62e6;
+  --site-accent-green: #05704b;
+  --site-accent-gold: #a8762a;
+  --site-danger: #c0271b;
+  --site-radius-sm: 6px;
+  --site-radius-md: 10px;
+  --site-shadow: 0 1px 2px rgba(11, 26, 56, 0.06);
+  background: var(--site-bg);
+  color: var(--site-text);
+}
+
+.site-btn {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--site-radius-sm);
+  border: 1px solid transparent;
+  padding: 0 1.4rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color var(--motion-duration) var(--motion-easing),
+    border-color var(--motion-duration) var(--motion-easing);
+}
+.site-btn:focus-visible,
+.site-link:focus-visible {
+  outline: 2px solid var(--site-accent-blue);
+  outline-offset: 2px;
+}
+.site-btn-primary {
+  background: var(--site-navy);
+  color: #ffffff;
+}
+.site-btn-primary:hover {
+  background: var(--site-navy-hover);
+}
+.site-btn-secondary {
+  background: #ffffff;
+  border-color: #c9d0db;
+  color: var(--site-navy);
+}
+.site-btn-secondary:hover {
+  border-color: var(--site-navy);
+}
+.site-btn-sm {
+  min-height: 40px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+}
+
+.site-link {
+  border-radius: var(--site-radius-sm);
+  color: var(--site-text);
+  transition: color var(--motion-duration) var(--motion-easing);
+}
+.site-link:hover {
+  color: var(--site-accent-blue);
+}
+
+.site-eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--site-muted);
+}
+
+/* Hero photo fades into the page on wide screens, as in the reference. */
+.site-hero-fade {
+  background: linear-gradient(90deg, var(--site-bg-soft) 0%, rgba(249, 250, 252, 0.7) 12%, rgba(249, 250, 252, 0) 30%);
+}
+.site-panel-fade-blue {
+  background: linear-gradient(90deg, var(--site-panel-blue) 0%, rgba(232, 241, 252, 0) 35%);
+}
+.site-panel-fade-warm {
+  background: linear-gradient(90deg, var(--site-panel-warm) 0%, rgba(246, 237, 227, 0) 40%);
+}
+
+.site-input {
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--site-radius-sm);
+  border: 1px solid #c9d0db;
+  background: #ffffff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--site-text);
+}
+.site-input:focus-visible {
+  outline: 2px solid var(--site-accent-blue);
+  outline-offset: 1px;
+}
+.site-input[aria-invalid="true"] {
+  border-color: var(--site-danger);
+}
