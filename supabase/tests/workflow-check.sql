@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0020 under real RLS.
+-- End-to-end workflow check of migrations 0001–0021 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -234,7 +234,8 @@ select id as "TAT1" from public.practice_items where bank_slug = 'tat' and key =
 select id as "OIRT1" from public.practice_items where bank_slug = 'oir-verbal-test' and key = 'oir-t-1' \gset
 select correct_option_id as "OIRT1_OK" from public.practice_items where id = :'OIRT1' \gset
 select id as "OIRT2" from public.practice_items where bank_slug = 'oir-verbal-test' and key = 'oir-t-2' \gset
-select t.eq((select count(*) from public.practice_items), 209, 'seed: 209 practice questions in 11 banks');
+select t.eq((select count(*) from public.practice_items where bank_slug not like 'diagnostic-%'), 209, 'seed: 209 practice questions in 11 banks');
+select t.eq((select count(*) from public.practice_items where bank_slug like 'diagnostic-%'), 12, 'seed: 12 diagnostic questions (8 multiple choice, 4 written)');
 
 select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
 select t.eq((select count(*) from public.practice_items where bank_slug = 'tat'), 13, 'student reads the TAT bank');
@@ -400,6 +401,39 @@ select t.fails(format('select public.readiness_signals(%L)', :'S1'), 'another ac
 reset role;
 select set_config('request.jwt.claim.sub', :'ADMIN_B', false); set role authenticated;
 select t.fails(format('select public.readiness_signals(%L)', :'S1'), 'another academy''s admin cannot');
+reset role;
+
+-- ---------- 14. Preferences and diagnostic (0021) ----------
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select public.save_student_preferences('cds', current_date + 60, 'in_progress', 'en', 60, 'Clear the SSB');
+select t.fails('select public.save_student_preferences(''cds'', current_date - 1, ''in_progress'', ''en'', 60, null)', 'a target date in the past is refused');
+select t.fails('select public.save_student_preferences(''army'', null, ''in_progress'', ''en'', 60, null)', 'an unknown entry scheme is refused');
+select public.submit_diagnostic('[{"key":"dk-1","optionId":"dk-1-a"},{"key":"dk-2","optionId":"dk-2-a"},{"key":"dr-1","optionId":"dr-1-c"},{"key":"dw-sit-1","response":"I give first aid and send two people for help."}]') as "DIAG1" \gset
+select t.fails('select public.submit_diagnostic(''[]'')', 'the diagnostic can be retaken only once a week');
+select t.fails(format('update public.diagnostic_attempts set kind = ''reassessment'' where id = %L', :'DIAG1'), 'the baseline can never be changed');
+reset role;
+select t.eq((select count(*) from public.student_profiles where user_id = :'S2' and entry_scheme = 'cds' and daily_study_minutes = 60 and onboarded_at is not null), 1, 'onboarding preferences are saved to the account');
+select t.eq((select count(*) from public.diagnostic_attempts where id = :'DIAG1' and kind = 'baseline'), 1, 'the first diagnostic is the baseline');
+select t.eq((select (sections->'knowledge'->>'correct')::bigint from public.diagnostic_attempts where id = :'DIAG1'), 1, 'knowledge is scored by the database (1 of 4)');
+select t.eq((select (sections->'reasoning'->>'correct')::bigint from public.diagnostic_attempts where id = :'DIAG1'), 1, 'reasoning is scored by the database (1 of 4)');
+select t.eq((select count(*) from public.ai_jobs where subject_type = 'diagnostic_attempt' and subject_id = :'DIAG1' and rubric_id = 'diagnostic'), 1, 'the written part is queued for AI feedback');
+update public.diagnostic_attempts set submitted_at = now() - interval '8 days' where id = :'DIAG1';
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select public.submit_diagnostic('[{"key":"dk-1","optionId":"dk-1-a"}]') as "DIAG2" \gset
+reset role;
+select t.eq((select count(*) from public.diagnostic_attempts where id = :'DIAG2' and kind = 'reassessment'), 1, 'later attempts are re-assessments, kept separately');
+select t.eq((select count(*) from public.ai_jobs where subject_id = :'DIAG2'), 0, 'a re-assessment with nothing written is not queued');
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.eq((select count(*) from public.diagnostic_attempts where student_id = :'S2'), 0, 'another student cannot read the diagnostic');
+select t.eq((select count(*) from public.student_profiles where user_id = :'S2'), 0, '...or the preferences');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.diagnostic_attempts where student_id = :'S2'), 2, 'their mentor reads the diagnostic');
+select t.eq((select count(*) from public.student_profiles where user_id = :'S2'), 1, 'their mentor reads the preferences');
+select t.fails('select public.submit_diagnostic(''[]'')', 'a mentor cannot take a student diagnostic');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.diagnostic_attempts where student_id = :'S2'), 0, 'another academy''s mentor cannot');
 reset role;
 \echo
 \echo ALL CHECKS PASSED

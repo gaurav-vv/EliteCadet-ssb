@@ -14,6 +14,9 @@ const AI_MAP: { rubric: RegExp; dimension?: RegExp; to: ReadinessDimensionId }[]
   { rubric: /^interview$/, dimension: /^(specificity|structure)$/, to: "communication" },
   { rubric: /^interview$/, dimension: /^reflection$/, to: "self_awareness" },
   { rubric: /^general-response$/, to: "communication" },
+  { rubric: /^diagnostic$/, dimension: /^communication$/, to: "communication" },
+  { rubric: /^diagnostic$/, dimension: /^situational_reasoning$/, to: "psychology" },
+  { rubric: /^diagnostic$/, dimension: /^self_awareness$/, to: "self_awareness" },
 ];
 
 // Mentor review categories (assessments) per readiness dimension.

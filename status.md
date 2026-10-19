@@ -310,6 +310,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-19 | **The PRD v2.0 is the product source** (`specs.md` §0). Its hard rules — no official-score or selection language, non-diagnostic psychology, readiness as a multi-dimension profile never a single number, AI and mentor evaluations both preserved, versioned expert-reviewed content — override older sections. The AI Mentor and mentor briefing move from out-of-scope to MVP. Recordings (T095) move to P2 per the PRD. The PRD PDF stays with the product owner (not committed to this public repo) | User decision 2026-10-19 + `AGENTS.md` §0 (specs.md is authoritative for what to build) |
 | 2026-10-19 | **AI runs only in a separate worker over a Postgres queue** (T101, `0017_ai_jobs.sql`, `worker/`). The app enqueues; the worker claims (`FOR UPDATE SKIP LOCKED`), calls Claude (`claude-opus-5-5`, effort medium, structured JSON output, `fallbacks: "default"` for refusals, cached rubric system prompt), validates with Zod and guardrails, then stores. An evaluation is discarded, never shown, if it predicts selection, claims an official score or a single readiness number, makes a clinical claim, mentions accent, or quotes words the student didn't write. Retries: SDK x2, then queue backoff x3, then `dead`. Cost and latency per call in `ai_usage` (super admin). The provider key lives only in the worker | PRD §11.7, §12.9–12.11; `specs.md` §0.1; `AGENTS.md` §3 (no provider SDK in the browser) and §11 |
 | 2026-10-19 | **Readiness is a seven-dimension profile computed by fixed rules, never by AI** (T104, `0020_readiness_signals.sql`, `lib/server/readiness/compute.ts`). `readiness_signals()` returns counts and averages only (no answer or feedback text), access-checked for the student, their mentors, their academy admins and super admins. Rules: mentor review averages (≥70 strong, ≥45 developing) lead once there are two reviews, else AI practice ratings weighted by confidence; "improving" when the latest mentor average beats the previous three by 8+ points (or the recent AI average by 0.5); fewer than two pieces of evidence = "not enough evidence"; consistency from active days, revision from retaking tests after feedback and Library reads. Academy admins see states only | PRD §5.3 (deterministic progress math), §11.8, §12.12; `specs.md` §0.1 |
+| 2026-10-19 | **The roadmap is computed by fixed rules from current evidence on every view, not stored and not AI-written** (T105). Inputs: preferences (onboarding, now in `student_profiles`), the diagnostic (first attempt = immutable baseline, enforced by a partial unique index and no update/delete grants; weekly re-assessments kept separately), the readiness profile, the mentor's open work and journey progress. So it "recalculates when new evidence is recorded" (FR-PLAN-01) without a background job. The suggested stage is shown next to the student's self-reported stage, never merged (PRD §5.4); the Daily Mission is at most three actions, each with its reason (FR-DASH-01) | PRD §5.3, §9.3, §13; FR-ONB-01/02, FR-PLAN-01, FR-DASH-01 |
 
 ---
 
@@ -1801,6 +1802,24 @@ What remains:
 
 Next task:
 - T105 — Diagnostic assessment + personalised roadmap
+
+Date: 2026-10-19
+Task: T105 — Diagnostic assessment + personalised roadmap
+Status: Complete in code; VERIFIED offline (local Postgres 17). Real Claude call for the diagnostic's written part deferred to the end
+
+What changed:
+- `0021_diagnostic_roadmap.sql`: preferences columns + `save_student_preferences`; mentor/academy-admin read of preferences; diagnostic banks (editable in Practice Banks); `diagnostic_attempts` with immutable baseline; `submit_diagnostic` (scores MCQ by section, once a week, queues AI feedback on the written part); diagnostic notifications
+- Worker: `diagnostic` v1 rubric; readiness maps its dimensions (communication, situational reasoning → psychology, self-awareness)
+- App: `lib/server/{student/preferences,diagnostic/service,roadmap/compute,roadmap/service}.ts`; `components/{student/preferences-form,diagnostic/*,roadmap/*}`; onboarding (step 1 of 2 → diagnostic), profile, diagnostic + result, roadmap pages; Roadmap nav item; dashboard Today's Mission from the roadmap
+- Removed: `components/student/{onboarding-form,profile-form}.tsx`, `lib/api/student.ts`, `lib/student/profile-storage.ts`
+- Tests: app 534 (23 new), worker 40, database 147 (18 new); screenshots in `docs/screenshots/t105/`
+
+What remains:
+- Hindi UI (the preference is stored; English is shown for now)
+- Real Claude feedback on the written diagnostic (deferred)
+
+Next task:
+- T106 — Courses + content versioning + review workflow
 
 ## 14. North Star
 

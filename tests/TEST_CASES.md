@@ -62,7 +62,7 @@ all green as of this update):
 - `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
 - `tests/unit/lib/notifications-service.test.ts`, `analytics-service.test.ts` — own-notifications scope, safe links, mark read, super-admin-only analytics, boundary validation (T089)
 - `tests/unit/lib/practice-validation.test.ts`, `practice-service.test.ts`, `practice-journey.test.ts`; `tests/integration/bank-practice-runner.test.tsx`, `mock-session.test.tsx` — answer/attempt validation, streak, role scope, server-side scoring, idempotent submit, journey wiring vs the 0014 seed, autosave with retry (T083b)
-- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies every migration to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics, practice, AI evaluations, psychology feedback, AI interview, readiness signals (129 checks)
+- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies every migration to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics, practice, AI evaluations, psychology feedback, AI interview, readiness signals, preferences and diagnostic (147 checks)
 - `worker/tests/engine.test.ts`, `worker/tests/queue.db.test.ts` — AI request shape (cache, structured output, fallback, answer as data), outcome classification, guardrails (selection prediction, official score, readiness %, clinical claims, accent, ungrounded evidence), pricing; queue idempotency, backoff, dead-lettering, concurrent claims (T101)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — the on-device Day 5 self-assessment, corrupted/blocked localStorage
@@ -258,6 +258,17 @@ implicit.
 | RDY-02 | Too little evidence shows "Not enough evidence yet", never a guess | P0 | `VERIFIED` (`readiness-compute.test.ts`) | New student | All dimensions "Not enough evidence yet" |
 | RDY-03 | A mentor's reviews outweigh AI feedback | P1 | `VERIFIED` (`readiness-compute.test.ts`) | 2+ reviews disagree with AI | Mentor-based state |
 | RDY-04 | Only the student, their mentors and their academy admin (states only) can see it | P0 | `VERIFIED` (`workflow-check.sql`, `readiness-service.test.ts`) | Other academy | Refused |
+
+### 2m. Onboarding, diagnostic and roadmap (T105)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| RMP-01 | Onboarding is saved to the account and editable from Profile | P0 | `VERIFIED` (`student-preferences.test.ts`, `workflow-check.sql`) | Save, reload on another device | Same details |
+| RMP-02 | The first diagnostic is an immutable baseline; later ones are re-assessments, at most weekly | P0 | `VERIFIED` (`workflow-check.sql`, `diagnostic-service.test.ts`) | Retake | Baseline unchanged; comparison shown |
+| RMP-03 | Multiple-choice is scored by the database and correct answers never reach the browser | P0 | `VERIFIED` (`workflow-check.sql`, `diagnostic-service.test.ts`) | — | — |
+| RMP-04 | The diagnostic is low-pressure: no timer, skippable, not marked while taking it | P1 | `VERIFIED` (`diagnostic-runner.test.tsx`) | — | — |
+| RMP-05 | The roadmap updates from new evidence and every Daily Mission item says why (max three) | P0 | `VERIFIED` (`roadmap-compute.test.ts`, `roadmap-view.test.tsx`) | New review arrives | Focus/mission change with reasons |
+| RMP-06 | The suggested stage is shown next to the self-reported one and never claims selection | P1 | `VERIFIED` (`roadmap-view.test.tsx`) | — | — |
 ---
 
 ## 3. Academy isolation / IDOR

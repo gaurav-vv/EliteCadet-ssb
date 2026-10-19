@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CalendarClock, History, ListChecks } from "lucide-react";
-import { ContinueJourneyCard } from "@/components/practice/continue-journey-card";
+import { TodayMission } from "@/components/roadmap/today-mission";
 import { ProgressStats } from "@/components/progress/progress-views";
 import { ReadinessStrip } from "@/components/progress/readiness-profile";
 import { StatCard } from "@/components/ui/stat-card";
@@ -47,7 +47,7 @@ export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: 
       {d.readiness && <ReadinessStrip profile={d.readiness} />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <ContinueJourneyCard mission={d.mission} heading="Today's Mission" />
+        <TodayMission actions={d.today} />
         <section aria-label="Practice streak" className="flex flex-col gap-3 lg:pt-[44px]">
           <StatCard icon="activities" label="Practice streak" value={d.streakDays === 1 ? "1 day" : `${d.streakDays} days`} />
         </section>

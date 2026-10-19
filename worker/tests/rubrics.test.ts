@@ -19,6 +19,10 @@ describe("rubric registry", () => {
     }
   });
 
+  it("has the diagnostic v1 rubric the database queues (communication, situational reasoning, self-awareness)", () => {
+    expect(getRubric("diagnostic", 1)?.dimensions.map((d) => d.id)).toEqual(["communication", "situational_reasoning", "self_awareness"]);
+  });
+
   it.each(["tat", "wat", "srt", "sdt"])("has a psychology-%s v1 rubric matching the database trigger's naming", (t) => {
     expect(getRubric(`psychology-${t}`, 1)).toBeDefined();
   });

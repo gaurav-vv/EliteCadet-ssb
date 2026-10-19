@@ -976,12 +976,26 @@ number.
 **Tests:** 129 database checks; 516 app tests.
 
 
-## T105 — Diagnostic assessment + personalised roadmap — P0 — `[ ]`
+## T105 — Diagnostic assessment + personalised roadmap — P0 — `[-]`
 FR-ONB-01/02, FR-PLAN-01.
 - Onboarding adds: entry scheme, target date, preparation stage, language, daily study time.
 - A low-anxiety diagnostic sets an immutable baseline.
 - The generated roadmap is recalculated when new evidence arrives.
 - Daily Mission reads from the roadmap (FR-DASH-01). Every recommendation answers "why".
+**Status:** built and tested offline:
+- migration `0021_diagnostic_roadmap.sql`: preferences on `student_profiles` (onboarding moves from
+  the browser to the account); 12 diagnostic questions (8 multiple choice, scored in the database;
+  4 written, AI feedback with rubric `diagnostic` v1); an immutable baseline plus weekly
+  re-assessments
+- roadmap computed by fixed rules on every view (`lib/server/roadmap`): suggested stage shown next to
+  the self-reported one; up to three focus areas with reasons; daily-time split; Daily Mission of at
+  most three actions, each with its reason
+- pages: `/onboarding`, `/student/profile`, `/student/diagnostic` (+ `[id]`), `/student/roadmap`
+  (nav item); dashboard Today's Mission now comes from the roadmap
+- removed: browser-only onboarding and profile storage
+
+**Tests:** 147 database checks; 40 worker tests; 534 app tests.
+
 
 ## T106 — Courses + content versioning + review workflow — P0 — `[ ]`
 FR-CONT-01.
