@@ -881,7 +881,7 @@ region).
 **Acceptance:** `specs.md` §8a.4h. Tests cover token scope (outsider, cancelled, outside window).
 **Needs:** a LiveKit Cloud project (free tier). Local testing works with `livekit-server --dev`.
 
-## T095 — Session recordings — P2 — `[ ]`
+## T095 — Session recordings — P2 (PRD: after the MVP) — `[ ]`
 **Spec:** `specs.md` §8a.4h. **Depends on:** T093, T094. **Decided 2026-10-19:** record sessions.
 **Requirements:**
 - Mentor-only start and stop through LiveKit Egress, with a visible "Recording" indicator and a
@@ -891,6 +891,91 @@ region).
 - Retention: 90 days by default, removed by a scheduled job (in the worker service).
 **Acceptance:** `specs.md` §8a.4h.
 **Needs:** a paid LiveKit plan for recording minutes; consent wording reviewed for students under 18.
+
+---
+
+# Phase 9 — PRD v2.0 MVP (adopted 2026-10-19, `specs.md` §0)
+
+Built one at a time, in this order. Each task ships with tests, `status.md` and screenshots, as
+before.
+
+## T100 — Staging environment live — P0 — `[ ]`
+Supabase staging (Mumbai) and Vercel preview deployments. Apply migrations 0001–0016. Create the
+first Super Admins (`supabase/snippets/grant_super_admin.sql`). Run the 10 logged-in e2e tests and
+click through every role.
+**Needs (owner):** Supabase staging keys in `.env.local` / Vercel. **Acceptance:** every e2e test
+passes against staging.
+
+## T101 — AI foundation: worker service + evaluation engine — P0 — `[ ]`
+- A separate worker (Node + TypeScript, Railway or Render, Mumbai) with a Postgres job queue,
+  retries, timeouts and dead-letter handling.
+- Provider keys live only in the worker.
+- One evaluation engine for every practice type:
+  - versioned rubrics per dimension
+  - output = evidence → rating → confidence → feedback (§0.1)
+- Guardrails: output-schema validation, banned-claim checks (no selection prediction, no
+  diagnosis), and "AI-generated practice evaluation" labels.
+- Telemetry per call: cost and latency.
+- Every AGENTS.md §11 failure is handled, and the student's answer is never lost.
+**Needs (owner):** AI provider decision and API key (§0.6.1).
+
+## T102 — AI feedback on psychology practice — P0 — `[ ]`
+FR-PSY-01/02. Feedback on TAT/WAT/SRT/SD submissions: observed patterns only, history over time,
+shown to the student and their mentor. Timers configurable per assessment version.
+
+## T103 — AI interview with dynamic follow-ups — P0 — `[ ]`
+FR-INT-01/02. Guided, Topic and Mock modes. Follow-up questions based on the previous answer:
+clarification, evidence, depth, consistency, reflection. Structured feedback in the same session.
+Can use the student's PIQ. Text answers only.
+
+## T104 — Readiness profile — P0 — `[ ]`
+FR-DASH-02. Seven dimensions, each with a state (Developing / Improving / Strong / Needs Attention),
+its evidence trail and a confidence level, computed from mentor reviews, AI evaluations, practice
+and attendance. Shown to the student, their mentor and the academy (states only). Never a single
+number.
+
+## T105 — Diagnostic assessment + personalised roadmap — P0 — `[ ]`
+FR-ONB-01/02, FR-PLAN-01.
+- Onboarding adds: entry scheme, target date, preparation stage, language, daily study time.
+- A low-anxiety diagnostic sets an immutable baseline.
+- The generated roadmap is recalculated when new evidence arrives.
+- Daily Mission reads from the roadmap (FR-DASH-01). Every recommendation answers "why".
+
+## T106 — Courses + content versioning + review workflow — P0 — `[ ]`
+FR-CONT-01.
+- Program → course → module → lesson structure, with text and video lessons.
+- Lifecycle: Draft → Review → Approved → Published → Deprecated → Archived.
+- Published versions can't change; progress is tied to the version the learner used.
+- SME review step with audit log. AI drafts are allowed but always reviewed.
+- Uses file materials (T093).
+**Needs (owner):** content authors and SME reviewers (§0.6.2).
+
+## T107 — Structured mentor feedback + AI-prepared briefing — P0 — `[ ]`
+FR-MENT-01/02.
+- Mentor evaluation per rubric dimension (dimension → evidence → rating → recommendation), tagged
+  as mentor-sourced and merged into the readiness profile.
+- AI briefing per student before a session: history, weak areas, recent activity.
+
+## T108 — AI Mentor (grounded chat) — P0 — `[ ]`
+FR-AI-01/02.
+- Conversational guidance grounded in the approved knowledge base (T106), using retrieval.
+- Explains concepts, adjusts the plan, shows "why" on request.
+- Escalates to a mentor for disputed or high-stakes questions.
+- Memory layers with retention and deletion (§0.5). Rate-limited.
+
+## T109 — MVP hardening + pilot launch — P0 — `[ ]`
+- Run the audits: T060–T065 (authorization, state, responsive, accessibility, performance,
+  security).
+- Hindi-ready UI strings.
+- Production environment with backups, monitoring and SMTP.
+- Privacy policy, terms and consent (students may be under 18).
+- Pilot with one academy.
+
+# Phase 10 — PRD Phase 2 (P1), after the pilot
+
+T093 file materials · T094 video rooms · mentor override of AI evaluations · messaging and
+announcements · GTO digital practice · Lecturette · Mock SSB · voice capture · spaced repetition ·
+community with validation pipeline. Each gets a full task when it starts.
 
 ---
 

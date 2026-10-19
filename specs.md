@@ -4,9 +4,105 @@
 **Authority:** Defines *what* the product must do. `AGENTS.md` defines *how* to build it.
 **Last structural revision:** 2026-09-16
 
-> Scope note: this platform has no media player, video playback, watch rooms, chat rooms, playback
-> queues or real-time playback synchronisation. Any requirement of that kind found in older prompts
-> or notes belongs to a different project and must be ignored.
+> Scope note: this platform has no media player for entertainment, watch-party rooms, playback queues
+> or playback synchronisation; requirements of that kind belong to a different project. Live mentor
+> sessions in video rooms (§8a.4h) and session recordings are in scope, per the PRD (§0).
+
+---
+
+## 0. Product Source — PRD v2.0 (adopted 2026-10-19)
+
+The product requirements come from **"AI-Powered Online SSB Preparation & Academy Management
+Platform — PRD v2.0"** (August 2026, 36 pages; kept by the product owner, not committed to this
+public repository). This file carries those requirements in implementable form. Where an older
+section below conflicts with this one, **this section wins**. Record any further conflict in
+`status.md` → Decisions.
+
+### 0.1 Hard rules (PRD §5.3–5.5, §11, §12.11) — never break
+
+- Every internal result is labelled a **"Platform Assessment Result"** or an **"AI-generated practice
+  evaluation"**, never an official SSB score. Nothing predicts or guarantees selection.
+- Psychology and GTO observations are **"observed practice patterns"**, never clinical,
+  psychological or personality claims.
+- Accent is never a signal of communication quality.
+- No single composite readiness number. Readiness is a **profile across dimensions**
+  (Communication, Self-Awareness, Interview, Psychology, GTO, Revision, Consistency). Each dimension
+  gets a state (**Developing / Improving / Strong / Needs Attention**), its evidence and a
+  confidence level.
+- **Feedback structure:** Observation → Evidence → Impact → Improvement Action → Recommended
+  Practice. Low confidence means more cautious advice, never more assertive.
+- **AI and mentor evaluations are both kept** when they disagree. The mentor's is marked final; the
+  AI's is never silently overwritten.
+- **AI grounding:**
+  - Factual guidance must trace back to the approved knowledge base, and uncertainty is stated.
+  - The learner sees evidence and conclusions, never the model's internal reasoning.
+- **Content:**
+  - AI may draft content, but a human author, an SME and a reviewer approve it before publishing.
+  - Published content can't change; edits create a new version.
+- **Digital vs physical practice:** digital GTO practice always says what still needs physical,
+  offline practice.
+- **Self-reported vs observed:** self-reported confidence is kept separate from observed
+  performance.
+
+### 0.2 MVP (P0) — required to validate the core loop with one pilot academy
+
+| ID | Requirement | State on 2026-10-19 |
+|---|---|---|
+| FR-ONB-01 | Onboarding captures entry scheme, target SSB date, preparation stage, preferred language and daily study time | Partial (T030) |
+| FR-ONB-02 | A low-anxiety **diagnostic assessment** sets the starting point. The baseline is never changed; later re-assessments are stored separately | Missing |
+| FR-ONB-02 / FR-PLAN-01 | A **personalised roadmap** is generated after the diagnostic and recalculated when new evidence arrives | Missing |
+| FR-DASH-01 | **Daily Mission:** a bounded, ranked set of next actions, each explainable | Partial (Today's Mission, Do next) |
+| FR-DASH-02 | **Readiness profile** across at least 5 dimensions, with state, evidence and confidence (§0.1) | Partial (averages by area) |
+| FR-INT-01/02 | **AI interview** (Guided, Topic, Mock modes): dynamic follow-up questions based on the previous answer, then structured feedback in the same session. Text answers at MVP | Missing (fixed question lists) |
+| FR-PSY-01/02 | Timed TAT/WAT/SRT/SD with configurable timers, plus **pattern-level, non-diagnostic feedback**. Response history is kept for comparison over time | Partial (timed practice, no feedback) |
+| FR-AI-01/02 | **AI Mentor:** grounded, explainable conversational guidance. Every non-trivial recommendation shows its evidence on request | Missing |
+| FR-MENT-01 | Mentor sees an **AI-prepared briefing** of an assigned student before a session | Missing |
+| FR-MENT-02 | Mentor submits **structured feedback** per rubric dimension (dimension → evidence → rating → recommendation), tagged as mentor-sourced, merged into the student's profile | Partial (score + strengths + improvements) |
+| FR-CONT-01 | **Content versioning + lifecycle:** Draft → Review → Approved → Published → Deprecated → Archived. Published versions can't change, and a learner's history stays valid after updates | Missing (draft/published/archived only) |
+| — | Core learning content: SSB Fundamentals, OLQs, Interview, Psychology, as **courses → modules → lessons**, text and video | Partial (flat Library) |
+| FR-ACAD-01 | Academy, batch, student and mentor management | **Done** |
+| FR-SEC-01 | Role-based access and academy data isolation | **Done** (database-verified) |
+| FR-SAFE-01 | Platform/practice labelling on every result (§0.1) | Partial |
+| FR-ANLY-01 | Student sees improvement between two attempts of the same type | Partial (score trend) |
+
+### 0.3 Phase 2 (P1)
+
+- GTO digital preparation (with simulated group participants, clearly labelled) and Lecturette
+  practice (preparation + speaking timers, topic bank).
+- Mock SSB integrated session with resumable state and a 7-day improvement plan.
+- Mentor override and annotation of AI evaluations, with the original preserved.
+- Mentor-led live sessions in video rooms (§8a.4h, T094). Mentor ↔ student messaging, protected
+  from unsolicited contact.
+- Academy scheduling with conflict detection, attendance and batch analytics (**done**). Academy
+  announcements.
+- Community: discussions, study groups, a validation pipeline into the knowledge base, reputation
+  and moderation.
+- Voice capture for interview answers and audio capture for lecturettes.
+- Spaced-repetition revision engine.
+
+### 0.4 Later (P2/P3)
+
+Session recordings (T095), live events/AMAs/workshops with waitlists, real-time multiplayer GTO,
+video capture, mentor analytics, multi-campus academies, institutional licensing, and expansion to
+the written defence exams.
+
+### 0.5 Non-functional (PRD §20)
+
+- RBAC is enforced at the API layer.
+- AI memory has an explicit retention and deletion policy per layer.
+- Recordings need consent and a retention period.
+- AI chat feels real-time; long evaluations show progress, never a blocking wait.
+- Mock SSB survives a dropped connection.
+- The platform handles seasonal spikes around call-letter releases.
+- **Hindi and English:** UI text must not assume English only.
+- Mentor overrides, moderation and content publication are audited with actor, time and reason.
+
+### 0.6 Open decisions (owner: product)
+
+1. **AI provider and model routing.** This blocks every AI item in §0.2.
+2. **Who writes and SME-reviews** the knowledge base and courses.
+3. **Pricing** and the institutional licensing model.
+4. **Languages** beyond Hindi and English.
 
 ---
 
@@ -1109,9 +1205,11 @@ build. Do not invent guarantees.
 ## 13. Out of Scope for the Initial MVP
 
 Groups · Leaderboard · Achievements · Career Guide · advanced live classes · advanced events ·
-advanced attendance · advanced messaging · advanced analytics and reports · AI Mentor · Mentor AI
-Assistant · Earnings · complex scheduling · full ERP functionality · complex finance management ·
-automated billing.
+advanced attendance · advanced messaging · advanced analytics and reports · Earnings · complex
+scheduling · full ERP functionality · complex finance management · automated billing.
+
+**Superseded 2026-10-19 by the PRD (§0):** the AI Mentor and the AI-prepared mentor briefing are now
+MVP (P0). Community, GTO, Lecturette and Mock SSB are Phase 2.
 
 The 5-Day SSB Practice Journey, previously listed here, was un-deferred and built 2026-09-20 — see
 §6.4a. Mentor/Academy visibility into a student's journey progress and AI feedback on journey
