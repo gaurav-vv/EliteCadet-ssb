@@ -929,9 +929,20 @@ Claude).
 **Waiting on:** a real Claude smoke test once the key exists, and deploying the worker (staging,
 T100).
 
-## T102 — AI feedback on psychology practice — P0 — `[ ]`
+## T102 — AI feedback on psychology practice — P0 — `[-]`
 FR-PSY-01/02. Feedback on TAT/WAT/SRT/SD submissions: observed patterns only, history over time,
 shown to the student and their mentor. Timers configurable per assessment version.
+**Status:** built and tested offline:
+- migration `0018_psychology_feedback.sql`: a submitted TAT/WAT/SRT/SD test is queued for
+  evaluation; the student is notified when it's ready; per-bank timers
+- worker rubrics `psychology-{tat,wat,srt,sdt}` v1 (observed patterns only)
+- results page `/student/practice/psychology/results/[id]` and "Your recent tests"
+- mentor view `/mentor/mentees/[id]/practice/[attemptId]`
+- Super Admin timer form on the bank page
+
+**Tests:** 106 database checks; 28 worker tests, including the end-to-end submit → evaluate →
+notify flow; 483 app tests.
+**Waiting on:** the real Claude call (API key), deferred to the end by the owner.
 
 ## T103 — AI interview with dynamic follow-ups — P0 — `[ ]`
 FR-INT-01/02. Guided, Topic and Mock modes. Follow-up questions based on the previous answer:

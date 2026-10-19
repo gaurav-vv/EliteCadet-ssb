@@ -34,6 +34,7 @@ describe.skipIf(!URL)("queue against Postgres", () => {
     const ev = (await pool.query("select * from public.ai_evaluations where job_id = $1", [id])).rows[0];
     expect(ev.label).toBe("AI-generated practice evaluation");
     expect(ev.dimensions).toHaveLength(4);
+    expect(ev.dimensions[0].name).toBe("Relevance");
     expect(ev.feedback).toEqual(goodEvaluation().feedback);
     const usage = (await pool.query("select * from public.ai_usage where job_id = $1", [id])).rows;
     expect(usage).toHaveLength(1);
@@ -75,5 +76,36 @@ describe.skipIf(!URL)("queue against Postgres", () => {
     expect(new Set(taken).size).toBe(taken.length);
     const held = a.rows[0]?.id;
     if (held) await expect(pool.query("select public.ai_fail_job($1, 'wb', 'x', true)", [held])).rejects.toThrow(/not held/);
+  });
+});
+
+describe.skipIf(!URL)("psychology test → AI feedback, end to end", () => {
+  it("a submitted TAT test is evaluated with the TAT rubric, stored with dimension names, and the student is notified", async () => {
+    const pool = new pg.Pool({ connectionString: URL });
+    try {
+      const student = (await pool.query("select id from public.profiles where role = 'student' limit 1")).rows[0].id;
+      const item = (await pool.query("select id, prompt from public.practice_items where bank_slug = 'tat' and key = 'tat-3'")).rows[0];
+      const answer = "Arjun gathers the villagers and plans how to repair the bridge before the rains.";
+      const attempt = (await pool.query("insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers) values ($1, 'tat', 'test', $2, $3::jsonb) returning id", [student, `e2e-${crypto.randomUUID()}`, JSON.stringify([{ itemId: item.id, response: answer }])])).rows[0].id;
+      const tat = {
+        dimensions: ["perception", "central_character", "action", "outcome", "structure"].map((d) => ({ dimension: d, rating: "developing", confidence: "medium", evidence: d === "action" ? ["plans how to repair the bridge"] : [], note: "Seen in the story." })),
+        feedback: goodEvaluation().feedback,
+        overall_confidence: "medium",
+      };
+      const { client, calls } = fakeClient(() => message({ json: tat }));
+      // Only this job is due now (others in this database may be backing off).
+      await pool.query("update public.ai_jobs set run_after = now() + interval '1 hour' where status = 'queued' and subject_id <> $1", [attempt]);
+      await runOnce(pool, client, "w-e2e", 5, SETTINGS, quiet);
+      const system = JSON.stringify(calls[0].body.system);
+      expect(system).toContain("psychology-tat v1");
+      expect(JSON.stringify(calls[0].body.messages)).toContain(item.prompt.slice(0, 30));
+      const ev = (await pool.query("select * from public.ai_evaluations where subject_id = $1", [attempt])).rows[0];
+      expect(ev.rubric_id).toBe("psychology-tat");
+      expect(ev.dimensions.find((d: { dimension: string }) => d.dimension === "action").name).toBe("Action toward the goal");
+      const note = (await pool.query("select href from public.notifications where recipient_id = $1 and kind = 'ai_feedback_ready' and ref_id = $2", [student, ev.id])).rows[0];
+      expect(note.href).toBe(`/student/practice/psychology/results/${attempt}`);
+    } finally {
+      await pool.end();
+    }
   });
 });

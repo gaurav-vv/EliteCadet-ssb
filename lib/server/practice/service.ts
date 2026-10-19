@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 import { getMyMentee } from "@/lib/server/academy-people/service";
 import { getActor, type Actor } from "@/lib/server/auth/guard";
 import { cleanAnswerPatch, cleanAttemptAnswers, cleanMockReview, isClientKey, isKey, isSlug, streakDays, validateItemInput, type ItemFieldErrors } from "@/lib/server/practice/validation";
+import { parseTiming, type TimingConfig } from "@/lib/practice/config";
 import { createClient } from "@/lib/supabase/server";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
 import { isUuid } from "@/lib/server/users/validation";
@@ -64,7 +65,7 @@ export async function getBank(slug: string, opts: { forTest?: boolean } = {}): P
   if (!isSlug(slug)) return fail("not_found", NO_BANK);
   const supabase = await createClient();
   const [bank, items] = await Promise.all([
-    supabase.from("practice_banks").select("slug, title, item_kind").eq("slug", slug).maybeSingle(),
+    supabase.from("practice_banks").select("slug, title, item_kind, timing").eq("slug", slug).maybeSingle(),
     supabase.from("practice_items").select(ITEM_COLS).eq("bank_slug", slug).eq("active", true).order("position").limit(500),
   ]);
   const failed = bank.error ?? items.error;
@@ -78,6 +79,7 @@ export async function getBank(slug: string, opts: { forTest?: boolean } = {}): P
       title: text(bank.data.title),
       kind,
       items: ((items.data ?? []) as Row[]).map((r) => toStudentItem(r, kind, !opts.forTest)).filter((i): i is McqItem | GuidedPracticeItem => i !== null),
+      timing: parseTiming(bank.data.timing),
     },
   };
 }
@@ -266,7 +268,7 @@ export async function getMenteePractice(studentId: string): Promise<ServiceResul
       .eq("student_id", studentId)
       .order("updated_at", { ascending: false })
       .limit(15),
-    supabase.from("practice_attempts").select("id, mode, correct, total, submitted_at, bank:practice_banks(title)").eq("student_id", studentId).order("submitted_at", { ascending: false }).limit(10),
+    supabase.from("practice_attempts").select("id, bank_slug, mode, correct, total, submitted_at, bank:practice_banks(title)").eq("student_id", studentId).order("submitted_at", { ascending: false }).limit(10),
   ]);
   const failed = answers.error ?? attempts.error;
   if (failed) return mapDbError(failed, "We couldn't load this student's practice. Please try again.");
@@ -282,7 +284,7 @@ export async function getMenteePractice(studentId: string): Promise<ServiceResul
         if (!answer) return [];
         return [{ bankTitle: text(one(item.bank)?.title), prompt: text(item.prompt), answer, done: r.done === true, updatedAt: text(r.updated_at) }];
       }),
-      attempts: ((attempts.data ?? []) as Row[]).map((r) => ({ id: r.id as string, bankTitle: text(one(r.bank)?.title), mode: r.mode === "mock" ? "mock" : "test", correct: typeof r.correct === "number" ? r.correct : null, total: Number(r.total) || 0, submittedAt: text(r.submitted_at) })),
+      attempts: ((attempts.data ?? []) as Row[]).map((r) => ({ id: r.id as string, bankSlug: text(r.bank_slug), bankTitle: text(one(r.bank)?.title), mode: r.mode === "mock" ? "mock" : "test", correct: typeof r.correct === "number" ? r.correct : null, total: Number(r.total) || 0, submittedAt: text(r.submitted_at) })),
     },
   };
 }
@@ -329,7 +331,7 @@ export async function getBankAdmin(slug: string): Promise<ServiceResult<{ bank: 
   if (!isSlug(slug)) return fail("not_found", NO_BANK);
   const supabase = await createClient();
   const [bank, items] = await Promise.all([
-    supabase.from("practice_banks").select("slug, title, item_kind").eq("slug", slug).maybeSingle(),
+    supabase.from("practice_banks").select("slug, title, item_kind, timing").eq("slug", slug).maybeSingle(),
     supabase.from("practice_items").select(ITEM_COLS).eq("bank_slug", slug).order("position").limit(500),
   ]);
   const failed = bank.error ?? items.error;
@@ -339,7 +341,7 @@ export async function getBankAdmin(slug: string): Promise<ServiceResult<{ bank: 
   return {
     ok: true,
     data: {
-      bank: { slug, title: text(bank.data.title), kind: bank.data.item_kind === "mcq" ? "mcq" : "response", active: list.filter((i) => i.active).length, inactive: list.filter((i) => !i.active).length },
+      bank: { slug, title: text(bank.data.title), kind: bank.data.item_kind === "mcq" ? "mcq" : "response", timing: parseTiming(bank.data.timing), active: list.filter((i) => i.active).length, inactive: list.filter((i) => !i.active).length },
       items: list,
     },
   };
@@ -409,5 +411,27 @@ export async function moveItem(id: string, direction: "up" | "down"): Promise<Se
   const supabase = await createClient();
   const { error } = await supabase.rpc("practice_move_item", { p_item: id, p_direction: direction === "up" ? -1 : 1 });
   if (error) return mapDbError(error, "We couldn't reorder that question. Please try again.");
+  return { ok: true, data: null };
+}
+
+// ---- Super Admin: timers (FR-PSY-01) ------------------------------------------------------
+
+export async function getBankTimings(slugs: string[]): Promise<Record<string, TimingConfig | null>> {
+  const valid = slugs.filter(isSlug);
+  if (valid.length === 0) return {};
+  const supabase = await createClient();
+  const { data } = await supabase.from("practice_banks").select("slug, timing").in("slug", valid);
+  return Object.fromEntries(((data ?? []) as Row[]).map((r) => [r.slug as string, parseTiming(r.timing)]));
+}
+
+/** `null` restores the standard timing. */
+export async function setBankTiming(slug: string, raw: unknown): Promise<ServiceResult<null>> {
+  if (!(await superAdmin())) return fail("unauthorized", "Only a super admin can change timers.");
+  if (!isSlug(slug)) return fail("not_found", NO_BANK);
+  const timing = raw === null ? null : parseTiming(raw);
+  if (raw !== null && !timing) return fail("validation_error", "Enter a valid timer.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_practice_bank_timing", { p_slug: slug, p_timing: timing });
+  if (error) return mapDbError(error, "We couldn't save the timer. Please try again.");
   return { ok: true, data: null };
 }

@@ -55,3 +55,9 @@ export async function moveItemAction(slug: string, id: string, direction: "up" |
   if (result.ok) refreshBank(slug);
   return result;
 }
+
+export async function setBankTimingAction(slug: string, timing: unknown) {
+  const result = await service.setBankTiming(slug, timing);
+  if (result.ok) refreshBank(slug);
+  return result;
+}

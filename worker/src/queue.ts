@@ -22,12 +22,14 @@ export async function claimJobs(pool: Pool, workerId: string, limit: number): Pr
   return rows;
 }
 
-export async function completeJob(pool: Pool, job: AiJob, workerId: string, model: string, evaluation: Evaluation): Promise<void> {
+// Each dimension is stored with its display name, so the
+// app can render an evaluation without its own copy of the rubric.
+export async function completeJob(pool: Pool, job: AiJob, workerId: string, model: string, evaluation: Evaluation, names: Record<string, string>): Promise<void> {
   await pool.query("select public.ai_complete_job($1, $2, $3, $4::jsonb, $5::jsonb, $6::public.ai_confidence)", [
     job.id,
     workerId,
     model,
-    JSON.stringify(evaluation.dimensions),
+    JSON.stringify(evaluation.dimensions.map((d) => ({ ...d, name: names[d.dimension] ?? d.dimension }))),
     JSON.stringify(evaluation.feedback),
     evaluation.overall_confidence,
   ]);

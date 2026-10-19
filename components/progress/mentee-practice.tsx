@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatIstDay } from "@/lib/server/sessions/validation";
 import type { MenteePracticeAnswer, MenteePracticeAttempt } from "@/types/practice";
 
 // A mentee's own practice, as their mentor sees it (0014: mentors of the
 // student's batch can read answers). Preparation work, not an evaluation.
-export function MenteePractice({ answers, attempts }: { answers: MenteePracticeAnswer[]; attempts: MenteePracticeAttempt[] }) {
+const PSYCHOLOGY = ["tat", "wat", "srt", "sdt"];
+
+export function MenteePractice({ studentId, answers, attempts }: { studentId: string; answers: MenteePracticeAnswer[]; attempts: MenteePracticeAttempt[] }) {
   if (answers.length === 0 && attempts.length === 0) {
     return (
       <div className="glass-regular rounded-card">
@@ -47,7 +50,13 @@ export function MenteePractice({ answers, attempts }: { answers: MenteePracticeA
                     {t.mode === "mock" ? "Mock run" : "Timed test"} · {formatIstDay(t.submittedAt)}
                   </span>
                 </span>
-                <span className="shrink-0 text-ink">{t.correct !== null ? `${t.correct} / ${t.total} correct` : `${t.total} answered`}</span>
+                {t.mode === "test" && PSYCHOLOGY.includes(t.bankSlug) ? (
+                  <Link href={`/mentor/mentees/${studentId}/practice/${t.id}`} className="inline-flex min-h-11 shrink-0 items-center text-brand-accent hover:underline">
+                    Answers & AI feedback
+                  </Link>
+                ) : (
+                  <span className="shrink-0 text-ink">{t.correct !== null ? `${t.correct} / ${t.total} correct` : `${t.total} answered`}</span>
+                )}
               </li>
             ))}
           </ul>

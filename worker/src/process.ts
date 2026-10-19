@@ -40,7 +40,7 @@ export async function processJob(pool: Pool, client: MessagesClient, job: AiJob,
   await logUsage(pool, job.id, outcome.usage, outcome.ok ? "succeeded" : outcome.code);
 
   if (outcome.ok) {
-    await completeJob(pool, job, workerId, outcome.model, outcome.evaluation);
+    await completeJob(pool, job, workerId, outcome.model, outcome.evaluation, Object.fromEntries(rubric.dimensions.map((d) => [d.id, d.name])));
     log.info("job succeeded", { job: job.id, rubric: `${rubric.id}@${rubric.version}`, model: outcome.model, attempt: job.attempts });
     return "succeeded";
   }

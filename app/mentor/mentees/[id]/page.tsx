@@ -76,7 +76,7 @@ export default async function MenteeDetailPage({ params }: { params: Promise<{ i
       <section aria-labelledby="practice-heading" className="flex flex-col gap-3">
         <h2 id="practice-heading" className="text-[18px] font-semibold text-ink">Practice</h2>
         {practice.ok && practice.data ? (
-          <MenteePractice answers={practice.data.answers} attempts={practice.data.attempts} />
+          <MenteePractice studentId={id} answers={practice.data.answers} attempts={practice.data.attempts} />
         ) : (
           <RetryErrorState message={practice.error?.message ?? "We couldn't load this student's practice. Please try again."} />
         )}

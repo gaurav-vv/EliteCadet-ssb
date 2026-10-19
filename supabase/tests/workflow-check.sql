@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0017 under real RLS.
+-- End-to-end workflow check of migrations 0001–0018 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -315,5 +315,36 @@ select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenti
 select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 0, 'academy admin cannot read AI feedback text');
 reset role;
 select t.fails(format('insert into public.ai_evaluations (job_id, subject_type, subject_id, student_id, rubric_id, rubric_version, model, label, dimensions, feedback, overall_confidence) values (gen_random_uuid(), %L, gen_random_uuid(), %L, %L, 1, %L, %L, %L, %L, %L)', 'x_x', :'S1', 'r', 'm', 'Official SSB score', '[{}]', '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'high'), 'every evaluation must carry the AI practice label');
+
+-- ---------- 11. Psychology AI feedback (0018) ----------
+select id as "TAT2" from public.practice_items where bank_slug = 'tat' and key = 'tat-2' \gset
+select id as "WAT1" from public.practice_items where bank_slug = 'wat' and key = 'wat-1' \gset
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers)
+  values (:'S1', 'tat', 'test', 'psy-0000000001', json_build_array(json_build_object('itemId', :'TAT2', 'response', 'Ravi calls a meeting and plans the relief work.'))::jsonb);
+select id as "PSY_ATT" from public.practice_attempts where client_key = 'psy-0000000001' \gset
+insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers)
+  values (:'S1', 'wat', 'test', 'psy-0000000002', json_build_array(json_build_object('itemId', :'WAT1', 'response', '   '))::jsonb);
+reset role;
+select t.eq((select count(*) from public.ai_jobs where subject_id = :'PSY_ATT' and rubric_id = 'psychology-tat' and rubric_version = 1), 1, 'submitting a TAT test queues one AI evaluation');
+select t.eq((select count(*) from public.ai_jobs where subject_id = :'PSY_ATT' and input->'items'->0->>'response' = 'Ravi calls a meeting and plans the relief work.' and input->'items'->0->>'prompt' <> ''), 1, '...with the question and answer snapshotted');
+select t.eq((select count(*) from public.ai_jobs j join public.practice_attempts a on a.id = j.subject_id where a.client_key = 'psy-0000000002'), 0, 'a test with nothing written is not queued');
+select t.eq((select count(*) from public.ai_jobs j join public.practice_attempts a on a.id = j.subject_id where a.client_key in ('run-0000000001', 'run-0000000004')), 0, 'OIR tests and mock interviews are not queued for psychology feedback');
+
+select id as "PSYJOB" from public.ai_claim_jobs('w-psy', 5) where subject_id = :'PSY_ATT' \gset
+select public.ai_complete_job(:'PSYJOB', 'w-psy', 'claude-opus-5-5',
+  '[{"dimension":"action","name":"Action toward the goal","rating":"strong","confidence":"medium","evidence":["plans the relief work"],"note":"The character acts."}]',
+  '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'medium');
+select t.eq(t.n(:'S1', 'ai_feedback_ready'), 1, 'notify: student told their practice feedback is ready');
+select t.eq((select count(*) from public.notifications where recipient_id = :'S1' and kind = 'ai_feedback_ready' and href = '/student/practice/psychology/results/' || :'PSY_ATT'), 1, '...linking to the results page');
+
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.fails('select public.set_practice_bank_timing(''srt'', ''{"mode":"budget","totalSeconds":1200}'')', 'a student cannot change timers');
+reset role;
+select set_config('request.jwt.claim.sub', :'SUPER', false); set role authenticated;
+select public.set_practice_bank_timing('srt', '{"mode":"budget","totalSeconds":1200}');
+select t.eq((select (timing->>'totalSeconds')::bigint from public.practice_banks where slug = 'srt'), 1200, 'super admin sets the SRT timer');
+select t.fails('select public.set_practice_bank_timing(''wat'', ''{"mode":"carousel","responseSeconds":1}'')', 'an out-of-range timer is refused');
+reset role;
 \echo
 \echo ALL CHECKS PASSED

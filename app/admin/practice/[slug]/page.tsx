@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { PracticeItemForm } from "@/components/admin/practice/item-form";
 import { PracticeItemList } from "@/components/admin/practice/item-list";
+import { TimerForm } from "@/components/admin/practice/timer-form";
+import { isPsychologyTest } from "@/lib/practice/activities";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -30,6 +32,14 @@ export default async function PracticeBankPage({ params }: { params: Promise<{ s
             title={result.data.bank.title}
             subtitle={`${result.data.bank.active} questions students see${result.data.bank.inactive ? `, ${result.data.bank.inactive} hidden` : ""}. Hiding a question keeps students' saved answers.`}
           />
+          {isPsychologyTest(slug) && (
+            <section aria-labelledby="timer-heading" className="glass-regular flex flex-col gap-4 rounded-card p-6">
+              <h2 id="timer-heading" className="text-[18px] font-semibold text-ink">
+                Timer
+              </h2>
+              <TimerForm test={slug} current={result.data.bank.timing ?? null} />
+            </section>
+          )}
           <section aria-labelledby="add-heading" className="glass-regular flex flex-col gap-4 rounded-card p-6">
             <h2 id="add-heading" className="text-[18px] font-semibold text-ink">
               Add a question

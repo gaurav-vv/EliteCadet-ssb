@@ -1754,6 +1754,22 @@ What remains:
 Next task:
 - T102
 
+Date: 2026-10-19
+Task: T102 — AI feedback on psychology practice
+Status: Complete in code; VERIFIED offline (fake model, local Postgres 17). Real Claude call deferred to the end (owner decision)
+
+What changed:
+- `0018_psychology_feedback.sql`: trigger on `practice_attempts` queues `psychology-<test>` v1 evaluations for timed TAT/WAT/SRT/SD tests (question + answer snapshot; blank tests not queued); `ai_feedback_ready` notification with a link to the results page; `practice_banks.timing` + super-admin-only `set_practice_bank_timing`
+- Worker: four psychology rubrics whose dimensions describe the responses, never the person; dimension names stored with each evaluation
+- App: `lib/server/ai/feedback.ts`; `components/practice/{ai-feedback,attempt-answers,pending-refresh}.tsx`; student results page + "Your recent tests"; submit screen links to feedback; mentor attempt view linked from the mentee's Practice section; Super Admin timer form; configured timers used in the tests and shown on the Psychology page
+- Tests: app 483 (13 new), worker 28 (rubric safety + end-to-end), database 106 checks (9 new); screenshots in `docs/screenshots/t102/`
+
+What remains:
+- Real Claude evaluation once the API key is added (deferred)
+
+Next task:
+- T103 — AI interview with dynamic follow-ups
+
 ## 14. North Star
 
 > **Build the smallest reliable web product that proves students prepare better with structured
