@@ -16,6 +16,8 @@ import { getMenteeProgress } from "@/lib/server/progress/service";
 import { MenteePractice } from "@/components/progress/mentee-practice";
 import { getMenteePractice } from "@/lib/server/practice/service";
 import { getMenteeInterviews } from "@/lib/server/ai/interview";
+import { ReadinessProfileView } from "@/components/progress/readiness-profile";
+import { getStudentReadiness } from "@/lib/server/readiness/service";
 
 export const metadata: Metadata = { title: "Mentee" };
 
@@ -32,7 +34,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 // batch, another academy, or nonexistent — is the same "not found" (specs §7.4).
 export default async function MenteeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [result, history, progress, practice, interviews] = await Promise.all([getMyMentee(id), getMenteeHistory(id), getMenteeProgress(id), getMenteePractice(id), getMenteeInterviews(id, 5)]);
+  const [result, history, progress, practice, interviews, readiness] = await Promise.all([getMyMentee(id), getMenteeHistory(id), getMenteeProgress(id), getMenteePractice(id), getMenteeInterviews(id, 5), getStudentReadiness(id, new Date().toISOString())]);
   if (!result.ok && result.error?.code === "not_found") notFound();
 
   if (!result.ok || !result.data) {
@@ -73,6 +75,8 @@ export default async function MenteeDetailPage({ params }: { params: Promise<{ i
           <RetryErrorState message={progress.error?.message ?? "We couldn't load this student's progress. Please try again."} />
         )}
       </section>
+
+      {readiness.ok && readiness.data && <ReadinessProfileView profile={readiness.data} />}
 
       <section aria-labelledby="practice-heading" className="flex flex-col gap-3">
         <h2 id="practice-heading" className="text-[18px] font-semibold text-ink">Practice</h2>

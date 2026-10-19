@@ -5,9 +5,10 @@ import { ChevronLeft } from "lucide-react";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { StatusBadge } from "@/components/academy/shared/status-badge";
 import { StudentRowActions } from "@/components/academy/students/student-row-actions";
-import { EmptyState } from "@/components/ui/empty-state";
+import { ReadinessProfileView } from "@/components/progress/readiness-profile";
 import { getAcademyBatchOptions } from "@/lib/api/batches";
 import { getAcademyStudent } from "@/lib/server/academy-people/service";
+import { getStudentReadiness } from "@/lib/server/readiness/service";
 import { formatDay } from "@/lib/utils/format-date";
 
 export const metadata: Metadata = { title: "Student" };
@@ -25,7 +26,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 // "not found" (server-side scope + RLS), never partial data.
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [result, batches] = await Promise.all([getAcademyStudent(id), getAcademyBatchOptions()]);
+  const [result, batches, readiness] = await Promise.all([getAcademyStudent(id), getAcademyBatchOptions(), getStudentReadiness(id, new Date().toISOString())]);
   if (!result.ok && result.error?.code === "not_found") notFound();
 
   if (!result.ok || !result.data) {
@@ -66,12 +67,11 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         <InfoCard label="Last login">{formatDay(student.lastLoginAt) ?? <span className="text-ink-secondary">Never</span>}</InfoCard>
       </section>
 
-      <section aria-labelledby="progress-heading" className="flex flex-col gap-3">
-        <h2 id="progress-heading" className="text-[18px] font-semibold text-ink">Progress</h2>
-        <div className="glass-regular rounded-card">
-          <EmptyState title="No progress data yet" description="Practice, assessment and attendance tracking arrive in a later phase." />
-        </div>
-      </section>
+      {readiness.ok && readiness.data ? (
+        <ReadinessProfileView profile={readiness.data} />
+      ) : (
+        <RetryErrorState message={readiness.error?.message ?? "We couldn't load this student's readiness profile. Please try again."} />
+      )}
     </div>
   );
 }

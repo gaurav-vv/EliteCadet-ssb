@@ -4,6 +4,7 @@
 
 import type { AttentionStudent, CategoryAverage, ProgressSummary, Recommendation } from "@/types/progress";
 import type { JourneyMission } from "@/types/practice";
+import type { ReadinessProfile } from "@/types/readiness";
 import type { SessionRecord } from "@/types/sessions";
 
 export interface ActivityEntry {
@@ -22,6 +23,8 @@ export interface StudentDashboard {
   recentActivity: ActivityEntry[];
   /** The next self-paced practice bank to work on (Today's Mission). */
   mission: JourneyMission;
+  /** Readiness profile states (FR-DASH-02); null if it couldn't be loaded. */
+  readiness: ReadinessProfile | null;
   /** Consecutive IST days with practice, ending today or yesterday. */
   streakDays: number;
 }

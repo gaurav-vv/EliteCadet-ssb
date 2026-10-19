@@ -13,6 +13,7 @@ import { countStartingWithin, isIstToday, isPendingReview, monthlyAverages, scor
 import { attentionReason, averagePct, categoryAverages, sortAttention, summarize } from "@/lib/server/progress/compute";
 import { getMyJourneyProgress } from "@/lib/server/practice/journey-progress";
 import { getMyStreak } from "@/lib/server/practice/service";
+import { getMyReadiness } from "@/lib/server/readiness/service";
 import { getAcademyPerformance, getMyProgress, toScorePoint } from "@/lib/server/progress/service";
 import { getAcademySessions, getMySessions, getMyStudentSessions } from "@/lib/server/sessions/service";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +30,7 @@ const ACTIVITY_LIMIT = 5;
 export async function getStudentDashboard(nowIso: string): Promise<ServiceResult<StudentDashboard>> {
   const me = await getActor();
   if (!me || me.profile.role !== "student") return fail("Only a student has this dashboard.");
-  const [progress, sessions, assessments, journey, streakDays] = await Promise.all([getMyProgress(nowIso), getMyStudentSessions("upcoming", nowIso), getStudentAssessments(), getMyJourneyProgress(), getMyStreak(nowIso)]);
+  const [progress, sessions, assessments, journey, streakDays, readiness] = await Promise.all([getMyProgress(nowIso), getMyStudentSessions("upcoming", nowIso), getStudentAssessments(), getMyJourneyProgress(), getMyStreak(nowIso), getMyReadiness(nowIso)]);
   if (!progress.ok || !progress.data) return progress as ServiceResult<never>;
 
   const activity: ActivityEntry[] = [];
@@ -54,6 +55,7 @@ export async function getStudentDashboard(nowIso: string): Promise<ServiceResult
       // A failed journey read hides the mission card rather than failing the dashboard.
       mission: journey.ok && journey.data ? journey.data.mission : null,
       streakDays,
+      readiness: readiness.ok && readiness.data ? readiness.data : null,
     },
   };
 }

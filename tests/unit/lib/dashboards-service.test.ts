@@ -11,6 +11,7 @@ vi.mock("@/lib/server/assessments/service", () => ({ getAcademyAssessments: vi.f
 vi.mock("@/lib/server/sessions/service", () => ({ getAcademySessions: vi.fn(), getMySessions: vi.fn(), getMyStudentSessions: vi.fn() }));
 vi.mock("@/lib/server/practice/journey-progress", () => ({ getMyJourneyProgress: vi.fn(async () => ({ ok: true, data: { bySlug: {}, overall: { done: 3, total: 10 }, days: [], mission: { dayNumber: 1, title: "OIR Practice", href: "/student/practice/day-1/oir-practice", done: 3, total: 10 } } })) }));
 vi.mock("@/lib/server/practice/service", () => ({ getMyStreak: vi.fn(async () => 2) }));
+vi.mock("@/lib/server/readiness/service", () => ({ getMyReadiness: vi.fn(async () => ({ ok: true, data: { dimensions: [], generatedAt: "t" } })) }));
 vi.mock("@/lib/server/progress/service", async (orig) => ({ ...(await orig<typeof import("@/lib/server/progress/service")>()), getAcademyPerformance: vi.fn(), getMyProgress: vi.fn() }));
 
 import { countStudents, findMyBatchIds } from "@/lib/server/academy-people/repository";
@@ -77,6 +78,7 @@ describe("getStudentDashboard", () => {
     expect(res.data?.recentActivity[0].detail).toBe("Score 7/10");
     expect(res.data?.mission).toMatchObject({ title: "OIR Practice", done: 3, total: 10 });
     expect(res.data?.streakDays).toBe(2);
+    expect(res.data?.readiness).toEqual({ dimensions: [], generatedAt: "t" });
   });
 });
 

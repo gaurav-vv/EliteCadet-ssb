@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarClock, History, ListChecks } from "lucide-react";
 import { ContinueJourneyCard } from "@/components/practice/continue-journey-card";
 import { ProgressStats } from "@/components/progress/progress-views";
+import { ReadinessStrip } from "@/components/progress/readiness-profile";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPanel, ListRow } from "@/components/ui/list-panel";
@@ -43,6 +44,7 @@ export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: 
             <p className="mt-1 text-[14px] text-ink-secondary sm:text-[15px]">Your next steps and progress, from your mentor&apos;s reviews and your sessions.</p>
           </div>
       <ProgressStats summary={d.summary} />
+      {d.readiness && <ReadinessStrip profile={d.readiness} />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <ContinueJourneyCard mission={d.mission} heading="Today's Mission" />

@@ -961,11 +961,20 @@ Can use the student's PIQ. Text answers only.
 **Tests:** 119 database checks; 39 worker tests, including the full interview flow on Postgres;
 495 app tests.
 
-## T104 — Readiness profile — P0 — `[ ]`
+## T104 — Readiness profile — P0 — `[-]`
 FR-DASH-02. Seven dimensions, each with a state (Developing / Improving / Strong / Needs Attention),
 its evidence trail and a confidence level, computed from mentor reviews, AI evaluations, practice
 and attendance. Shown to the student, their mentor and the academy (states only). Never a single
 number.
+**Status:** built and tested offline:
+- migration `0020_readiness_signals.sql`: one access-checked function returning numbers only
+- fixed, explainable rules in `lib/server/readiness/compute.ts`: mentor reviews lead once there are
+  two; "improving" from recent trends; "not enough evidence" instead of guessing; confidence
+- shown on the student's Progress page and dashboard, the mentor's mentee page, and the academy
+  student page (states only)
+
+**Tests:** 129 database checks; 516 app tests.
+
 
 ## T105 — Diagnostic assessment + personalised roadmap — P0 — `[ ]`
 FR-ONB-01/02, FR-PLAN-01.

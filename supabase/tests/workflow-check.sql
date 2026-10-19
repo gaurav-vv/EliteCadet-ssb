@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0019 under real RLS.
+-- End-to-end workflow check of migrations 0001–0020 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -377,6 +377,29 @@ select t.fails(format('select public.interview_append_question(%L, %L, ''new_top
 select t.fails(format('update public.interview_turns set answer = %L where id = %L', 'changed', :'INT_T1'), 'answers cannot be edited afterwards');
 select public.skip_interview_wait(:'INT_S');
 select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S' and seq = 2 and kind = 'bank'), 1, 'skipping the wait continues from the question bank');
+reset role;
+
+-- ---------- 13. Readiness signals (0020) ----------
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select public.readiness_signals(:'S1') as "RS" \gset
+select t.eq(((:'RS')::jsonb -> 'mentor' -> 0 ->> 'n')::bigint, 1, 'readiness: the student''s mentor review is counted');
+select t.eq(((:'RS')::jsonb -> 'mentor' -> 0 ->> 'avg_pct')::numeric::bigint, 70, '...with its average');
+select t.eq((select count(*) from jsonb_array_elements((:'RS')::jsonb -> 'ai') x where x->>'rubric_id' = 'psychology-tat'), 1, 'readiness: AI practice feedback ratings are counted');
+select t.eq((case when ((:'RS')::jsonb ->> 'active_days_28')::int >= 1 then 1 else 0 end), 1, 'readiness: active days are counted');
+select t.eq((case when (:'RS')::jsonb::text ~ '(Ravi calls|plans the relief|My answer)' then 1 else 0 end), 0, 'readiness signals contain no answer or feedback text');
+select t.fails(format('select public.readiness_signals(%L)', :'S2'), 'a student cannot read another student''s signals');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from (select public.readiness_signals(:'S1')) x), 1, 'their mentor reads the signals');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from (select public.readiness_signals(:'S1')) x), 1, 'their academy admin reads the signals (states only in the app)');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.fails(format('select public.readiness_signals(%L)', :'S1'), 'another academy''s mentor cannot');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_B', false); set role authenticated;
+select t.fails(format('select public.readiness_signals(%L)', :'S1'), 'another academy''s admin cannot');
 reset role;
 \echo
 \echo ALL CHECKS PASSED
