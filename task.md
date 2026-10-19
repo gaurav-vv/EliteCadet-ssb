@@ -906,7 +906,7 @@ click through every role.
 **Needs (owner):** Supabase staging keys in `.env.local` / Vercel. **Acceptance:** every e2e test
 passes against staging.
 
-## T101 — AI foundation: worker service + evaluation engine — P0 — `[ ]`
+## T101 — AI foundation: worker service + evaluation engine — P0 — `[-]`
 - A separate worker (Node + TypeScript, Railway or Render, Mumbai) with a Postgres job queue,
   retries, timeouts and dead-letter handling.
 - Provider keys live only in the worker.
@@ -917,7 +917,17 @@ passes against staging.
   diagnosis), and "AI-generated practice evaluation" labels.
 - Telemetry per call: cost and latency.
 - Every AGENTS.md §11 failure is handled, and the student's answer is never lost.
-**Needs (owner):** AI provider decision and API key (§0.6.1).
+**Needs (owner):** an Anthropic API key in the worker host's settings (provider decided 2026-10-19:
+Claude).
+**Status:** built and tested offline with a fake model client:
+- migration `0017_ai_jobs.sql`
+- `worker/`: queue, evaluation engine, guardrails, telemetry, `general-response` v1 rubric
+- 20 worker tests (16 engine, 4 queue against Postgres)
+- 12 new RLS checks (97 total)
+- a CI job running both against a throwaway Postgres
+
+**Waiting on:** a real Claude smoke test once the key exists, and deploying the worker (staging,
+T100).
 
 ## T102 — AI feedback on psychology practice — P0 — `[ ]`
 FR-PSY-01/02. Feedback on TAT/WAT/SRT/SD submissions: observed patterns only, history over time,

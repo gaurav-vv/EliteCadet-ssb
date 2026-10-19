@@ -308,6 +308,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Notifications come from database triggers; analytics from one guarded SQL function** (T089, `0013_notifications_analytics.sql`). Events write `notifications` rows inside the same transaction as the change: sessions scheduled or cancelled, assessments opened, submissions, reviews, batch membership, content requests. No code path can forget one, and there is no insert policy, so clients can't forge one. Recipients can only set `read_at` (column grant). Each event notifies a person once (`ref_id` de-duplication), except content-request status changes. Hrefs are same-site paths, checked in the DB and the service. Platform analytics is a SECURITY DEFINER function that refuses everyone but a super admin, so aggregates don't widen any table's RLS. The bell's badge is rendered by the layout and its list is fetched when it opens. There is no realtime push yet | Brief Phase 10 + `AGENTS.md` §10 (server-side authorization) + §15 (no infrastructure without measured need: realtime deferred) |
 | 2026-10-08 | **Practice banks and saved practice move to Postgres** (T083b, `0014_practice.sql`). The 11 question banks (209 items) are seeded with the exact shipped content and edited only by the Super Admin; the journey's days/modules/copy stay in code and point at banks by slug. Students' self-paced answers, ticks and "done" are saved per question; timed tests and mock runs are saved once per run (idempotent on a browser-generated key) and MCQ is scored by the database, so a test never ships the correct options. The student and their batch's mentors can read answers; academy and super admins get counts only via `practice_stats()`. Items are hidden, never deleted, so answers keep their question. PIQ-based questions, the PIQ form and the self-assessment stay on the device | User decisions 2026-10-08 (scope: banks + saved practice; editors: Super Admin only; visibility: student + mentors) + `AGENTS.md` §8, §11 (never lose input) |
 | 2026-10-19 | **The PRD v2.0 is the product source** (`specs.md` §0). Its hard rules — no official-score or selection language, non-diagnostic psychology, readiness as a multi-dimension profile never a single number, AI and mentor evaluations both preserved, versioned expert-reviewed content — override older sections. The AI Mentor and mentor briefing move from out-of-scope to MVP. Recordings (T095) move to P2 per the PRD. The PRD PDF stays with the product owner (not committed to this public repo) | User decision 2026-10-19 + `AGENTS.md` §0 (specs.md is authoritative for what to build) |
+| 2026-10-19 | **AI runs only in a separate worker over a Postgres queue** (T101, `0017_ai_jobs.sql`, `worker/`). The app enqueues; the worker claims (`FOR UPDATE SKIP LOCKED`), calls Claude (`claude-opus-5-5`, effort medium, structured JSON output, `fallbacks: "default"` for refusals, cached rubric system prompt), validates with Zod and guardrails, then stores. An evaluation is discarded, never shown, if it predicts selection, claims an official score or a single readiness number, makes a clinical claim, mentions accent, or quotes words the student didn't write. Retries: SDK x2, then queue backoff x3, then `dead`. Cost and latency per call in `ai_usage` (super admin). The provider key lives only in the worker | PRD §11.7, §12.9–12.11; `specs.md` §0.1; `AGENTS.md` §3 (no provider SDK in the browser) and §11 |
 
 ---
 
@@ -1735,6 +1736,23 @@ What remains:
 - Production: run supabase/migrations/0016_demo_requests.sql after the 0005–0015 catch-up.
 - Super-admin view of demo requests; rate limiting on the public form.
 ```
+
+Date: 2026-10-19
+Task: T101 — AI foundation (worker service + evaluation engine)
+Status: Complete in code; VERIFIED offline (fake model client, local Postgres 17). Not yet run against the real Claude API (no key on this machine)
+
+What changed:
+- `supabase/migrations/0017_ai_jobs.sql`: `ai_jobs` queue, `ai_evaluations` (label fixed to "AI-generated practice evaluation"), `ai_usage`; RLS read-only for the student and their batch mentors (usage: super admin); queue functions not callable through the API
+- `worker/` (separate deployable, Railway/Render): config, pricing, versioned rubrics (`general-response` v1), prompt, schema, guardrails, evaluate, queue, main loop with graceful shutdown; README with deploy steps
+- Tests: worker 20/20 (engine 16, queue-on-Postgres 4 incl. two workers racing); `supabase/tests/workflow-check.sql` 97/97 (12 new AI checks); app lint, types and 470 Vitest tests unchanged and passing
+- CI: new "Database checks & AI worker tests" job (Postgres service): all migrations + RLS workflow check + worker tests on every PR
+
+What remains:
+- Add an Anthropic API key to the worker host and run one real evaluation (smoke test); deploy the worker with staging (T100)
+- T102 (psychology feedback) adds the psychology rubrics and the enqueue trigger on submissions, and shows feedback in the app
+
+Next task:
+- T102
 
 ## 14. North Star
 

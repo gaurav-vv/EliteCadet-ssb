@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0014 under real RLS.
+-- End-to-end workflow check of migrations 0001–0017 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -285,5 +285,35 @@ select t.eq((select count(*) from public.practice_items where id = :'TAT1'), 0, 
 select t.eq((select count(*) from public.practice_answers where item_id = :'TAT1'), 1, '...and their saved answer is kept');
 select t.fails('select public.practice_move_item(gen_random_uuid(), 1)', 'only a super admin can reorder');
 reset role;
+
+-- ---------- 10. AI jobs and evaluations (0017) ----------
+select public.enqueue_ai_evaluation('practice_attempt', gen_random_uuid(), :'S1', 'general-response', 1, '{"items":[{"prompt":"Q","response":"My answer"}]}') as "AIJOB" \gset
+select id as "AIJOB2" from public.ai_claim_jobs('w-check', 1) \gset
+select public.ai_complete_job(:'AIJOB2', 'w-check', 'claude-opus-5-5',
+  '[{"dimension":"relevance","rating":"strong","confidence":"high","evidence":["My answer"],"note":"ok"}]',
+  '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'high');
+select t.eq((select count(*) from public.ai_evaluations where job_id = :'AIJOB'), 1, 'worker stores an evaluation for the claimed job');
+
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 1, 'student reads their own AI evaluation');
+select t.eq((select count(*) from public.ai_jobs where student_id = :'S1'), 1, 'student sees their job status');
+select t.fails(format('insert into public.ai_evaluations (job_id, subject_type, subject_id, student_id, rubric_id, rubric_version, model, dimensions, feedback, overall_confidence) values (%L, %L, gen_random_uuid(), %L, %L, 1, %L, %L, %L, %L)', :'AIJOB', 'x_x', :'S1', 'general-response', 'm', '[{}]', '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'high'), 'students cannot write AI evaluations');
+select t.fails(format('select public.enqueue_ai_evaluation(%L, gen_random_uuid(), %L, %L, 1, %L)', 'practice_attempt', :'S1', 'general-response', '{"items":[]}'), 'clients cannot enqueue AI jobs');
+select t.fails('select * from public.ai_claim_jobs(''me'', 1)', 'clients cannot claim AI jobs');
+select t.eq((select count(*) from public.ai_usage), 0, 'students cannot read AI cost data');
+reset role;
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 0, 'another student cannot read it');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 1, 'their mentor reads it');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 0, 'another academy''s mentor cannot');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 0, 'academy admin cannot read AI feedback text');
+reset role;
+select t.fails(format('insert into public.ai_evaluations (job_id, subject_type, subject_id, student_id, rubric_id, rubric_version, model, label, dimensions, feedback, overall_confidence) values (gen_random_uuid(), %L, gen_random_uuid(), %L, %L, 1, %L, %L, %L, %L, %L)', 'x_x', :'S1', 'r', 'm', 'Official SSB score', '[{}]', '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'high'), 'every evaluation must carry the AI practice label');
 \echo
 \echo ALL CHECKS PASSED
