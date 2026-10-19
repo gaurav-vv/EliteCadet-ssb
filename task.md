@@ -850,6 +850,48 @@ approval. Reset email delivery not verified (needs custom SMTP + URL allowlist).
 tests, build pass. **Follow-ups:** T092 super-admin demo-request list + form rate limiting; replace
 cropped reference photos with licensed high-resolution images.
 
+
+## T093 — File materials (PDFs and documents) in Supabase Storage — P1 — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** Super Admin, Mentors and Academy Admins upload;
+students don't.
+**Requirements:**
+- Migration:
+  - a private `materials` bucket
+  - storage RLS mirroring `can_read_content()` / ownership
+  - `contents` gains a file reference: path, name, type, size
+  - an academy-owned content type for Academy Admin documents
+- Server-side upload: type sniffed from the bytes, 50 MB limit, path built by the server. Download
+  through short-lived signed URLs only.
+- Content forms (Super Admin, mentor, academy) get a file field. Library rows show file type and
+  size, and open through the signed link.
+**Acceptance:** `specs.md` §8a.4h. Database checks cover cross-academy and non-assigned access.
+**Needs:** a Supabase project (Storage can't be tested on plain Postgres).
+
+## T094 — Live meeting rooms with LiveKit (WebRTC) — P1 — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** LiveKit (open source; LiveKit Cloud, India
+region).
+**Requirements:**
+- Server route that issues a join token only to the session's mentor and participants, in the join
+  window, never for cancelled sessions.
+- Env: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (server only).
+- Room page `/{role}/sessions/[id]/room` built with LiveKit's React components: camera, mic, screen
+  share, chat. The mentor can mute or remove participants; students join muted.
+- A LiveKit webhook (signature-verified) marks attendance on join.
+- Online sessions default to a room; a pasted link remains as a fallback.
+**Acceptance:** `specs.md` §8a.4h. Tests cover token scope (outsider, cancelled, outside window).
+**Needs:** a LiveKit Cloud project (free tier). Local testing works with `livekit-server --dev`.
+
+## T095 — Session recordings — P2 — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Depends on:** T093, T094. **Decided 2026-10-19:** record sessions.
+**Requirements:**
+- Mentor-only start and stop through LiveKit Egress, with a visible "Recording" indicator and a
+  notice on joining.
+- Output to a private Supabase Storage bucket. Signed-link playback for the session's people and
+  their academy admin.
+- Retention: 90 days by default, removed by a scheduled job (in the worker service).
+**Acceptance:** `specs.md` §8a.4h.
+**Needs:** a paid LiveKit plan for recording minutes; consent wording reviewed for students under 18.
+
 ---
 
 # Post-MVP Backlog

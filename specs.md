@@ -939,6 +939,70 @@ The Practice journey's question banks and every student's practice work are stor
 - Only a super admin can change a bank.
 - No count shown is invented.
 
+### 8a.4h File materials and live meeting rooms (decided 2026-10-19)
+
+**File materials (T093).** PDFs and other materials are stored in **Supabase Storage**, a private
+bucket in the same project as the database, so the same sign-in and the same rules decide who
+may open a file.
+
+- **Who uploads:**
+  - **Super Admin:** platform Library content.
+  - **Mentors:** their own My Content.
+  - **Academy Admins:** academy-wide documents for their own students and mentors.
+  - Students don't upload.
+- **Files:** each file belongs to one content item. A content item can be text, a link, **or a
+  file**.
+- **Allowed types:** PDF, DOCX, PPTX, XLSX, PNG, JPG, MP3 and MP4.
+  - Size limit: 50 MB per file to start.
+  - The type is checked from the file itself, not just its name.
+- **Access:**
+  - Files are never public.
+  - The server hands out a short-lived signed link (minutes) only to someone who may read that
+    content item, using the same rules as the Library.
+  - Storage row-level security repeats the same rules.
+- **Other rules:**
+  - Replacing a file keeps the content item and its assignments.
+  - Archiving content hides the file.
+  - Deleting is Super Admin only.
+
+**Live meeting rooms (T094).** Online sessions use built-in video rooms on **LiveKit** (open-source
+WebRTC, LiveKit Cloud, India region), instead of a pasted meeting link.
+
+- **Rooms:**
+  - Each online session gets one room, named after the session.
+  - The room opens 15 minutes before the start and closes 30 minutes after the end.
+- **Join tokens:**
+  - The app's server issues a short-lived LiveKit join token only to the session's mentor and its
+    participants: the whole batch, or the selected students.
+  - Nobody else can join, even with the link. Cancelled sessions issue no tokens.
+  - The LiveKit API secret stays on the server.
+- **In the room:**
+  - Camera, microphone, screen share and chat.
+  - The mentor is the host and can mute or remove a participant.
+  - Students join muted.
+- **Attendance:** joining a room counts as being present for attendance. The mentor can still
+  correct it.
+- **Existing links:** a pasted external link stays possible as a fallback for sessions created
+  before rooms existed.
+
+**Recordings (T095).** Sessions can be recorded, through LiveKit's recording service.
+
+- **Consent:** only the mentor starts or stops a recording. Everyone in the room sees a clear
+  "Recording" indicator, and is told when they join.
+- **Storage:** recordings go to Supabase Storage in a private bucket.
+- **Access:** only the session's mentor and participants, plus their academy admin, can watch a
+  recording, through short-lived signed links.
+- **Retention:** recordings are deleted after 90 days by default (a setting).
+- Recordings use paid plan minutes and storage, so cost is tracked in Platform Analytics.
+
+**Acceptance:**
+- An uploaded PDF opens for exactly the people who can read its content item, and for nobody else,
+  even with the link.
+- A mentor and their batch can meet in a room with video, audio and screen share.
+- Outsiders can't join a room.
+- Joining marks attendance.
+- A recording is visible only to the session's people, and only within the retention period.
+
 ### 8a.5 Domain model
 
 ```text
