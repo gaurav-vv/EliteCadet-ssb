@@ -99,7 +99,7 @@ the written defence exams.
 
 ### 0.6 Open decisions (owner: product)
 
-1. **AI provider and model routing.** This blocks every AI item in §0.2.
+1. ~~AI provider~~ **Decided 2026-10-19: Anthropic Claude.** The key lives only in the worker (T101); model routing per task is a T101 design choice.
 2. **Who writes and SME-reviews** the knowledge base and courses.
 3. **Pricing** and the institutional licensing model.
 4. **Languages** beyond Hindi and English.
