@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0018 under real RLS.
+-- End-to-end workflow check of migrations 0001–0019 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -345,6 +345,38 @@ select set_config('request.jwt.claim.sub', :'SUPER', false); set role authentica
 select public.set_practice_bank_timing('srt', '{"mode":"budget","totalSeconds":1200}');
 select t.eq((select (timing->>'totalSeconds')::bigint from public.practice_banks where slug = 'srt'), 1200, 'super admin sets the SRT timer');
 select t.fails('select public.set_practice_bank_timing(''wat'', ''{"mode":"carousel","responseSeconds":1}'')', 'an out-of-range timer is refused');
+reset role;
+
+-- ---------- 12. AI interview (0019) ----------
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select public.start_interview_session('topic', 'hobbies', '{}') as "INT_S" \gset
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S' and seq = 1 and question = 'What do you do in your free time, and how did you get into it?'), 1, 'a topic interview opens with that topic''s question');
+select id as "INT_T1" from public.interview_turns where session_id = :'INT_S' and seq = 1 \gset
+select t.fails('select public.start_interview_session(''topic'', null, ''{}'')', 'a topic interview needs a topic');
+select public.answer_interview_turn(:'INT_T1', 'I play hockey; I started at school.');
+select t.fails(format('select public.answer_interview_turn(%L, %L)', :'INT_T1', 'again'), 'a question can be answered only once');
+reset role;
+select t.eq((select count(*) from public.ai_jobs where kind = 'interview_question' and subject_id = :'INT_T1'), 1, 'answering queues the next AI question');
+
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S'), 0, 'another student cannot read the interview');
+select t.fails(format('select public.skip_interview_wait(%L)', :'INT_S'), 'another student cannot change it');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S'), 1, 'their mentor reads the interview');
+select t.fails('select public.start_interview_session(''mock'', null, ''{}'')', 'a mentor cannot start a student interview');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.interview_sessions where id = :'INT_S'), 0, 'another academy''s mentor cannot');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S'), 0, 'the academy admin cannot read interview answers');
+reset role;
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.fails(format('select public.interview_append_question(%L, %L, ''new_topic'', null)', :'INT_S', 'Any question?'), 'students cannot write questions themselves');
+select t.fails(format('update public.interview_turns set answer = %L where id = %L', 'changed', :'INT_T1'), 'answers cannot be edited afterwards');
+select public.skip_interview_wait(:'INT_S');
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S' and seq = 2 and kind = 'bank'), 1, 'skipping the wait continues from the question bank');
 reset role;
 \echo
 \echo ALL CHECKS PASSED

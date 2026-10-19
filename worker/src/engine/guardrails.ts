@@ -7,7 +7,7 @@ export type GuardrailViolation =
   | { kind: "banned_claim"; rule: string; field: string }
   | { kind: "ungrounded_evidence"; dimension: string; quote: string };
 
-const BANNED: { rule: string; pattern: RegExp }[] = [
+export const BANNED: { rule: string; pattern: RegExp }[] = [
   { rule: "selection_prediction", pattern: /\b(you|candidate|student|he|she|they)\b[^.]{0,40}\b(will|would|are going to|is going to|are likely to|is likely to)\b[^.]{0,20}\b(be\s+)?(selected|recommended|rejected|screened out|pass|fail|clear|crack)\b/i },
   { rule: "selection_prediction", pattern: /\b(guarantee[sd]?|assure[sd]?)\b[^.]{0,30}\b(selection|recommendation|success)\b/i },
   { rule: "official_score", pattern: /\bofficial\s+(ssb\s+)?(score|result|rating|grade|marks?)\b/i },

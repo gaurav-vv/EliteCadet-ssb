@@ -36,7 +36,10 @@ export default async function InterviewPracticePage() {
       actions={
         <>
           <Button asChild size="sm">
-            <Link href="/student/practice/interview/mock">Start mock interview</Link>
+            <Link href="/student/practice/interview/ai">AI interview</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/student/practice/interview/mock">Timed mock (no AI)</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/student/practice/interview/piq">My PIQ questions</Link>

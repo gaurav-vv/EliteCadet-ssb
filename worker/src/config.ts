@@ -10,6 +10,8 @@ export interface WorkerConfig {
   pollIntervalMs: number;
   concurrency: number;
   evaluation: { model: string; effort: Effort; maxTokens: number; timeoutMs: number };
+  /** The AI interviewer's next question: latency matters, so a lighter effort by default. */
+  question: { model: string; effort: Effort; maxTokens: number; timeoutMs: number };
 }
 
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
@@ -27,6 +29,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
   if (missing.length > 0) throw new Error(`Missing environment variables: ${missing.join(", ")} (see worker/README.md)`);
   const effort = (env.AI_EVALUATION_EFFORT ?? "medium") as Effort;
   if (!EFFORTS.includes(effort)) throw new Error(`AI_EVALUATION_EFFORT must be one of ${EFFORTS.join(", ")}`);
+  const questionEffort = (env.AI_QUESTION_EFFORT ?? "low") as Effort;
+  if (!EFFORTS.includes(questionEffort)) throw new Error(`AI_QUESTION_EFFORT must be one of ${EFFORTS.join(", ")}`);
   return {
     databaseUrl: env.DATABASE_URL!,
     workerId: env.WORKER_ID ?? `worker-${process.pid}`,
@@ -37,6 +41,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
       effort,
       maxTokens: int("AI_EVALUATION_MAX_TOKENS", 16000, 1024, 64000),
       timeoutMs: int("AI_REQUEST_TIMEOUT_MS", 120_000, 10_000, 600_000),
+    },
+    question: {
+      model: env.AI_QUESTION_MODEL ?? "claude-opus-5-5",
+      effort: questionEffort,
+      maxTokens: int("AI_QUESTION_MAX_TOKENS", 4000, 1024, 16000),
+      timeoutMs: int("AI_QUESTION_TIMEOUT_MS", 45_000, 10_000, 300_000),
     },
   };
 }

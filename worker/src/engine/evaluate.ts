@@ -34,9 +34,9 @@ export interface CallUsage extends TokenUsage {
 
 // Server-side refusal fallbacks: a policy decline is retried on Anthropic's
 // recommended model inside the same call instead of failing the job.
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
-function usageFrom(message: Anthropic.Beta.BetaMessage, latencyMs: number): CallUsage[] {
+export function usageFrom(message: Anthropic.Beta.BetaMessage, latencyMs: number): CallUsage[] {
   const iterations = message.usage.iterations ?? [];
   const parts: TokenUsage[] =
     iterations.length > 0
@@ -60,7 +60,7 @@ function usageFrom(message: Anthropic.Beta.BetaMessage, latencyMs: number): Call
   return parts.map((p, i) => ({ ...p, costMicroUsd: costMicroUsd(p), latencyMs: i === parts.length - 1 ? latencyMs : 0 }));
 }
 
-function classifyError(error: unknown): { code: FailureCode; retryable: boolean } {
+export function classifyError(error: unknown): { code: FailureCode; retryable: boolean } {
   if (error instanceof Anthropic.RateLimitError) return { code: "rate_limited", retryable: true };
   if (error instanceof Anthropic.APIConnectionTimeoutError) return { code: "timeout", retryable: true };
   if (error instanceof Anthropic.APIConnectionError) return { code: "network", retryable: true };

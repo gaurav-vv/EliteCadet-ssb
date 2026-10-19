@@ -62,7 +62,7 @@ all green as of this update):
 - `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
 - `tests/unit/lib/notifications-service.test.ts`, `analytics-service.test.ts` — own-notifications scope, safe links, mark read, super-admin-only analytics, boundary validation (T089)
 - `tests/unit/lib/practice-validation.test.ts`, `practice-service.test.ts`, `practice-journey.test.ts`; `tests/integration/bank-practice-runner.test.tsx`, `mock-session.test.tsx` — answer/attempt validation, streak, role scope, server-side scoring, idempotent submit, journey wiring vs the 0014 seed, autosave with retry (T083b)
-- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies every migration to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics, practice, AI evaluations, psychology feedback (106 checks)
+- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies every migration to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics, practice, AI evaluations, psychology feedback, AI interview (119 checks)
 - `worker/tests/engine.test.ts`, `worker/tests/queue.db.test.ts` — AI request shape (cache, structured output, fallback, answer as data), outcome classification, guardrails (selection prediction, official score, readiness %, clinical claims, accent, ungrounded evidence), pricing; queue idempotency, backoff, dead-lettering, concurrent claims (T101)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — the on-device Day 5 self-assessment, corrupted/blocked localStorage
@@ -245,6 +245,10 @@ implicit.
 | AI-07 | Psychology feedback describes patterns, never the person, and is labelled as an AI practice evaluation | P0 | `VERIFIED` (`worker/tests/rubrics.test.ts`, `ai-feedback-view.test.tsx`) | — | Guardrail + label |
 | AI-08 | Student is notified and can open the feedback; mentor sees a mentee's from the mentee page | P1 | `VERIFIED` (DB + `ai-feedback.test.ts`); MANUAL live | Submit, wait | Notification → results page |
 | AI-09 | Super admin changes a test's timer; students get it next attempt; others can't | P1 | `VERIFIED` (`workflow-check.sql`, `practice-timing.test.ts`) | Set SRT to 20 min | SRT runs 20 min |
+| AI-10 | The AI interviewer follows up on the student's own answer, one question at a time, never repeating or predicting selection | P0 | `VERIFIED` (`worker/tests/question.test.ts`) | — | Guardrails reject bad questions |
+| AI-11 | An AI failure or slow answer never stops the interview (bank fallback, skip) and a late AI question after a skip is dropped | P0 | `VERIFIED` (`worker/tests/queue.db.test.ts`, `workflow-check.sql`) | Refuse / skip | Next question from the bank |
+| AI-12 | Only the student answers their interview; their mentor reads it; others and academy admins can't | P0 | `VERIFIED` (`workflow-check.sql`) | — | — |
+| AI-13 | A failed save keeps the typed answer; mock mode auto-submits when time runs out | P1 | `VERIFIED` (`interview-room.test.tsx`) | — | — |
 ---
 
 ## 3. Academy isolation / IDOR

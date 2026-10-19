@@ -11,6 +11,12 @@ App / database trigger ──enqueue──▶ ai_jobs (Postgres) ◀──claim�
 
 - **Queue:** `ai_jobs`, with claims using `FOR UPDATE SKIP LOCKED`, so any number of workers can
   run safely. A crashed worker's job is picked up again after 10 minutes.
+- **Wake-up:** new jobs wake the worker at once through `LISTEN ai_jobs`, so an interview
+  follow-up doesn't wait for the next poll. Polling stays as the fallback.
+- **Job kinds:**
+  - `evaluation`: rubric feedback on psychology tests and whole interviews
+  - `interview_question`: the AI interviewer's next question. If that job gives up, the database
+    continues the interview from the question bank.
 - **Retries:**
   - The SDK retries twice (429/5xx/network).
   - The queue then retries with exponential backoff (30s, 60s…), up to 3 attempts.
@@ -50,6 +56,10 @@ DATABASE_URL=postgresql://... ANTHROPIC_API_KEY=... npm start
 | `AI_EVALUATION_EFFORT` | no | `medium` | `low`…`max`. |
 | `AI_EVALUATION_MAX_TOKENS` | no | `16000` | |
 | `AI_REQUEST_TIMEOUT_MS` | no | `120000` | |
+| `AI_QUESTION_MODEL` | no | `claude-opus-5-5` | The AI interviewer's next question (T103). |
+| `AI_QUESTION_EFFORT` | no | `low` | Questions need speed more than depth. |
+| `AI_QUESTION_MAX_TOKENS` | no | `4000` | |
+| `AI_QUESTION_TIMEOUT_MS` | no | `45000` | After this the student can skip to a bank question. |
 | `WORKER_CONCURRENCY` | no | `2` | Jobs processed at once. |
 | `POLL_INTERVAL_MS` | no | `3000` | Idle polling delay. |
 | `WORKER_ID` | no | `worker-<pid>` | Shown in job locks. |

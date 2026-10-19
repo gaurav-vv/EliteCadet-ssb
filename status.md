@@ -1770,6 +1770,22 @@ What remains:
 Next task:
 - T103 — AI interview with dynamic follow-ups
 
+Date: 2026-10-19
+Task: T103 — AI interview with dynamic follow-ups
+Status: Complete in code; VERIFIED offline (fake model, local Postgres 17). Real Claude call deferred to the end (owner decision)
+
+What changed:
+- `0019_ai_interview.sql`: `interview_topics` (7 seeded), `interview_sessions`, `interview_turns`; `start_interview_session` / `answer_interview_turn` / `skip_interview_wait` (ownership and turn order checked in the database); `ai_jobs.kind` (`evaluation` | `interview_question`); the next question is written by the worker, or taken from the interview bank when the AI job gives up or the student skips — a late AI follow-up after a skip is dropped; after the last answer an `interview` v1 evaluation is queued; feedback-ready notification; `pg_notify('ai_jobs')` wake-up
+- Worker: `engine/question.ts` (interviewer: one short question, follow-up type clarification/evidence/depth/consistency/reflection or new topic; guardrails reject multiple questions, banned claims and repeats), `rubrics/interview.ts`, job-kind dispatch, separate model settings for questions (effort low), LISTEN-based wake-up
+- App: `lib/server/ai/interview.ts`, `lib/actions/interview.ts`, `components/interview/{interview-start,interview-room}.tsx`, `/student/practice/interview/ai` + `[sessionId]`, mentor `/mentor/mentees/[id]/interviews/[sessionId]` + "AI interviews" on the mentee page, "AI interview" entry on the Interview page
+- Tests: app 495 (12 new), worker 39 (11 new incl. the end-to-end interview), database 119 (13 new); screenshots in `docs/screenshots/t103/`
+
+What remains:
+- Real Claude calls once the API key is added (deferred)
+
+Next task:
+- T104 — Readiness profile
+
 ## 14. North Star
 
 > **Build the smallest reliable web product that proves students prepare better with structured

@@ -26,16 +26,40 @@ async function main() {
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);
 
-  log.info("worker started", { worker: config.workerId, model: config.evaluation.model, effort: config.evaluation.effort, concurrency: config.concurrency });
+  // New jobs wake the loop at once (pg_notify from 0019), so an interview
+  // follow-up doesn't wait for the next poll. Polling stays as the fallback.
+  let wake: (() => void) | null = null;
+  const listener = new pg.Client({ connectionString: config.databaseUrl });
+  try {
+    await listener.connect();
+    listener.on("notification", () => wake?.());
+    listener.on("error", () => log.error("listen connection lost; polling only"));
+    await listener.query("listen ai_jobs");
+  } catch {
+    log.error("could not listen for new jobs; polling only");
+  }
+
+  const routes = { evaluation: config.evaluation, question: config.question };
+  log.info("worker started", { worker: config.workerId, evaluation: config.evaluation.model, question: config.question.model, concurrency: config.concurrency });
   while (!stopping) {
     let handled = 0;
     try {
-      handled = await runOnce(pool, client, config.workerId, config.concurrency, config.evaluation, log);
+      handled = await runOnce(pool, client, config.workerId, config.concurrency, routes, log);
     } catch (error) {
       log.error("poll failed", { error: error instanceof Error ? error.name : "unknown" });
     }
-    if (handled === 0 && !stopping) await new Promise((r) => setTimeout(r, config.pollIntervalMs));
+    if (handled === 0 && !stopping) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, config.pollIntervalMs);
+        wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      wake = null;
+    }
   }
+  await listener.end().catch(() => undefined);
   await pool.end();
   log.info("worker stopped");
 }

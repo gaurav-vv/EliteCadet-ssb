@@ -7,6 +7,7 @@ import type { CallUsage } from "./engine/evaluate.js";
 
 export interface AiJob {
   id: string;
+  kind: "evaluation" | "interview_question";
   subject_type: string;
   subject_id: string;
   student_id: string;
@@ -54,4 +55,8 @@ export async function logUsage(pool: Pool, jobId: string, usage: CallUsage[], ou
       outcome,
     ]);
   }
+}
+
+export async function completeInterviewQuestion(pool: Pool, job: AiJob, workerId: string, question: string, kind: "follow_up" | "new_topic", followUpType: string | null): Promise<void> {
+  await pool.query("select public.ai_complete_interview_question($1, $2, $3, $4::public.interview_turn_kind, $5::public.interview_follow_up)", [job.id, workerId, question, kind, followUpType]);
 }

@@ -8,6 +8,7 @@ import { fakeClient, goodEvaluation, message, STUDENT_ANSWER } from "./helpers.j
 
 const URL = process.env.TEST_DATABASE_URL;
 const SETTINGS = { model: "claude-opus-5-5", effort: "medium" as const, maxTokens: 16000, timeoutMs: 120000 };
+const ROUTES = { evaluation: SETTINGS, question: { ...SETTINGS, effort: "low" as const, maxTokens: 4000 } };
 const quiet: Logger = { info: () => undefined, error: () => undefined };
 
 describe.skipIf(!URL)("queue against Postgres", () => {
@@ -29,7 +30,7 @@ describe.skipIf(!URL)("queue against Postgres", () => {
     const id = await enqueue(subject);
     expect(await enqueue(subject)).toBe(id);
     const { client } = fakeClient(() => message());
-    expect(await runOnce(pool, client, "w1", 5, SETTINGS, quiet)).toBeGreaterThanOrEqual(1);
+    expect(await runOnce(pool, client, "w1", 5, ROUTES, quiet)).toBeGreaterThanOrEqual(1);
     expect((await job(id)).status).toBe("succeeded");
     const ev = (await pool.query("select * from public.ai_evaluations where job_id = $1", [id])).rows[0];
     expect(ev.label).toBe("AI-generated practice evaluation");
@@ -43,14 +44,14 @@ describe.skipIf(!URL)("queue against Postgres", () => {
 
   it("a retryable failure backs off and keeps the job; a final failure marks it dead", async () => {
     const retry = await enqueue(crypto.randomUUID());
-    await runOnce(pool, fakeClient(() => message({ stop_reason: "max_tokens" })).client, "w1", 5, SETTINGS, quiet);
+    await runOnce(pool, fakeClient(() => message({ stop_reason: "max_tokens" })).client, "w1", 5, ROUTES, quiet);
     const j = await job(retry);
     expect(j.status).toBe("queued");
     expect(j.last_error_code).toBe("truncated");
     expect(new Date(j.run_after).getTime()).toBeGreaterThan(Date.now() + 20_000);
 
     const final = await enqueue(crypto.randomUUID());
-    await runOnce(pool, fakeClient(() => message({ stop_reason: "refusal" })).client, "w1", 5, SETTINGS, quiet);
+    await runOnce(pool, fakeClient(() => message({ stop_reason: "refusal" })).client, "w1", 5, ROUTES, quiet);
     expect((await job(final)).status).toBe("dead");
   });
 
@@ -60,7 +61,7 @@ describe.skipIf(!URL)("queue against Postgres", () => {
     bad.feedback.impact = "You will be selected at the SSB.";
     for (let i = 0; i < 3; i++) {
       await pool.query("update public.ai_jobs set run_after = now() where id = $1", [id]);
-      await runOnce(pool, fakeClient(() => message({ json: bad })).client, "w1", 5, SETTINGS, quiet);
+      await runOnce(pool, fakeClient(() => message({ json: bad })).client, "w1", 5, ROUTES, quiet);
     }
     const j = await job(id);
     expect(j.status).toBe("dead");
@@ -95,7 +96,7 @@ describe.skipIf(!URL)("psychology test → AI feedback, end to end", () => {
       const { client, calls } = fakeClient(() => message({ json: tat }));
       // Only this job is due now (others in this database may be backing off).
       await pool.query("update public.ai_jobs set run_after = now() + interval '1 hour' where status = 'queued' and subject_id <> $1", [attempt]);
-      await runOnce(pool, client, "w-e2e", 5, SETTINGS, quiet);
+      await runOnce(pool, client, "w-e2e", 5, ROUTES, quiet);
       const system = JSON.stringify(calls[0].body.system);
       expect(system).toContain("psychology-tat v1");
       expect(JSON.stringify(calls[0].body.messages)).toContain(item.prompt.slice(0, 30));
@@ -105,6 +106,74 @@ describe.skipIf(!URL)("psychology test → AI feedback, end to end", () => {
       const note = (await pool.query("select href from public.notifications where recipient_id = $1 and kind = 'ai_feedback_ready' and ref_id = $2", [student, ev.id])).rows[0];
       expect(note.href).toBe(`/student/practice/psychology/results/${attempt}`);
     } finally {
+      await pool.end();
+    }
+  });
+});
+
+describe.skipIf(!URL)("AI interview, end to end", () => {
+  const asStudent = async (client: pg.PoolClient, student: string, sql: string, params: unknown[] = []) => {
+    await client.query("select set_config('request.jwt.claim.sub', $1, false)", [student]);
+    await client.query("set role authenticated");
+    try {
+      return await client.query(sql, params);
+    } finally {
+      await client.query("reset role");
+    }
+  };
+  const turns = async (pool: pg.Pool, session: string) => (await pool.query("select * from public.interview_turns where session_id = $1 order by seq", [session])).rows;
+
+  it("follow-ups come from the AI, a failed question falls back to the bank, and the last answer gets feedback", async () => {
+    const pool = new pg.Pool({ connectionString: URL });
+    const db = await pool.connect();
+    try {
+      const student = (await pool.query("select id from public.profiles where role = 'student' limit 1")).rows[0].id;
+      await pool.query("update public.ai_jobs set run_after = now() + interval '1 hour' where status = 'queued'");
+      const session = (await asStudent(db, student, "select public.start_interview_session('guided', null, '{\"hometown\":\"Pune\"}') as id")).rows[0].id;
+      let t = await turns(pool, session);
+      expect(t).toHaveLength(1);
+      expect(t[0].kind).toBe("opening");
+
+      // 1 → AI follow-up
+      await asStudent(db, student, "select public.answer_interview_turn($1, $2)", [t[0].id, "I am from Pune and I captain my college hockey team."]);
+      const ai = fakeClient(() => message({ json: { question: "What did captaining the team teach you?", kind: "follow_up", follow_up_type: "depth" } }));
+      await runOnce(pool, ai.client, "w-int", 5, ROUTES, quiet);
+      t = await turns(pool, session);
+      expect(t[1]).toMatchObject({ seq: 2, question: "What did captaining the team teach you?", kind: "follow_up", follow_up_type: "depth" });
+      expect(JSON.stringify(ai.calls[0].body.messages)).toContain("hometown: Pune");
+
+      // 2 → AI refuses → job dead → bank question appears
+      await asStudent(db, student, "select public.answer_interview_turn($1, $2)", [t[1].id, "To plan ahead and listen to my team."]);
+      await runOnce(pool, fakeClient(() => message({ stop_reason: "refusal" })).client, "w-int", 5, ROUTES, quiet);
+      t = await turns(pool, session);
+      expect(t[2].kind).toBe("bank");
+
+      // 3 → student skips the wait; a late AI follow-up is dropped as stale
+      await asStudent(db, student, "select public.answer_interview_turn($1, $2)", [t[2].id, "Because I want a life of service."]);
+      await asStudent(db, student, "select public.skip_interview_wait($1)", [session]);
+      t = await turns(pool, session);
+      expect(t[3].kind).toBe("bank");
+      await runOnce(pool, fakeClient(() => message({ json: { question: "Why service in particular?", kind: "follow_up", follow_up_type: "depth" } })).client, "w-int", 5, ROUTES, quiet);
+      expect(await turns(pool, session)).toHaveLength(4);
+
+      // 4, 5 → last answer completes the session and queues interview feedback
+      await asStudent(db, student, "select public.answer_interview_turn($1, $2)", [t[3].id, "I read about the Kargil war."]);
+      await runOnce(pool, fakeClient(() => message({ json: { question: "Which part of that history stayed with you most?", kind: "follow_up", follow_up_type: "reflection" } })).client, "w-int", 5, ROUTES, quiet);
+      t = await turns(pool, session);
+      await asStudent(db, student, "select public.answer_interview_turn($1, $2)", [t[4].id, "The courage of young officers."]);
+      expect((await pool.query("select status from public.interview_sessions where id = $1", [session])).rows[0].status).toBe("completed");
+      const feedback = {
+        dimensions: ["relevance", "specificity", "structure", "consistency", "reflection"].map((d) => ({ dimension: d, rating: "developing", confidence: "medium", evidence: d === "specificity" ? ["I captain my college hockey team"] : [], note: "Seen in the answers." })),
+        feedback: goodEvaluation().feedback,
+        overall_confidence: "medium",
+      };
+      await runOnce(pool, fakeClient(() => message({ json: feedback })).client, "w-int", 5, ROUTES, quiet);
+      const ev = (await pool.query("select * from public.ai_evaluations where subject_type = 'interview_session' and subject_id = $1", [session])).rows[0];
+      expect(ev.rubric_id).toBe("interview");
+      const note = (await pool.query("select href from public.notifications where ref_id = $1", [ev.id])).rows[0];
+      expect(note.href).toBe(`/student/practice/interview/ai/${session}`);
+    } finally {
+      db.release();
       await pool.end();
     }
   });

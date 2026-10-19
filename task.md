@@ -944,10 +944,22 @@ shown to the student and their mentor. Timers configurable per assessment versio
 notify flow; 483 app tests.
 **Waiting on:** the real Claude call (API key), deferred to the end by the owner.
 
-## T103 — AI interview with dynamic follow-ups — P0 — `[ ]`
+## T103 — AI interview with dynamic follow-ups — P0 — `[-]`
 FR-INT-01/02. Guided, Topic and Mock modes. Follow-up questions based on the previous answer:
 clarification, evidence, depth, consistency, reflection. Structured feedback in the same session.
 Can use the student's PIQ. Text answers only.
+**Status:** built and tested offline:
+- migration `0019_ai_interview.sql`: sessions, turns and topics; student functions start, answer
+  and skip; bank fallback when an AI question fails or the student skips (stale AI follow-ups are
+  dropped); feedback job on the last answer; LISTEN wake-up; notifications
+- worker: AI interviewer (`question.ts`, low effort, guardrails: one question, no banned claims,
+  no repeats) and the `interview` v1 feedback rubric
+- app: `/student/practice/interview/ai` (start: guided, topic or mock, optional PIQ sharing; past
+  interviews) and `[sessionId]` (live room with a mock timer, waiting state and skip; feedback at
+  the end); mentor view and list on the mentee page
+
+**Tests:** 119 database checks; 39 worker tests, including the full interview flow on Postgres;
+495 app tests.
 
 ## T104 — Readiness profile — P0 — `[ ]`
 FR-DASH-02. Seven dimensions, each with a state (Developing / Improving / Strong / Needs Attention),
