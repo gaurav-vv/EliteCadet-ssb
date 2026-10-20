@@ -71,7 +71,10 @@ export function MentorDashboardView({ d }: { d: MentorDashboard }) {
                 <ListRow key={s.id} href={`/mentor/sessions/${s.id}`}>
                   <span className="min-w-0">
                     <span className="block truncate text-sm text-ink">{s.title}</span>
-                    <span className="block text-[13px] text-ink-secondary">{s.batchName ?? "Batch"}</span>
+                    <span className="block text-[13px] text-ink-secondary">
+                      {s.batchName ?? "Batch"}
+                      {s.meetingKind ? ` · ${s.actualStartedAt && !s.actualEndedAt ? "Live now" : s.meetingKind === "one_to_one" ? "One-to-one video room" : "Batch video room"}` : ""}
+                    </span>
                   </span>
                   <span className="shrink-0 text-[13px] text-ink">{formatIstTimeRange(s.startsAt, s.endsAt)}</span>
                 </ListRow>

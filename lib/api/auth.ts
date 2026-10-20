@@ -3,7 +3,7 @@
 // work lives in lib/auth/actions.ts as Server Actions.
 
 import { createClient } from "@/lib/supabase/client";
-import { loadAccountAccess } from "@/lib/auth/account";
+import { describeLookupFailure, loadAccountAccess } from "@/lib/auth/account";
 import type { AuthResult, LoginInput, SignupInput } from "@/types/auth";
 
 export const SUSPENDED_MESSAGE = "This account has been suspended. Contact your academy or the platform team for help.";
@@ -157,7 +157,7 @@ export async function logIn(input: LoginInput): Promise<AuthResult<{ role: strin
           error: { code: "account_suspended", message: access.reason === "academy_suspended" ? ACADEMY_SUSPENDED_MESSAGE : SUSPENDED_MESSAGE },
         };
       case "lookup_failed":
-        console.error("[auth] profile lookup failed after sign-in", { code: access.code, message: access.message });
+        console.error(`[auth] profile lookup failed after sign-in: ${describeLookupFailure("login", access)}`);
         return { ok: false, error: { code: "account_unavailable", message: ACCOUNT_UNAVAILABLE_MESSAGE } };
       case "missing_profile":
       case "unknown_role":

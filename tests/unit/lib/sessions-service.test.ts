@@ -81,11 +81,14 @@ describe("scheduleSession", () => {
     db.queue.push(
       { data: [{ id: STUDENT, full_name: "Asha", batch_id: BATCH }], error: null },
       { data: [{ id: "slot", weekday: 1, start_time: "09:00:00", end_time: "10:00:00" }], error: null },
-      { data: { id: SESSION }, error: null },
+      { data: null, error: null }, // insert (no RETURNING: RLS can't see the new row)
       { data: null, error: null }, // clear participants
     );
     const res = await service.scheduleSession(input, NOW);
-    expect(res).toMatchObject({ ok: true, data: { id: SESSION }, outsideAvailability: true });
+    expect(res).toMatchObject({ ok: true, data: { id: expect.stringMatching(/^[0-9a-f-]{36}$/) }, outsideAvailability: true });
+    // The id is chosen by the server and written with the row.
+    const insert = db.from.mock.results[2].value.insert as ReturnType<typeof vi.fn>;
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ id: res.data?.id, mentor_id: ME, created_by: ME }));
   });
 });
 

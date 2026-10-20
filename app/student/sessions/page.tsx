@@ -19,7 +19,7 @@ export default async function StudentSessionsPage({ searchParams }: { searchPara
       {!result.ok || !result.data ? (
         <RetryErrorState message={result.error?.message ?? "We couldn't load your sessions. Please try again."} />
       ) : (
-        <SessionAgenda sessions={result.data} show={{ mentor: true, link: true }} empty={filter === "upcoming" ? { title: "No upcoming sessions", description: "When your mentor schedules one, it appears here." } : { title: "Nothing here", description: "Nothing to show for this view." }} />
+        <SessionAgenda sessions={result.data} show={{ mentor: true, link: true }} hrefFor={(s) => `/student/sessions/${s.id}`} empty={filter === "upcoming" ? { title: "No upcoming sessions", description: "When your mentor schedules one, it appears here." } : { title: "Nothing here", description: "Nothing to show for this view." }} />
       )}
     </div>
   );

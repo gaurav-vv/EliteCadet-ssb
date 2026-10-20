@@ -867,7 +867,24 @@ students don't.
 **Acceptance:** `specs.md` §8a.4h. Database checks cover cross-academy and non-assigned access.
 **Needs:** a Supabase project (Storage can't be tested on plain Postgres).
 
-## T094 — Live meeting rooms with LiveKit (WebRTC) — P1 — `[ ]`
+## T094 — Live meeting rooms with LiveKit (WebRTC) — P1 — `[-]`
+**Progress 2026-10-20:**
+- Built: one-to-one and batch meetings on sessions (`0022_live_meetings.sql`); the 120-minute daily
+  cap; join tokens; the room UI; mentor controls; webhook attendance. See `docs/live-meetings.md`.
+- **Open:**
+  - A real two-browser meeting against a running LiveKit server (not done yet).
+  - Chat.
+  - Tests for token scope.
+  - Applying 0022 and 0023 to hosted databases.
+- **2026-10-20, academy admins (0023):**
+  - Admins schedule on behalf of a host mentor (the cap is the mentor's), and can start, end,
+    cancel, co-host, moderate and see attendance in their own academy only.
+  - New pages: `/academy/sessions/new`, `/academy/sessions/[id]` and `/room`.
+  - Tests:
+    - `supabase/tests/workflow-check.sql` §10: 37 checks under real RLS (academy isolation, role
+      refusals, shared cap, batch > 100, webhook scope).
+    - `tests/unit/lib/live-meetings-access.test.ts`: 13 tests.
+  - Still open: admin edit of a meeting, chat, the real two-browser test.
 **Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** LiveKit (open source; LiveKit Cloud, India
 region).
 **Requirements:**

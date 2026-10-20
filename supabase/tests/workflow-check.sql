@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0021 under real RLS.
+-- End-to-end workflow check of migrations 0001–0023 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -435,5 +435,127 @@ reset role;
 select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
 select t.eq((select count(*) from public.diagnostic_attempts where student_id = :'S2'), 0, 'another academy''s mentor cannot');
 reset role;
+-- ---------- 10. Live meetings (0022, 0023): roles, academy isolation, daily cap ----------
+-- t.ist(days ahead, 'HH:MM') = that IST wall-clock time; t.fails_with checks the SQLSTATE.
+create function t.ist(d int, hm text) returns timestamptz language sql stable as $$
+  select ((current_date + d)::timestamp + hm::time) at time zone 'Asia/Kolkata' $$;
+create function t.fails_with(stmt text, state text, label text) returns void language plpgsql as $$
+begin
+  begin
+    execute stmt;
+  exception when others then
+    if sqlstate <> state then raise exception 'FAIL %: expected %, got % (%)', label, state, sqlstate, sqlerrm; end if;
+    raise notice 'pass  % (refused: %)', label, sqlerrm;
+    return;
+  end;
+  raise exception 'FAIL %: statement was allowed', label;
+end $$;
+grant execute on all functions in schema t to authenticated, service_role;
+grant usage on schema t to service_role;
+-- as postgres: count rows regardless of RLS
+create function t.cnt(q text) returns bigint language plpgsql security definer as $$
+declare n bigint; begin execute q into n; return n; end $$;
+grant execute on function t.cnt(text) to authenticated, service_role;
+
+-- Admin A schedules on behalf of mentor A (host); the cap is mentor A's.
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select public.admin_schedule_live_meeting('batch', :'BA', null, :'MENT_A', 'Admin batch call', null, t.ist(20, '10:00'), t.ist(20, '11:00')) as "M1" \gset
+select public.admin_schedule_live_meeting('one_to_one', null, :'S1', :'MENT_A', 'Admin 1:1', null, t.ist(20, '12:00'), t.ist(20, '13:00')) as "M2" \gset
+select t.eq((select count(*) from public.sessions where id in (:'M1', :'M2') and mentor_id = :'MENT_A' and created_by = :'ADMIN_A'), 2, 'admin A schedules batch + one-to-one, hosted by mentor A');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(21, %L), t.ist(21, %L))', 'batch', :'BB', :'MENT_B', 'Cross academy', '10:00', '11:00'), 'MT003', 'admin A cannot schedule for academy B''s batch');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, null, %L, %L, %L, null, t.ist(21, %L), t.ist(21, %L))', 'one_to_one', :'S3', :'MENT_A', 'Cross student', '10:00', '11:00'), 'MT003', 'admin A cannot pick academy B''s student');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(21, %L), t.ist(21, %L))', 'batch', :'BA', :'MENT_B', 'Wrong host', '10:00', '11:00'), 'MT009', 'host must be a mentor of the batch');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(20, %L), t.ist(20, %L))', 'batch', :'BA', :'MENT_A', 'Over cap', '15:00', '15:15'), 'MT001', 'admin booking hits mentor A''s 120-minute day');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(22, %L), t.ist(22, %L))', 'batch', :'BA', :'MENT_A', 'Too long', '10:00', '12:30'), 'MT001', '150-minute meeting refused');
+select t.eq(t.affected(format('update public.sessions set title = %L where id = %L', 'Hijack', :'M1')), 0, 'admin A cannot PATCH a session row directly');
+select t.fails(format('insert into public.sessions (batch_id, mentor_id, created_by, title, starts_at, ends_at, mode, meeting_kind, for_whole_batch) values (%L, %L, %L, %L, t.ist(23, %L), t.ist(23, %L), %L, %L, true)', :'BA', :'MENT_A', :'ADMIN_A', 'Direct insert', '10:00', '11:00', 'online', 'batch'), 'admin A cannot insert a session row directly');
+select t.fails_with(format('select public.start_live_meeting(%L)', :'M1'), 'MT007', 'admin A cannot start before the room opens');
+reset role;
+
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id in (:'M1', :'M2')), 2, 'mentor A sees meetings booked on their behalf');
+select t.fails_with(format('select public.save_live_meeting(null, %L, %L, null, %L, null, t.ist(20, %L), t.ist(20, %L))', 'batch', :'BA', 'Mentor over cap', '16:00', '16:15'), 'MT001', 'mentor A''s own booking shares the same daily cap');
+reset role;
+
+select set_config('request.jwt.claim.sub', :'ADMIN_B', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id = :'M1'), 0, 'admin B cannot see academy A''s meeting');
+select t.fails_with(format('select public.cancel_live_meeting(%L, %L)', :'M1', 'Not mine'), 'P0002', 'admin B cannot cancel it');
+select t.fails_with(format('select public.start_live_meeting(%L)', :'M1'), 'P0002', 'admin B cannot start it');
+select t.fails_with(format('select public.end_live_meeting(%L)', :'M1'), 'P0002', 'admin B cannot end it');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(21, %L), t.ist(21, %L))', 'batch', :'BA', :'MENT_A', 'B into A', '10:00', '11:00'), 'MT003', 'admin B cannot schedule for academy A''s batch');
+select t.eq((select count(*) from public.live_meeting_attendance where session_id = :'M1'), 0, 'admin B reads no attendance of academy A');
+reset role;
+
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id = :'M1'), 0, 'mentor B cannot see academy A''s meeting');
+select t.fails_with(format('select public.cancel_live_meeting(%L, %L)', :'M1', 'Not mine'), 'P0002', 'mentor B cannot cancel it');
+reset role;
+
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id in (:'M1', :'M2')), 2, 'S1 sees the batch meeting and their one-to-one');
+select t.fails_with(format('select public.cancel_live_meeting(%L, %L)', :'M1', 'Student try'), 'P0002', 'a student cannot cancel');
+select t.fails_with(format('select public.start_live_meeting(%L)', :'M1'), 'P0002', 'a student cannot start');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(21, %L), t.ist(21, %L))', 'batch', :'BA', :'MENT_A', 'Student books', '10:00', '11:00'), '42501', 'a student cannot schedule');
+reset role;
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id in (:'M1', :'M2')), 1, 'S2 sees the batch meeting, not S1''s one-to-one');
+reset role;
+select set_config('request.jwt.claim.sub', :'S3', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id in (:'M1', :'M2')), 0, 'academy B''s student sees neither');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(21, %L), t.ist(21, %L))', 'batch', :'BA', :'MENT_A', 'Mentor uses admin path', '10:00', '11:00'), '42501', 'a mentor cannot use the admin scheduling path');
+reset role;
+
+-- Admin A cancels the one-to-one: the mentor's day frees up again.
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select public.cancel_live_meeting(:'M2', 'Student travelling');
+select t.eq(t.cnt(format('select count(*) from public.sessions where id = %L and status = %L and cancelled_by = %L and cancelled_at is not null', :'M2', 'cancelled', :'ADMIN_A')), 1, 'admin A cancels; server records who and when');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from (select public.save_live_meeting(null, 'batch', :'BA', null, 'Freed slot', null, t.ist(20, '16:00'), t.ist(20, '16:30'))) x), 1, 'cancelled time no longer counts against mentor A');
+reset role;
+
+-- A meeting about to start: admin A starts and ends it; admin B can't.
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select public.admin_schedule_live_meeting('batch', :'BA', null, :'MENT_A', 'Starting soon', null, now() + interval '10 minutes', now() + interval '40 minutes') as "M3" \gset
+select t.eq((select count(*) from (select public.start_live_meeting(:'M3')) x), 1, 'admin A starts within the 15-minute window');
+select t.fails(format('select public.cancel_live_meeting(%L, %L)', :'M3', 'Too late'), 'a started meeting cannot be cancelled');
+insert into public.live_meeting_removals (session_id, user_id, removed_by) values (:'M3', :'S2', :'ADMIN_A');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_B', false); set role authenticated;
+select t.fails(format('insert into public.live_meeting_removals (session_id, user_id, removed_by) values (%L, %L, %L)', :'M3', :'S1', :'ADMIN_B'), 'admin B cannot remove anyone from academy A''s meeting');
+reset role;
+
+-- Webhook writes: service role only; staff and the audience recorded, outsiders ignored.
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.fails(format('select public.record_live_meeting_event(%L, %L, %L, %L)', :'M3', :'ADMIN_A', 'PA_x', 'participant_joined'), 'a signed-in user cannot write attendance');
+reset role;
+set role service_role;
+select public.record_live_meeting_event(:'M3', :'ADMIN_A', 'PA_admin', 'participant_joined');
+select public.record_live_meeting_event(:'M3', :'S1', 'PA_s1', 'participant_joined');
+select public.record_live_meeting_event(:'M3', :'MENT_B', 'PA_mb', 'participant_joined');
+select public.record_live_meeting_event(:'M3', :'S3', 'PA_s3', 'participant_joined');
+reset role;
+select t.eq(t.cnt(format('select count(*) from public.live_meeting_attendance where session_id = %L', :'M3')), 2, 'webhook: academy A admin + S1 recorded, academy B mentor/student ignored');
+
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from public.live_meeting_attendance where session_id = :'M3'), 2, 'admin A reads its attendance');
+select t.eq((select count(*) from (select public.end_live_meeting(:'M3')) x), 1, 'admin A ends it');
+select t.eq((select count(*) from public.sessions where id = :'M3' and status = 'completed' and actual_ended_at is not null), 1, 'ended: completed with a server end time');
+reset role;
+
+-- Batch limit: 101 enrolled students → batch meetings refused (MT002).
+insert into auth.users (id, email, raw_app_meta_data, raw_user_meta_data)
+  select gen_random_uuid(), format('big%s@x.test', g), json_build_object('role','student','academy_id',:'AC_A')::jsonb, '{"full_name":"Big"}'
+  from generate_series(1, 101) g;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+insert into public.batches (academy_id, name) values (:'AC_A', 'Alpha big');
+select id as "BIG" from public.batches where name = 'Alpha big' \gset
+insert into public.batch_students (batch_id, student_id) select :'BIG', p.id from public.profiles p where p.email like 'big%@x.test';
+insert into public.batch_mentors (batch_id, mentor_id) values (:'BIG', :'MENT_A');
+select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(25, %L), t.ist(25, %L))', 'batch', :'BIG', :'MENT_A', 'Too big', '10:00', '11:00'), 'MT002', 'batch meeting refused for 101 enrolled students');
+reset role;
+
 \echo
 \echo ALL CHECKS PASSED

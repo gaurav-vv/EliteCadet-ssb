@@ -108,7 +108,9 @@ test.describe("auth flows on a local Supabase stack", () => {
     await expect(page.getByText(/check your email/i)).toBeVisible();
 
     const link = await emailLink(email);
-    await page.goto(link);
+    // "commit": the callback redirects twice; waiting for "load" on the first
+    // URL can abort while the dev server compiles the next route.
+    await page.goto(link, { waitUntil: "commit" });
     await expect(page).toHaveURL(/\/reset-password$/);
     await page.getByLabel("New password").fill(NEW_PASSWORD);
     await page.getByRole("button", { name: /save new password/i }).click();
@@ -118,9 +120,54 @@ test.describe("auth flows on a local Supabase stack", () => {
     await expect(page).toHaveURL(/\/student$/);
 
     const again = await (await browser.newContext()).newPage();
-    await again.goto(link);
+    await again.goto(link, { waitUntil: "commit" });
     await expect(again).toHaveURL(/\/forgot-password\?reason=link_invalid(#.*)?$/);
     await expect(again.getByText(/invalid, expired or already used/i)).toBeVisible();
+  });
+
+  test("mentor invite: academy admin invites → email → set password → mentor dashboard; bad or reused links fail", async ({ browser }) => {
+    const admin = await (await browser.newContext()).newPage();
+    await signUp(admin, uniqueEmail("inviter"), { academy: "E2E Invite Academy" });
+    await expect(admin).toHaveURL(/\/academy$/);
+
+    const mentorEmail = uniqueEmail("mentor");
+    await admin.goto("/academy/mentors");
+    await admin.getByLabel("Full name").fill("E2E Mentor");
+    await admin.getByLabel("Email").fill(mentorEmail);
+    await admin.getByRole("button", { name: /send invite/i }).click();
+    await expect(admin.getByRole("status")).toContainText(/invite sent/i);
+
+    // Captured by the local Mailpit inbox — proof an email was generated and
+    // handed to SMTP, not just that the API said "ok".
+    const link = await emailLink(mentorEmail);
+    expect(new URL(link).searchParams.get("type")).toBe("invite");
+
+    // A tampered token is refused before anything else.
+    const tampered = new URL(link);
+    tampered.searchParams.set("token", "0".repeat(56));
+    const forged = await (await browser.newContext()).newPage();
+    await forged.goto(tampered.toString(), { waitUntil: "commit" });
+    await expect(forged.getByText(/this reset link has expired/i)).toBeVisible();
+
+    // Invite link → signed in → choose a password (tokens never stay in the URL).
+    const mentor = await (await browser.newContext()).newPage();
+    await mentor.goto(link, { waitUntil: "commit" });
+    await expect(mentor).toHaveURL(/\/reset-password$/);
+    await mentor.getByLabel("New password").fill(NEW_PASSWORD);
+    await mentor.getByRole("button", { name: /save new password/i }).click();
+    await expect(mentor).toHaveURL(/\/login\?reason=password_updated$/);
+    await logIn(mentor, mentorEmail, NEW_PASSWORD);
+    await expect(mentor).toHaveURL(/\/mentor$/);
+    await expectHealthyPage(mentor);
+
+    // The admin now sees them as a mentor of this academy.
+    await admin.goto("/academy/mentors");
+    await expect(admin.getByText(mentorEmail)).toBeVisible();
+
+    // The same link a second time fails safely.
+    const again = await (await browser.newContext()).newPage();
+    await again.goto(link, { waitUntil: "commit" });
+    await expect(again.getByText(/this reset link has expired/i)).toBeVisible();
   });
 
   test("dev preview signs into every role's own dashboard", async ({ browser }) => {

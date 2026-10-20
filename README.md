@@ -163,6 +163,12 @@ that adds it.
 npm run dev        # http://localhost:3000
 ```
 
+**Live meeting rooms (optional):** in-app one-to-one and batch video meetings run on LiveKit
+(WebRTC). Apply `0022_live_meetings.sql`, start a local `livekit-server`, and set `LIVEKIT_URL`,
+`LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` (server-only). Without them, everything else works and
+the meeting page says video isn't set up. Setup, the scheduling rules and production/TURN notes are
+in [`docs/live-meetings.md`](docs/live-meetings.md).
+
 ## Testing
 
 ```bash

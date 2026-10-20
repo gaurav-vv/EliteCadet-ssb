@@ -2,7 +2,7 @@
 // Times are entered and shown in IST (Asia/Kolkata, UTC+05:30, no DST) and
 // stored as UTC.
 
-import type { AvailabilitySlot, SessionFilter, SessionInput, SessionMode } from "@/types/sessions";
+import { MEETING_MAX_DAYS_AHEAD, MEETING_MAX_MINUTES, MEETING_MIN_MINUTES, type AvailabilitySlot, type MeetingKind, type SessionFilter, type SessionInput, type SessionMode } from "@/types/sessions";
 
 const IST_OFFSET_MINUTES = 5 * 60 + 30;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -117,6 +117,52 @@ export function validateSessionInput(input: Partial<Record<keyof SessionInput, u
       for_whole_batch: forWholeBatch,
       participantIds: forWholeBatch ? [] : participantIds,
     },
+  };
+}
+
+export interface CleanMeeting {
+  kind: MeetingKind;
+  batch_id: string; // batch meetings; for one-to-one the database derives it from the student
+  student_id: string | null;
+  title: string;
+  description: string | null;
+  starts_at: string;
+  ends_at: string;
+}
+
+// A live meeting (mode "room"): the whole batch or one student, 15–120
+// minutes, starting in the future and at most 90 days ahead. The end time may
+// fall on the next day (an end earlier than the start means "after midnight").
+// The database re-checks all of it, plus the mentor's 120-minute daily limit.
+export function validateMeetingInput(input: Partial<Record<keyof SessionInput, unknown>>, nowIso: string): { ok: true; value: CleanMeeting } | { ok: false; errors: SessionFieldErrors } {
+  const errors: SessionFieldErrors = {};
+  const kind: MeetingKind = input.forWholeBatch === false ? "one_to_one" : "batch";
+  const batchId = str(input.batchId);
+  const studentId = str(input.studentId);
+  const title = str(input.title).replace(/\s+/g, " ");
+  const description = str(input.description);
+
+  if (!UUID_RE.test(batchId)) errors.batchId = "Choose one of your batches.";
+  if (kind === "one_to_one" && !UUID_RE.test(studentId)) errors.studentId = "Choose the student for this meeting.";
+  if (title.length < 3 || title.length > 140) errors.title = "Title must be 3–140 characters.";
+  if (description.length > 2000) errors.description = "Keep the description under 2,000 characters.";
+
+  const startsAt = istToUtcIso(str(input.date), str(input.startTime));
+  let endsAt = istToUtcIso(str(input.date), str(input.endTime));
+  if (!startsAt) errors.date = "Enter a valid date and start time.";
+  if (!endsAt) errors.endTime = "Enter a valid end time.";
+  if (startsAt && endsAt) {
+    if (Date.parse(endsAt) <= Date.parse(startsAt)) endsAt = new Date(Date.parse(endsAt) + 24 * 60 * 60_000).toISOString();
+    const minutes = (Date.parse(endsAt) - Date.parse(startsAt)) / 60_000;
+    if (minutes < MEETING_MIN_MINUTES || minutes > MEETING_MAX_MINUTES) errors.endTime = `Meetings are ${MEETING_MIN_MINUTES}–${MEETING_MAX_MINUTES} minutes long.`;
+    if (Date.parse(startsAt) <= Date.parse(nowIso)) errors.date = "Choose a time in the future.";
+    else if (Date.parse(startsAt) > Date.parse(nowIso) + MEETING_MAX_DAYS_AHEAD * 24 * 60 * 60_000) errors.date = `Meetings can be scheduled up to ${MEETING_MAX_DAYS_AHEAD} days ahead.`;
+  }
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    value: { kind, batch_id: batchId, student_id: kind === "one_to_one" ? studentId : null, title, description: description || null, starts_at: startsAt!, ends_at: endsAt! },
   };
 }
 

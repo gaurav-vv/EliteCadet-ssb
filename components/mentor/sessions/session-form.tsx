@@ -8,23 +8,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { scheduleSessionAction, updateSessionAction } from "@/lib/actions/sessions";
-import type { SessionInput } from "@/types/sessions";
+import { scheduleAcademyMeetingAction, scheduleSessionAction, updateSessionAction } from "@/lib/actions/sessions";
+import { MEETING_BATCH_MAX_STUDENTS, MEETING_DAILY_LIMIT_MINUTES, MEETING_MAX_MINUTES, MEETING_MIN_MINUTES, type SessionInput } from "@/types/sessions";
 
 type Errors = Partial<Record<keyof SessionInput, string>>;
 
 interface SessionFormProps {
-  batches: { id: string; name: string; students: { id: string; name: string }[] }[];
+  batches: { id: string; name: string; students: { id: string; name: string }[]; mentors?: { id: string; name: string }[] }[];
+  // "academy": an academy admin schedules a live meeting for a host mentor
+  // (live video room only, no edit mode).
+  variant?: "mentor" | "academy";
   // Edit mode: the session id + its current values (date/times already in IST).
   sessionId?: string;
   initial?: SessionInput;
 }
 
-const BLANK: SessionInput = { batchId: "", title: "", description: "", date: "", startTime: "", endTime: "", mode: "online", meetingUrl: "", location: "", forWholeBatch: true, participantIds: [] };
+const BLANK: SessionInput = { batchId: "", title: "", description: "", date: "", startTime: "", endTime: "", mode: "room", meetingUrl: "", location: "", forWholeBatch: true, participantIds: [], studentId: "" };
+
+const MODES = [
+  { value: "room", label: "Live video room" },
+  { value: "online", label: "Online (meeting link)" },
+  { value: "offline", label: "Offline (in person)" },
+] as const;
 
 // Schedule (or edit) a session for one of the mentor's batches. Times are
 // entered in IST; the server converts and re-validates everything.
-export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
+export function SessionForm({ batches, sessionId, initial, variant = "mentor" }: SessionFormProps) {
+  const academy = variant === "academy";
   const router = useRouter();
   const [values, setValues] = useState<SessionInput>(initial ?? { ...BLANK, batchId: batches[0]?.id ?? "" });
   const [errors, setErrors] = useState<Errors>({});
@@ -40,7 +50,7 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
     setPending(true);
     setMessage(null);
     try {
-      const result = sessionId ? await updateSessionAction(sessionId, values) : await scheduleSessionAction(values);
+      const result = academy ? await scheduleAcademyMeetingAction({ ...values, mode: "room" }) : sessionId ? await updateSessionAction(sessionId, values) : await scheduleSessionAction(values);
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
         setMessage({ tone: "error", text: result.error?.message ?? "We couldn't save the session. Please try again." });
@@ -49,7 +59,7 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
       setErrors({});
       const note = result.outsideAvailability ? " Note: it's outside the availability you've set." : "";
       if (!sessionId && result.data && "id" in result.data) {
-        router.push(`/mentor/sessions/${result.data.id}?scheduled=1${result.outsideAvailability ? "&outside=1" : ""}`);
+        router.push(academy ? `/academy/sessions/${result.data.id}?scheduled=1` : `/mentor/sessions/${result.data.id}?scheduled=1${result.outsideAvailability ? "&outside=1" : ""}`);
         return;
       }
       setMessage({ tone: "success", text: `Session saved.${note}` });
@@ -62,7 +72,13 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
   }
 
   if (batches.length === 0) {
-    return <p className="glass-regular rounded-card px-6 py-6 text-sm text-ink-secondary">You&apos;re not assigned to a batch yet. Your academy admin assigns mentors to batches; you can schedule sessions once you have one.</p>;
+    return (
+      <p className="glass-regular rounded-card px-6 py-6 text-sm text-ink-secondary">
+        {academy
+          ? "Your academy has no active batches yet. Create a batch, add students and assign a mentor, then schedule a meeting."
+          : "You're not assigned to a batch yet. Your academy admin assigns mentors to batches; you can schedule sessions once you have one."}
+      </p>
+    );
   }
 
   return (
@@ -75,7 +91,7 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="s-batch">Batch</Label>
-          <Select value={values.batchId} onValueChange={(v) => setValues((cur) => ({ ...cur, batchId: v, participantIds: [] }))} disabled={pending}>
+          <Select value={values.batchId} onValueChange={(v) => setValues((cur) => ({ ...cur, batchId: v, participantIds: [], studentId: "", mentorId: "" }))} disabled={pending}>
             <SelectTrigger id="s-batch" className="min-h-11 w-full" {...a11y("batchId")}><SelectValue /></SelectTrigger>
             <SelectContent>{batches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
           </Select>
@@ -87,6 +103,21 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
           {err("title")}
         </div>
       </div>
+      {academy && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="s-mentor">Host mentor</Label>
+          {(batch?.mentors ?? []).length === 0 ? (
+            <p className="text-[13px] text-ink-secondary">No mentor is assigned to this batch yet. Assign one in Batches first.</p>
+          ) : (
+            <Select value={values.mentorId ?? ""} onValueChange={(v) => set("mentorId", v)} disabled={pending}>
+              <SelectTrigger id="s-mentor" className="min-h-11 w-full" {...a11y("mentorId")}><SelectValue placeholder="Choose the mentor who will host" /></SelectTrigger>
+              <SelectContent>{batch!.mentors!.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
+          <p className="text-[12px] text-ink-secondary">The meeting is on the mentor&apos;s calendar and counts toward their {MEETING_DAILY_LIMIT_MINUTES}-minute daily limit.</p>
+          {err("mentorId")}
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="s-description">Description (optional)</Label>
         <Textarea id="s-description" rows={3} value={values.description} onChange={(e) => set("description", e.target.value)} disabled={pending} {...a11y("description")} />
@@ -94,6 +125,11 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
       </div>
       <fieldset className="grid gap-4 sm:grid-cols-3">
         <legend className="mb-2 text-sm font-medium text-ink">When (IST)</legend>
+        {values.mode === "room" && (
+          <p className="text-[13px] text-ink-secondary sm:col-span-3">
+            {MEETING_MIN_MINUTES}–{MEETING_MAX_MINUTES} minutes. {academy ? "Each mentor" : "You"} can host up to {MEETING_DAILY_LIMIT_MINUTES} minutes of live meetings a day. An end time earlier than the start means it ends after midnight.
+          </p>
+        )}
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="s-date">Date</Label>
           <Input id="s-date" type="date" className="min-h-11" value={values.date} onChange={(e) => set("date", e.target.value)} disabled={pending} {...a11y("date")} />
@@ -112,15 +148,22 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
       </fieldset>
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm font-medium text-ink">Where</legend>
-        <div className="flex flex-wrap gap-4">
-          {(["online", "offline"] as const).map((m) => (
-            <label key={m} className="flex min-h-11 items-center gap-2 text-sm text-ink">
-              <input type="radio" name="s-mode" className="size-4 accent-(--brand-accent)" checked={values.mode === m} onChange={() => set("mode", m)} disabled={pending} />
-              {m === "online" ? "Online" : "Offline (in person)"}
-            </label>
-          ))}
-        </div>
-        {values.mode === "online" ? (
+        {!academy && (
+          <div className="flex flex-wrap gap-4">
+            {MODES.map((m) => (
+              <label key={m.value} className="flex min-h-11 items-center gap-2 text-sm text-ink">
+                <input type="radio" name="s-mode" className="size-4 accent-(--brand-accent)" checked={values.mode === m.value} onChange={() => set("mode", m.value)} disabled={pending} />
+                {m.label}
+              </label>
+            ))}
+          </div>
+        )}
+        {err("mode")}
+        {values.mode === "room" ? (
+          <p className="text-[13px] text-ink-secondary">
+            {academy ? "Live video room. " : ""}Students join from their Sessions page. Only the invited students can enter, and nothing is recorded.
+          </p>
+        ) : values.mode === "online" ? (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="s-link">Meeting link</Label>
             <Input id="s-link" type="url" placeholder="https://" className="min-h-11" value={values.meetingUrl} onChange={(e) => set("meetingUrl", e.target.value)} disabled={pending} {...a11y("meetingUrl")} />
@@ -139,14 +182,31 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
         <div className="flex flex-wrap gap-4">
           <label className="flex min-h-11 items-center gap-2 text-sm text-ink">
             <input type="radio" name="s-who" className="size-4 accent-(--brand-accent)" checked={values.forWholeBatch} onChange={() => set("forWholeBatch", true)} disabled={pending} />
-            The whole batch
+            {values.mode === "room" ? `The whole batch (up to ${MEETING_BATCH_MAX_STUDENTS} students)` : "The whole batch"}
           </label>
           <label className="flex min-h-11 items-center gap-2 text-sm text-ink">
             <input type="radio" name="s-who" className="size-4 accent-(--brand-accent)" checked={!values.forWholeBatch} onChange={() => set("forWholeBatch", false)} disabled={pending} />
-            Selected students
+            {values.mode === "room" ? "One student (one-to-one)" : "Selected students"}
           </label>
         </div>
-        {!values.forWholeBatch && (
+        {values.mode === "room" && values.forWholeBatch && batch && batch.students.length > MEETING_BATCH_MAX_STUDENTS && (
+          <p role="alert" className="text-[13px] text-(--academy-danger-text)">This batch has {batch.students.length} students; batch meetings allow at most {MEETING_BATCH_MAX_STUDENTS}.</p>
+        )}
+        {values.mode === "room" && !values.forWholeBatch && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="s-student">Student</Label>
+            {(batch?.students ?? []).length === 0 ? (
+              <p className="text-[13px] text-ink-secondary">This batch has no students yet.</p>
+            ) : (
+              <Select value={values.studentId} onValueChange={(v) => set("studentId", v)} disabled={pending}>
+                <SelectTrigger id="s-student" className="min-h-11 w-full" {...a11y("studentId")}><SelectValue placeholder="Choose a student" /></SelectTrigger>
+                <SelectContent>{batch!.students.map((st) => <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
+            {err("studentId")}
+          </div>
+        )}
+        {values.mode !== "room" && !values.forWholeBatch && (
           <div className="flex flex-col gap-1.5">
             {(batch?.students ?? []).length === 0 ? (
               <p className="text-[13px] text-ink-secondary">This batch has no students yet.</p>
@@ -173,7 +233,7 @@ export function SessionForm({ batches, sessionId, initial }: SessionFormProps) {
         )}
       </fieldset>
       <div className="flex justify-end">
-        <Button type="submit" className="min-h-11" disabled={pending}>{pending ? "Saving…" : sessionId ? "Save changes" : "Schedule session"}</Button>
+        <Button type="submit" className="min-h-11" disabled={pending}>{pending ? "Saving…" : sessionId ? "Save changes" : academy ? "Schedule meeting" : "Schedule session"}</Button>
       </div>
     </form>
   );

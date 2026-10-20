@@ -1,3 +1,4 @@
+import { describeLookupFailure, lookupFailure } from "@/lib/auth/account";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/auth";
 
@@ -19,14 +20,14 @@ export async function getCurrentUserAndProfile(): Promise<{
     return { user: null, profile: null, profileError: false };
   }
 
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("id, role, full_name, academy_id, status")
-    .eq("id", user.id)
-    .maybeSingle();
+  const {
+    data: profile,
+    error,
+    status,
+  } = await supabase.from("profiles").select("id, role, full_name, academy_id, status").eq("id", user.id).maybeSingle();
 
   if (error) {
-    console.error("[auth] profile lookup failed", { code: error.code, message: error.message });
+    console.error(`[auth] profile lookup failed: ${describeLookupFailure("session", lookupFailure(error, status))}`);
   }
 
   return {

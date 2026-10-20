@@ -1064,18 +1064,41 @@ may open a file.
 **Live meeting rooms (T094).** Online sessions use built-in video rooms on **LiveKit** (open-source
 WebRTC, LiveKit Cloud, India region), instead of a pasted meeting link.
 
+- **Who runs meetings (decided 2026-10-20):**
+  - Mentors, for batches they teach.
+  - Academy admins, for any batch or student in their own academy, hosted by a mentor of that
+    batch. The meeting counts toward that mentor's daily limit.
+  - Admins can start, end, cancel, co-host (same controls as the mentor) and see attendance. They
+    can't edit a meeting; they cancel and reschedule.
+- **Meeting types (decided 2026-10-20):** exactly two.
+  - **One-to-one:** the mentor and one student from a batch they mentor.
+  - **Batch:** the mentor and the whole batch. Only batches of up to 100 enrolled students.
+- **Scheduling (decided 2026-10-20):**
+  - Meetings run 15–120 minutes and start in the future, up to 90 days ahead.
+  - A mentor may host at most **120 minutes of live meetings per calendar day** (IST, the academy
+    timezone until academies get their own setting).
+  - Scheduled, live and completed meetings count their full scheduled length. Cancelled ones don't.
+    A meeting that crosses midnight counts on both days.
+  - No overlapping meetings.
+  - The database enforces all of this, safely under concurrent bookings.
 - **Rooms:**
   - Each online session gets one room, named after the session.
-  - The room opens 15 minutes before the start and closes 30 minutes after the end.
+  - The room opens 15 minutes before the start. Students can join once the mentor has started.
+    The room closes at the scheduled end (decided 2026-10-20, replacing "30 minutes after the end",
+    so the daily cap can't be stretched).
+  - Status shown: scheduled · live · completed · cancelled. Actual start and end come from the
+    server clock.
 - **Join tokens:**
   - The app's server issues a short-lived LiveKit join token only to the session's mentor and its
     participants: the whole batch, or the selected students.
   - Nobody else can join, even with the link. Cancelled sessions issue no tokens.
   - The LiveKit API secret stays on the server.
 - **In the room:**
-  - Camera, microphone, screen share and chat.
-  - The mentor is the host and can mute or remove a participant.
+  - Camera, microphone, screen share and chat. Chat is deferred, see T094.
+  - The mentor is the host and can mute or remove a participant. A removed student can't rejoin.
   - Students join muted.
+  - In batch meetings, students join listen-only. The mentor lets an individual student speak or
+    share video, and can take it back.
 - **Attendance:** joining a room counts as being present for attendance. The mentor can still
   correct it.
 - **Existing links:** a pasted external link stays possible as a fallback for sessions created

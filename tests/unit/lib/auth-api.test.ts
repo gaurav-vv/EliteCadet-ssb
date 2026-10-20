@@ -84,6 +84,20 @@ describe("logIn", () => {
     expect(auth.signOut).toHaveBeenCalled();
   });
 
+  it("logs the failed lookup as one readable line with the database code, never a bare {}", async () => {
+    fake({
+      signIn: { user: { id: "u1" }, error: null },
+      profile: { data: null, error: { code: "42703", message: "column profiles.status does not exist" } },
+    });
+    await logIn(creds);
+    const call = vi.mocked(console.error).mock.calls.find(([first]) => String(first).includes("profile lookup failed after sign-in"));
+    expect(call).toHaveLength(1);
+    expect(call![0]).toContain("code=42703");
+    expect(call![0]).toContain("column profiles.status does not exist");
+    expect(call![0]).toContain("apply the pending supabase/migrations");
+    expect(call![0]).not.toContain(creds.email);
+  });
+
   it("refuses an unrecognised role", async () => {
     const auth = fake({ signIn: { user: { id: "u1" }, error: null }, profile: { data: { role: "owner", status: "active" }, error: null } });
     expect((await logIn(creds)).error?.code).toBe("profile_missing");

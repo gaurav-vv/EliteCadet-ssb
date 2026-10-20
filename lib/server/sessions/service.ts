@@ -5,20 +5,22 @@
 
 import { getActor, type Actor } from "@/lib/server/auth/guard";
 import { findMyBatchIds } from "@/lib/server/academy-people/repository";
-import { parseSessionFilter, validateSessionInput, validateSlot, withinAvailability, type SessionFieldErrors } from "@/lib/server/sessions/validation";
+import { meetingDbError } from "@/lib/server/meetings/errors";
+import { parseSessionFilter, validateMeetingInput, validateSessionInput, validateSlot, withinAvailability, type CleanMeeting, type SessionFieldErrors } from "@/lib/server/sessions/validation";
 import { createClient } from "@/lib/supabase/server";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
 import { isUuid } from "@/lib/server/users/validation";
 import type { DbError } from "@/lib/server/users/repository";
-import type { AvailabilitySlot, SessionFilter, SessionInput, SessionMode, SessionRecord, SessionState } from "@/types/sessions";
+import type { AvailabilitySlot, MeetingKind, SessionFilter, SessionInput, SessionMode, SessionRecord, SessionState } from "@/types/sessions";
 
 type Result<T> = ServiceResult<T> & { fieldErrors?: SessionFieldErrors; outsideAvailability?: boolean };
 
 const fail = <T>(code: "validation_error" | "not_found" | "unauthorized", message: string): ServiceResult<T> => ({ ok: false, error: { code, message } });
 const NOT_FOUND = "We couldn't find that session.";
 
-const COLUMNS =
-  "id, batch_id, mentor_id, title, description, starts_at, ends_at, mode, meeting_url, location, for_whole_batch, status, cancel_reason, batch:batches(name), mentor:profiles!sessions_mentor_id_fkey(full_name), session_participants(student_id)";
+export const SESSION_COLUMNS =
+  "id, batch_id, mentor_id, title, description, starts_at, ends_at, mode, meeting_url, location, for_whole_batch, status, cancel_reason, meeting_kind, actual_started_at, actual_ended_at, ended_early, batch:batches(name), mentor:profiles!sessions_mentor_id_fkey(full_name), session_participants(student_id)";
+const COLUMNS = SESSION_COLUMNS;
 
 export function toSession(row: unknown): SessionRecord | null {
   if (typeof row !== "object" || row === null) return null;
@@ -47,6 +49,10 @@ export function toSession(row: unknown): SessionRecord | null {
       const o = typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {};
       return typeof o.student_id === "string" ? [o.student_id] : [];
     }),
+    meetingKind: r.meeting_kind === "one_to_one" || r.meeting_kind === "batch" ? (r.meeting_kind as MeetingKind) : null,
+    actualStartedAt: typeof r.actual_started_at === "string" ? r.actual_started_at : null,
+    actualEndedAt: typeof r.actual_ended_at === "string" ? r.actual_ended_at : null,
+    endedEarly: r.ended_early === true,
   };
 }
 
@@ -143,9 +149,41 @@ async function writeParticipants(sessionId: string, ids: string[]): Promise<DbEr
   return error;
 }
 
+// Live meeting (mode "room"): one transaction in save_live_meeting (0022),
+// which re-checks the batch/student, the 120-minute daily limit and overlaps.
+async function saveMeeting(sessionId: string | null, input: Partial<Record<keyof SessionInput, unknown>>, nowIso: string): Promise<Result<{ id: string }>> {
+  const parsed = validateMeetingInput(input, nowIso);
+  if (!parsed.ok) return { ...fail("validation_error", "Please fix the highlighted fields."), fieldErrors: parsed.errors };
+  const form = await getScheduleFormData();
+  if (!form.ok || !form.data) return form as ServiceResult<never>;
+  const v: CleanMeeting = parsed.value;
+  const batch = form.data.batches.find((b) => b.id === v.batch_id);
+  if (!batch) return { ...fail("validation_error", "You can only schedule for batches you teach."), fieldErrors: { batchId: "Choose one of your batches." } };
+  if (v.kind === "one_to_one" && !batch.students.some((st) => st.id === v.student_id)) return { ...fail("validation_error", "Pick a student from this batch."), fieldErrors: { studentId: "Pick a student from this batch." } };
+  if (v.kind === "batch" && batch.students.length === 0) return { ...fail("validation_error", "This batch has no students yet."), fieldErrors: { batchId: "This batch has no students yet." } };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("save_live_meeting", {
+    p_session: sessionId,
+    p_kind: v.kind,
+    p_batch: v.batch_id,
+    p_student: v.student_id,
+    p_title: v.title,
+    p_description: v.description,
+    p_starts_at: v.starts_at,
+    p_ends_at: v.ends_at,
+  });
+  if (error || typeof data !== "string") {
+    const mapped = meetingDbError<never>(error ?? {}, "We couldn't save the meeting. Please try again.");
+    return error?.code === "MT001" || error?.code === "23P01" ? { ...mapped, fieldErrors: { date: mapped.error?.message } } : mapped;
+  }
+  return { ok: true, data: { id: data }, outsideAvailability: !withinAvailability(form.data.availability, v.starts_at, v.ends_at) };
+}
+
 export async function scheduleSession(input: Partial<Record<keyof SessionInput, unknown>>, nowIso: string): Promise<Result<{ id: string }>> {
   const me = await mentor();
   if (!me) return fail("unauthorized", "Only a mentor can schedule sessions.");
+  if (input.mode === "room") return saveMeeting(null, input, nowIso);
   const parsed = validateSessionInput(input, nowIso);
   if (!parsed.ok) return { ...fail("validation_error", "Please fix the highlighted fields."), fieldErrors: parsed.errors };
   const form = await getScheduleFormData();
@@ -157,17 +195,25 @@ export async function scheduleSession(input: Partial<Record<keyof SessionInput, 
 
   const { participantIds, ...row } = parsed.value;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("sessions").insert({ ...row, mentor_id: me.id, created_by: me.id }).select("id").single();
-  if (error || !data) return sessionDbError(error ?? {}, "We couldn't schedule the session. Please try again.");
-  const partError = await writeParticipants(data.id as string, participantIds);
+  // The id is chosen here and the insert returns nothing: the select policy
+  // (can_see_session) can't see a row its own INSERT … RETURNING creates.
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("sessions").insert({ ...row, id, mentor_id: me.id, created_by: me.id });
+  if (error) return sessionDbError(error, "We couldn't schedule the session. Please try again.");
+  const partError = await writeParticipants(id, participantIds);
   if (partError) return sessionDbError(partError, "The session was saved, but we couldn't add the selected students. Open it and try again.");
-  return { ok: true, data: { id: data.id as string }, outsideAvailability: !withinAvailability(form.data.availability, row.starts_at, row.ends_at) };
+  return { ok: true, data: { id }, outsideAvailability: !withinAvailability(form.data.availability, row.starts_at, row.ends_at) };
 }
 
 export async function updateSession(id: string, input: Partial<Record<keyof SessionInput, unknown>>, nowIso: string): Promise<Result<null>> {
   const current = await getMySession(id);
   if (!current.ok || !current.data) return current as ServiceResult<never>;
   if (current.data.status !== "scheduled") return fail("validation_error", "Only a scheduled session can be edited.");
+  if (current.data.actualStartedAt) return fail("validation_error", "This meeting has started, so it can't be edited.");
+  if (input.mode === "room") {
+    const saved = await saveMeeting(id, input, nowIso);
+    return saved.ok ? { ok: true, data: null, outsideAvailability: saved.outsideAvailability } : (saved as Result<null>);
+  }
   const parsed = validateSessionInput(input, nowIso);
   if (!parsed.ok) return { ...fail("validation_error", "Please fix the highlighted fields."), fieldErrors: parsed.errors };
   const form = await getScheduleFormData();
@@ -179,7 +225,7 @@ export async function updateSession(id: string, input: Partial<Record<keyof Sess
 
   const { participantIds, ...row } = parsed.value;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("sessions").update(row).eq("id", id).eq("mentor_id", current.data.mentorId).eq("status", "scheduled").select("id");
+  const { data, error } = await supabase.from("sessions").update({ ...row, meeting_kind: null }).eq("id", id).eq("mentor_id", current.data.mentorId).eq("status", "scheduled").select("id");
   if (error) return sessionDbError(error, "We couldn't save the session. Please try again.");
   if (!data || data.length === 0) return fail("not_found", NOT_FOUND);
   const partError = await writeParticipants(id, participantIds);
@@ -193,9 +239,10 @@ export async function cancelSession(id: string, reason: unknown): Promise<Servic
   const why = typeof reason === "string" ? reason.trim() : "";
   if (why.length < 3 || why.length > 300) return fail("validation_error", "Give a short reason (3–300 characters). Your students will see it.");
   if (current.data.status !== "scheduled") return fail("validation_error", "Only a scheduled session can be cancelled.");
+  if (current.data.actualStartedAt) return fail("validation_error", "This meeting has started. End it from the meeting page instead.");
   const supabase = await createClient();
   const { error } = await supabase.from("sessions").update({ status: "cancelled", cancel_reason: why }).eq("id", id).eq("status", "scheduled");
-  if (error) return mapDbError(error);
+  if (error) return meetingDbError(error, "We couldn't cancel the session. Please try again.");
   return { ok: true, data: null };
 }
 
@@ -204,6 +251,8 @@ export async function completeSession(id: string, nowIso: string): Promise<Servi
   if (!current.ok || !current.data) return current as ServiceResult<never>;
   if (current.data.status !== "scheduled") return fail("validation_error", "Only a scheduled session can be marked completed.");
   if (Date.parse(current.data.startsAt) > Date.parse(nowIso)) return fail("validation_error", "You can mark it completed once it has started.");
+  // Live meetings finish with "End meeting" (server clock, attendance closed).
+  if (current.data.meetingKind) return fail("validation_error", current.data.actualStartedAt ? "End this meeting from its meeting page." : "This live meeting was never started. Cancel it if it didn't happen.");
   const supabase = await createClient();
   const { error } = await supabase.from("sessions").update({ status: "completed" }).eq("id", id).eq("status", "scheduled");
   if (error) return mapDbError(error);
@@ -265,4 +314,126 @@ export async function getAcademySessions(filter: unknown, nowIso: string, batchI
   const actor = await getActor();
   if (!actor || actor.profile.role !== "academy_admin" || !actor.profile.academyId) return fail("unauthorized", "Only an academy admin can view academy sessions.");
   return listSessions({ academyId: actor.profile.academyId, batchId: batchId && isUuid(batchId) ? batchId : undefined }, parseSessionFilter(filter), nowIso);
+}
+
+// One session for its student (RLS: can_see_session — their batch's, or one
+// they were selected for). Anything else is "not found".
+export async function getMyStudentSession(id: string): Promise<ServiceResult<SessionRecord>> {
+  const actor = await getActor();
+  if (!actor || actor.profile.role !== "student") return fail("unauthorized", "Only a student can view their sessions.");
+  if (!isUuid(id)) return fail("not_found", NOT_FOUND);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("sessions").select(COLUMNS).eq("id", id).maybeSingle();
+  if (error) return mapDbError(error);
+  const session = data ? toSession(data) : null;
+  return session ? { ok: true, data: session } : fail("not_found", NOT_FOUND);
+}
+
+// ---- Academy admin: live meetings on behalf of a mentor (0023) ------------------
+
+export interface AcademyScheduleFormData {
+  batches: { id: string; name: string; students: { id: string; name: string }[]; mentors: { id: string; name: string }[] }[];
+}
+
+async function academyAdmin(): Promise<Actor | null> {
+  const actor = await getActor();
+  return actor && actor.profile.role === "academy_admin" && actor.profile.academyId ? actor : null;
+}
+
+// The admin's own academy's active batches, each with its students and mentors.
+export async function getAcademyScheduleFormData(): Promise<ServiceResult<AcademyScheduleFormData>> {
+  const me = await academyAdmin();
+  if (!me) return fail("unauthorized", "Only an academy admin can schedule meetings here.");
+  const academyId = me.profile.academyId!;
+  const supabase = await createClient();
+  const [batches, students] = await Promise.all([
+    supabase.from("batch_overview").select("id, name, mentors").eq("academy_id", academyId).eq("status", "active").order("name"),
+    supabase.from("academy_students").select("id, full_name, email, batch_id").eq("academy_id", academyId).not("batch_id", "is", null).order("full_name"),
+  ]);
+  if (batches.error) return mapDbError(batches.error);
+  if (students.error) return mapDbError(students.error);
+  const byBatch = new Map<string, { id: string; name: string }[]>();
+  for (const row of (students.data ?? []) as Record<string, unknown>[]) {
+    if (typeof row.id !== "string" || typeof row.batch_id !== "string") continue;
+    byBatch.set(row.batch_id, [...(byBatch.get(row.batch_id) ?? []), { id: row.id, name: (typeof row.full_name === "string" && row.full_name) || (typeof row.email === "string" ? row.email : "Unnamed student") }]);
+  }
+  return {
+    ok: true,
+    data: {
+      batches: ((batches.data ?? []) as Record<string, unknown>[]).flatMap((b) => {
+        if (typeof b.id !== "string" || typeof b.name !== "string") return [];
+        const mentors = (Array.isArray(b.mentors) ? b.mentors : []).flatMap((m: unknown) => {
+          const o = typeof m === "object" && m !== null ? (m as Record<string, unknown>) : {};
+          return typeof o.id === "string" ? [{ id: o.id, name: typeof o.name === "string" && o.name ? o.name : "Unnamed mentor" }] : [];
+        });
+        return [{ id: b.id, name: b.name, students: byBatch.get(b.id) ?? [], mentors }];
+      }),
+    },
+  };
+}
+
+// The admin picks the batch (or one student), the host mentor and the time.
+// The meeting belongs to the mentor and uses THEIR 120-minute day; the
+// database re-checks academy, host and every 0022 rule (admin_schedule_live_meeting).
+export async function scheduleAcademyMeeting(input: Partial<Record<keyof SessionInput, unknown>>, nowIso: string): Promise<Result<{ id: string }>> {
+  const me = await academyAdmin();
+  if (!me) return fail("unauthorized", "Only an academy admin can schedule meetings here.");
+  const parsed = validateMeetingInput(input, nowIso);
+  const mentorId = typeof input.mentorId === "string" ? input.mentorId.trim() : "";
+  const errors: SessionFieldErrors = parsed.ok ? {} : { ...parsed.errors };
+  if (!isUuid(mentorId)) errors.mentorId = "Choose the mentor who will host.";
+  if (!parsed.ok || Object.keys(errors).length > 0) return { ...fail("validation_error", "Please fix the highlighted fields."), fieldErrors: errors };
+
+  const form = await getAcademyScheduleFormData();
+  if (!form.ok || !form.data) return form as ServiceResult<never>;
+  const v = parsed.value;
+  const batch = form.data.batches.find((b) => b.id === v.batch_id);
+  if (!batch) return { ...fail("validation_error", "Choose a batch from your academy."), fieldErrors: { batchId: "Choose a batch from your academy." } };
+  if (!batch.mentors.some((m) => m.id === mentorId)) return { ...fail("validation_error", "Choose a mentor assigned to this batch."), fieldErrors: { mentorId: "Choose a mentor assigned to this batch." } };
+  if (v.kind === "one_to_one" && !batch.students.some((st) => st.id === v.student_id)) return { ...fail("validation_error", "Pick a student from this batch."), fieldErrors: { studentId: "Pick a student from this batch." } };
+  if (v.kind === "batch" && batch.students.length === 0) return { ...fail("validation_error", "This batch has no students yet."), fieldErrors: { batchId: "This batch has no students yet." } };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_schedule_live_meeting", {
+    p_kind: v.kind,
+    p_batch: v.batch_id,
+    p_student: v.student_id,
+    p_mentor: mentorId,
+    p_title: v.title,
+    p_description: v.description,
+    p_starts_at: v.starts_at,
+    p_ends_at: v.ends_at,
+  });
+  if (error || typeof data !== "string") {
+    const mapped = meetingDbError<never>(error ?? {}, "We couldn't schedule the meeting. Please try again.");
+    return error?.code === "MT001" || error?.code === "23P01" ? { ...mapped, fieldErrors: { date: mapped.error?.message } } : mapped;
+  }
+  return { ok: true, data: { id: data } };
+}
+
+// One session in the admin's academy; any other id is "not found".
+export async function getAcademySession(id: string): Promise<ServiceResult<SessionRecord>> {
+  const me = await academyAdmin();
+  if (!me) return fail("unauthorized", "Only an academy admin can view academy sessions.");
+  if (!isUuid(id)) return fail("not_found", NOT_FOUND);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("sessions").select(COLUMNS).eq("id", id).eq("academy_id", me.profile.academyId!).maybeSingle();
+  if (error) return mapDbError(error);
+  const session = data ? toSession(data) : null;
+  return session ? { ok: true, data: session } : fail("not_found", NOT_FOUND);
+}
+
+// Admins cancel live meetings (not started yet) through cancel_live_meeting.
+export async function cancelAcademyMeeting(id: string, reason: unknown): Promise<ServiceResult<null>> {
+  const current = await getAcademySession(id);
+  if (!current.ok || !current.data) return current as ServiceResult<never>;
+  const why = typeof reason === "string" ? reason.trim() : "";
+  if (why.length < 3 || why.length > 300) return fail("validation_error", "Give a short reason (3–300 characters). Students and the mentor will see it.");
+  if (!current.data.meetingKind) return fail("validation_error", "Only live meetings can be cancelled here. Ask the session's mentor to cancel it.");
+  if (current.data.status !== "scheduled") return fail("validation_error", "Only a scheduled meeting can be cancelled.");
+  if (current.data.actualStartedAt) return fail("validation_error", "This meeting has started. End it from the meeting page instead.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_live_meeting", { p_session: id, p_reason: why });
+  if (error) return meetingDbError(error, "We couldn't cancel the meeting. Please try again.");
+  return { ok: true, data: null };
 }

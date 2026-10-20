@@ -311,6 +311,8 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-19 | **AI runs only in a separate worker over a Postgres queue** (T101, `0017_ai_jobs.sql`, `worker/`). The app enqueues; the worker claims (`FOR UPDATE SKIP LOCKED`), calls Claude (`claude-opus-5-5`, effort medium, structured JSON output, `fallbacks: "default"` for refusals, cached rubric system prompt), validates with Zod and guardrails, then stores. An evaluation is discarded, never shown, if it predicts selection, claims an official score or a single readiness number, makes a clinical claim, mentions accent, or quotes words the student didn't write. Retries: SDK x2, then queue backoff x3, then `dead`. Cost and latency per call in `ai_usage` (super admin). The provider key lives only in the worker | PRD §11.7, §12.9–12.11; `specs.md` §0.1; `AGENTS.md` §3 (no provider SDK in the browser) and §11 |
 | 2026-10-19 | **Readiness is a seven-dimension profile computed by fixed rules, never by AI** (T104, `0020_readiness_signals.sql`, `lib/server/readiness/compute.ts`). `readiness_signals()` returns counts and averages only (no answer or feedback text), access-checked for the student, their mentors, their academy admins and super admins. Rules: mentor review averages (≥70 strong, ≥45 developing) lead once there are two reviews, else AI practice ratings weighted by confidence; "improving" when the latest mentor average beats the previous three by 8+ points (or the recent AI average by 0.5); fewer than two pieces of evidence = "not enough evidence"; consistency from active days, revision from retaking tests after feedback and Library reads. Academy admins see states only | PRD §5.3 (deterministic progress math), §11.8, §12.12; `specs.md` §0.1 |
 | 2026-10-19 | **The roadmap is computed by fixed rules from current evidence on every view, not stored and not AI-written** (T105). Inputs: preferences (onboarding, now in `student_profiles`), the diagnostic (first attempt = immutable baseline, enforced by a partial unique index and no update/delete grants; weekly re-assessments kept separately), the readiness profile, the mentor's open work and journey progress. So it "recalculates when new evidence is recorded" (FR-PLAN-01) without a background job. The suggested stage is shown next to the student's self-reported stage, never merged (PRD §5.4); the Daily Mission is at most three actions, each with its reason (FR-DASH-01) | PRD §5.3, §9.3, §13; FR-ONB-01/02, FR-PLAN-01, FR-DASH-01 |
+| 2026-10-20 | **Live meetings are sessions with a `meeting_kind`** (`one_to_one` / `batch`), not a second meetings table (T094, `0022_live_meetings.sql`). Media is LiveKit (SFU) over WebRTC. Rules are enforced in Postgres: the 120-minute daily cap per mentor (IST calendar day; scheduled, live and completed count their full scheduled length, cancelled don't; crossing midnight counts on both days; per-mentor advisory lock against concurrent bookings), 15–120 minute meetings, batch ≤ 100 students, and server-clock actual start/end. The room closes at the scheduled end (not +30 min as the spec said earlier). Batch students join listen-only and the mentor grants speaking or video. Attendance comes from signed LiveKit webhooks. No recording. Academy admins read only | User brief 2026-10-20 + `specs.md` §8a.4h (updated) + `AGENTS.md` §19 (no parallel implementation) |
+| 2026-10-20 | **Academy admins schedule live meetings on behalf of a host mentor** (0023). `mentor_id` stays the host and the 120-minute day is the host mentor's, under the same lock, whoever books. Admins act only through SECURITY DEFINER functions that check "active admin of this session's academy" (`current_active_admin_academy_id()`). There is no direct write policy on `sessions` for admins. Admins co-host with the mentor's controls. They can't edit (they cancel and reschedule) and can't change a mentor's link or in-person sessions | User brief 2026-10-20 + `AGENTS.md` §10 (academy isolation is a security boundary) |
 
 ---
 
@@ -431,6 +433,111 @@ Next task:
 ---
 
 ## 13a. Update Log
+
+```text
+Date: 2026-10-20
+Task: T094 — academy admins schedule and run live meetings
+Status: In Progress (code + database rules verified; no real meeting verified yet)
+
+What changed:
+- supabase/migrations/0023_live_meetings_academy_admin.sql (forward-only, applied to the local
+  Docker DB):
+  - current_active_admin_academy_id().
+  - admin_schedule_live_meeting(): batch or student must be in the admin's academy; the host must
+    be an active mentor of that batch.
+  - cancel_live_meeting(): host mentor or academy admin, not started, needs a reason.
+  - start_live_meeting / end_live_meeting / record_live_meeting_event now also accept the
+    academy's admins.
+  - Removal policies for admins.
+- Security fix found by the new SQL checks: the "may this caller act" test in
+  cancel/start/end_live_meeting evaluated to NULL for non-admins (`not (x or NULL)`), which IF
+  treats as "allowed". Mentor B could cancel academy A's meeting. Wrapped in coalesce(…, false);
+  the check now passes. 0022's end_live_meeting had the same shape and is superseded by 0023.
+- Server:
+  - lib/server/meetings/service.ts: admin = co-host. Academy-scoped lookup, start/end/moderate,
+    attendance with roles, room cap +1 host.
+  - lib/server/sessions/service.ts: getAcademyScheduleFormData, scheduleAcademyMeeting,
+    getAcademySession, cancelAcademyMeeting; actions in lib/actions/sessions.ts.
+- UI:
+  - /academy/sessions: "Schedule meeting", rows link to details.
+  - /academy/sessions/new: the shared SessionForm with variant="academy" (host mentor picker,
+    live room only).
+  - /academy/sessions/[id]: meeting panel, End, Cancel (the shared dialog with an admin action),
+    attendance.
+  - /academy/sessions/[id]/room.
+  - The room treats mentor and admin as hosts.
+- Tests:
+  - supabase/tests/workflow-check.sql §10 (+37 checks, all migrations 0001–0023, real RLS, run in
+    a throwaway DB inside the local Supabase container): ALL CHECKS PASSED.
+  - tests/unit/lib/live-meetings-access.test.ts: 13 new tests.
+  - sessions-service.test.ts updated for the earlier no-RETURNING fix.
+  - Unit 484/484 and integration 75/75 pass. npm run lint, npm run typecheck and npm run build
+    pass.
+
+What remains:
+- A real two-browser meeting (needs LIVEKIT_* and a running LiveKit server).
+- Admins can't edit a meeting (cancel and reschedule instead).
+- Chat is not built.
+- Apply 0022 and 0023 to hosted databases.
+
+Blocker:
+- None in code.
+
+Next task:
+- Manual two-browser test: mentor + student, then academy admin + student.
+```
+
+```text
+Date: 2026-10-20
+Task: T094 — Live meeting rooms (LiveKit / WebRTC): one-to-one and batch meetings
+Status: In Progress (code complete and type-checked; no real meeting verified yet)
+
+What changed:
+- supabase/migrations/0022_live_meetings.sql (forward-only):
+  - New sessions columns: meeting_kind, timezone, actual_started_at / actual_ended_at,
+    ended_early, cancelled_at / cancelled_by.
+  - guard_live_meeting trigger: server-owned columns, the 120-minute daily cap under an advisory
+    lock, batch ≤ 100, the start window.
+  - New tables: live_meeting_attendance and live_meeting_removals (RLS).
+  - Functions: save_live_meeting (security invoker), start_live_meeting / end_live_meeting /
+    record_live_meeting_event (security definer; the last is service role only).
+  - Applied to the local Docker database. The cap (including midnight crossover), cancel freeing
+    time, and rejection of client-set actual times and direct completion were verified with SQL in
+    a rolled-back transaction.
+- lib/server/meetings/{livekit,service,errors}.ts, lib/actions/meetings.ts:
+  - 10-minute single-room tokens, identity = auth user id.
+  - Moderation through RoomService.
+  - Auto-finish after the scheduled end.
+- app/api/livekit/webhook/route.ts: signature-verified attendance.
+- Pages:
+  - /mentor/sessions/[id]/room and /student/sessions/[id]/room.
+  - New /student/sessions/[id].
+  - Mentor session page: meeting panel, End meeting, who joined.
+- components/meetings/*: lobby/waiting/outcome screens, host-led stage, participant list,
+  reconnecting and device-denied states.
+- Session form: "Live video room" mode (the default) and a one-student picker. The agenda shows
+  "Live now". The dashboards link into meetings.
+- Deps: livekit-server-sdk 2.19.1, livekit-client 2.22.3, @livekit/components-react 2.9.24 (exact).
+- docs/live-meetings.md, scripts/livekit/livekit.dev.yaml, .env.example (LIVEKIT_*), README,
+  specs.md §8a.4h, task.md T094.
+- Fixed (pre-existing bug): scheduleSession used insert().select("id"). RLS's select policy
+  (can_see_session) can't see a row its own INSERT … RETURNING creates, so scheduling failed with
+  "new row violates row-level security policy". The id is now generated server-side with no
+  RETURNING. Reproduced with SQL as a mentor on the local DB.
+
+What remains:
+- A real two-browser meeting against a running LiveKit server (needs LIVEKIT_* in .env.local).
+- Webhook attendance needs SUPABASE_SERVICE_ROLE_KEY (local key) in .env.local.
+- Chat (spec) is not built.
+- Tests for token scope are not written (user asked for no tests this round).
+- Apply 0022 to any hosted database.
+
+Blocker:
+- None in code. LiveKit credentials are needed to see video.
+
+Next task:
+- Manual two-browser verification, then T094 tests.
+```
 
 ```text
 Date: 2026-09-18

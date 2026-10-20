@@ -1,0 +1,20 @@
+# Local LiveKit server for live meeting rooms (T094) — DEVELOPMENT ONLY.
+# See docs/live-meetings.md. No keys here: pass them at start-up with
+#   LIVEKIT_KEYS="devkey: <a random secret of 32+ characters>"
+# and put the same pair in .env.local as LIVEKIT_API_KEY / LIVEKIT_API_SECRET.
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: false
+room:
+  # Rooms are created by the app (mentor's start) with their own caps.
+  auto_create: false
+webhook:
+  # Must be one of the keys in LIVEKIT_KEYS; it signs each webhook.
+  api_key: devkey
+  urls:
+    - http://localhost:3000/api/livekit/webhook
+logging:
+  level: info

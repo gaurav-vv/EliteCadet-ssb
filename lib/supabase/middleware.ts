@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { loadAccountAccess } from "@/lib/auth/account";
+import { describeLookupFailure, loadAccountAccess } from "@/lib/auth/account";
 import { roleForPath } from "@/lib/auth/redirect";
 import { publicSupabaseEnv } from "@/lib/supabase/env";
 
@@ -61,7 +61,7 @@ export async function updateSession(request: NextRequest) {
       // An outage or schema mismatch, not a permission decision: never
       // /forbidden. The session is kept so a retry works once it recovers;
       // /login is public, so this cannot loop.
-      console.error("[auth] profile lookup failed in proxy", { code: access.code, message: access.message });
+      console.error(`[auth] profile lookup failed in proxy: ${describeLookupFailure("proxy", access)}`);
       return toLogin("account_unavailable", true);
     case "missing_profile":
       console.error("[auth] signed-in user has no profile row", { userId: user.id });

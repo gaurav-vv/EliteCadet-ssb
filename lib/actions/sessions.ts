@@ -14,7 +14,7 @@ function refresh(id?: string) {
   revalidatePath("/mentor/sessions", "layout");
   if (id) revalidatePath(`/mentor/sessions/${id}`);
   revalidatePath("/student/sessions");
-  revalidatePath("/academy/sessions");
+  revalidatePath("/academy/sessions", "layout");
   revalidatePath("/academy/batches", "layout");
 }
 
@@ -51,5 +51,21 @@ export async function addAvailabilityAction(input: { weekday: string; startTime:
 export async function removeAvailabilityAction(id: string) {
   const result = await service.removeAvailability(id);
   if (result.ok) revalidatePath("/mentor/sessions", "layout");
+  return result;
+}
+
+// Academy admin: live meetings on behalf of a mentor (rules in the service and 0023).
+export async function scheduleAcademyMeetingAction(input: Values) {
+  const result = await service.scheduleAcademyMeeting(input, now());
+  if (result.ok) refresh();
+  return result;
+}
+
+export async function cancelAcademyMeetingAction(id: string, reason: string) {
+  const result = await service.cancelAcademyMeeting(id, reason);
+  if (result.ok) {
+    refresh(id);
+    revalidatePath(`/academy/sessions/${id}`);
+  }
   return result;
 }

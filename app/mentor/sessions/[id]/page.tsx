@@ -8,7 +8,10 @@ import { SessionForm } from "@/components/mentor/sessions/session-form";
 import { SessionAgenda } from "@/components/sessions/session-agenda";
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MeetingPanel } from "@/components/meetings/meeting-panel";
+import { endMeetingAction } from "@/lib/actions/meetings";
 import { completeSessionAction } from "@/lib/actions/sessions";
+import { getMeetingAttendance, getMeetingView } from "@/lib/server/meetings/service";
 import { AttendanceForm } from "@/components/progress/attendance-form";
 import { getAttendanceSheet } from "@/lib/server/progress/service";
 import { getMySessionView, getScheduleFormData } from "@/lib/server/sessions/service";
@@ -30,7 +33,13 @@ export default async function MentorSessionPage({ params, searchParams }: { para
       </div>
     );
   }
-  const { session: s, started } = result.data;
+  const meeting = result.data.session.meetingKind ? await Promise.all([getMeetingView(id), getMeetingAttendance(id)]) : null;
+  const view = meeting?.[0].ok ? meeting[0].data : undefined;
+  // The meeting view may have just finished an overrun meeting; prefer it.
+  const s = view?.session ?? result.data.session;
+  const { started } = result.data;
+  const live = s.status === "scheduled" && Boolean(s.actualStartedAt) && !s.actualEndedAt;
+  const editable = s.status === "scheduled" && !s.actualStartedAt;
   const start = utcIsoToIst(s.startsAt);
   const end = utcIsoToIst(s.endsAt);
 
@@ -49,12 +58,17 @@ export default async function MentorSessionPage({ params, searchParams }: { para
         <h1 className="text-[28px] font-bold text-ink">{s.title}</h1>
         {s.status === "scheduled" && (
           <div className="flex flex-wrap gap-3">
-            {started && <ConfirmActionDialog triggerLabel="Mark completed" title="Mark this session completed?" description="It moves to Past for you and your students." confirmLabel="Mark completed" action={completeSessionAction.bind(null, s.id)} />}
-            <CancelSessionDialog sessionId={s.id} />
+            {started && !s.meetingKind && <ConfirmActionDialog triggerLabel="Mark completed" title="Mark this session completed?" description="It moves to Past for you and your students." confirmLabel="Mark completed" action={completeSessionAction.bind(null, s.id)} />}
+            {live && <ConfirmActionDialog triggerLabel="End meeting" title="End the meeting for everyone?" description="Everyone in the room is disconnected and the meeting moves to Past. Attendance is saved." confirmLabel="End meeting" destructive action={endMeetingAction.bind(null, s.id)} />}
+            {editable && <CancelSessionDialog sessionId={s.id} />}
           </div>
         )}
       </div>
       <SessionAgenda sessions={[s]} show={{ batch: true, link: true }} empty={{ title: "", description: "" }} />
+      {s.meetingKind && view && (
+        <MeetingPanel session={s} join={view.join} role="mentor" roomHref={`/mentor/sessions/${s.id}/room`} attendance={meeting?.[1].ok ? (meeting[1].data ?? []) : null} />
+      )}
+      {s.meetingKind && !view && <RetryErrorState message={meeting?.[0].error?.message ?? "We couldn't check the meeting room. Please try again."} />}
       {attendance.ok && attendance.data?.canMark && (
         <section aria-labelledby="attendance-heading" className="flex flex-col gap-3">
           <h2 id="attendance-heading" className="text-[18px] font-bold text-ink">Attendance</h2>
@@ -65,7 +79,7 @@ export default async function MentorSessionPage({ params, searchParams }: { para
           )}
         </section>
       )}
-      {s.status === "scheduled" && form.ok && form.data && (
+      {editable && form.ok && form.data && (
         <section aria-labelledby="edit-heading" className="flex flex-col gap-3">
           <h2 id="edit-heading" className="text-[18px] font-bold text-ink">Edit</h2>
           <SessionForm
@@ -78,11 +92,12 @@ export default async function MentorSessionPage({ params, searchParams }: { para
               date: start.date,
               startTime: start.time,
               endTime: end.time,
-              mode: s.mode,
+              mode: s.meetingKind ? "room" : s.mode,
               meetingUrl: s.meetingUrl ?? "",
               location: s.location ?? "",
               forWholeBatch: s.forWholeBatch,
-              participantIds: s.participantIds,
+              participantIds: s.meetingKind ? [] : s.participantIds,
+              studentId: s.meetingKind === "one_to_one" ? (s.participantIds[0] ?? "") : "",
             }}
           />
         </section>

@@ -75,7 +75,7 @@ export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: 
         <Section title="Next session" link={{ href: "/student/sessions", label: "All sessions" }}>
           {d.nextSession ? (
             <ListPanel>
-              <ListRow href="/student/sessions">
+              <ListRow href={`/student/sessions/${d.nextSession.id}`}>
                 <span className="min-w-0">
                   <span className="block text-sm text-ink">{d.nextSession.title}</span>
                   <span className="block text-[13px] text-ink-secondary">
@@ -83,7 +83,9 @@ export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: 
                     {d.nextSession.mentorName ? ` · ${d.nextSession.mentorName}` : ""}
                   </span>
                 </span>
-                <span className="shrink-0 text-[13px] text-ink">{d.nextSession.mode === "online" ? "Online" : "In person"}</span>
+                <span className="shrink-0 text-[13px] text-ink">
+                  {d.nextSession.meetingKind ? (d.nextSession.actualStartedAt && !d.nextSession.actualEndedAt ? "Live now · Join" : "Video room") : d.nextSession.mode === "online" ? "Online" : "In person"}
+                </span>
               </ListRow>
             </ListPanel>
           ) : (

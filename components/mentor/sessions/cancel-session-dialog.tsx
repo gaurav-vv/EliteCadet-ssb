@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cancelSessionAction } from "@/lib/actions/sessions";
 
 // Cancelling needs a reason; participants see it on their Sessions page.
-export function CancelSessionDialog({ sessionId }: { sessionId: string }) {
+// `cancelAction` swaps in another Server Action (the academy admin's).
+export function CancelSessionDialog({ sessionId, cancelAction = cancelSessionAction }: { sessionId: string; cancelAction?: typeof cancelSessionAction }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -21,7 +22,7 @@ export function CancelSessionDialog({ sessionId }: { sessionId: string }) {
     setPending(true);
     setError(null);
     try {
-      const result = await cancelSessionAction(sessionId, reason);
+      const result = await cancelAction(sessionId, reason);
       if (!result.ok) {
         setError(result.error?.message ?? "That didn't work. Please try again.");
         return;
