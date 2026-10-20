@@ -235,7 +235,22 @@ export async function updatePassword(password: string): Promise<AuthResult<null>
 // recovery session. /auth/callback has already handled ?code= and
 // ?token_hash=; this covers links that put tokens (or an error) in the URL
 // hash — e.g. invites sent by the service role, which carry no PKCE verifier.
-export async function establishRecoverySession(): Promise<"ready" | "invalid"> {
+//
+// One attempt at a time: the hash is read and stripped once, so a second call
+// while the first is still running (React StrictMode runs effects twice in
+// development) must share the first call's result. Without this, the second
+// call saw an empty hash, checked for a user before setSession finished, and
+// showed a valid invite as "expired".
+let recoveryAttempt: Promise<"ready" | "invalid"> | null = null;
+
+export function establishRecoverySession(): Promise<"ready" | "invalid"> {
+  recoveryAttempt ??= readRecoverySession().finally(() => {
+    recoveryAttempt = null;
+  });
+  return recoveryAttempt;
+}
+
+async function readRecoverySession(): Promise<"ready" | "invalid"> {
   const supabase = createClient();
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
 

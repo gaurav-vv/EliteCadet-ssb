@@ -13,3 +13,20 @@ export function publicSupabaseEnv(): { url: string; anonKey: string } {
   }
   return { url: url!, anonKey: anonKey! };
 }
+
+// Where auth emails really go when the app talks to a LOCAL Supabase stack
+// (`npx supabase start`): the local Auth server has no outgoing SMTP unless
+// [auth.email.smtp] is set up in supabase/config.toml, so invites and reset
+// emails are captured by Mailpit ([local_smtp] port 54324) instead of being
+// delivered. Null for any hosted project. Lets "sent" messages say so honestly.
+export function localMailboxUrl(): string | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return null;
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  return host === "127.0.0.1" || host === "localhost" ? `http://${host}:54324` : null;
+}

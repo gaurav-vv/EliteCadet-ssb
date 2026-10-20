@@ -191,6 +191,18 @@ describe("establishRecoverySession", () => {
     expect(window.location.hash).toBe("");
   });
 
+  it("shares one attempt between overlapping calls (StrictMode runs the effect twice)", async () => {
+    window.history.replaceState(null, "", "/reset-password#access_token=AT&refresh_token=RT&type=invite");
+    const auth = fake({ user: { id: "u1" } });
+    let finish!: () => void;
+    auth.setSession.mockReturnValue(new Promise((resolve) => (finish = () => resolve({ error: null }))));
+    const first = establishRecoverySession();
+    const second = establishRecoverySession(); // hash already stripped by the first call
+    finish();
+    expect(await Promise.all([first, second])).toEqual(["ready", "ready"]);
+    expect(auth.setSession).toHaveBeenCalledTimes(1);
+  });
+
   it("is invalid when Supabase reports an expired link in the hash", async () => {
     window.history.replaceState(null, "", "/reset-password#error=access_denied&error_code=otp_expired");
     const auth = fake({ user: { id: "u1" } });

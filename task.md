@@ -884,7 +884,57 @@ students don't.
     - `supabase/tests/workflow-check.sql` §10: 37 checks under real RLS (academy isolation, role
       refusals, shared cap, batch > 100, webhook scope).
     - `tests/unit/lib/live-meetings-access.test.ts`: 13 tests.
-  - Still open: admin edit of a meeting, chat, the real two-browser test.
+  - Still open: admin edit of a meeting, chat.
+- **2026-10-20, verified locally:**
+  - A real two-browser meeting (`tests/e2e/live-meeting-local.spec.ts`, opt-in with
+    `E2E_LIVEKIT=1`): media, host controls, webhook attendance and "end for all" pass.
+  - Attendance = "joined at least once"; time in room is shown but not judged. There's no 75%
+    rule.
+  - Not done: a test over a real network with TURN; applying 0022–0024 to hosted databases
+    (needs approval).
+
+- **2026-10-20, meetings production pass (0025):**
+  - Done:
+    - Interface per `session_ref.png`.
+    - Stored chat, reactions, raise hand.
+    - Host controls: mute all, lower hands.
+    - The End Meeting race fixed; ending reports failures, is retryable and is bounded by
+      timeouts.
+    - Server-side scheduled end (webhook + worker sweep).
+    - The 75% attendance rule from connected time.
+    - Host names for students.
+  - Tests:
+    - SQL §12 (246 checks total).
+    - Unit tests for room logic and the meetings service.
+    - e2e: a two-browser meeting with chat, reactions, hands, leave vs end and attendance.
+  - Open:
+    - Whiteboard, polls, breakout rooms (shown as not available).
+    - Admin editing of meetings.
+    - A test over a real network/TURN.
+    - Applying 0022–0025 to hosted databases.
+
+## T106 — Email delivery + independent mentors — P0 — `[-]`
+**Spec:** `specs.md` §8a.1 (mentor types), `docs/email.md`.
+- [x] Diagnosed: local email goes to Mailpit (never real inboxes); Mailpit loses mail on restart;
+  hosted Supabase needs custom SMTP.
+- [x] Fixed: valid invite shown as expired (StrictMode double effect in `establishRecoverySession`).
+- [x] Fixed: batch memberships survived academy moves (`0024_independent_mentors.sql`).
+- [x] Independent mentors: super admin invite, no academy, academy-only areas empty with a notice.
+- [x] Tests:
+  - e2e: invite, independent mentor, reset, bad, reused and expired links.
+  - SQL §11.
+  - Unit: invite permissions, the recovery race, the updated academy rules.
+- [x] 2026-10-20 (later): "no emails anywhere" re-diagnosed. Both flows work locally; mail is
+  captured in Mailpit. The UI now says so (`LocalMailboxNote`) instead of implying delivery.
+- [x] 2026-10-20: re-inviting an address that has another pending role/academy no longer "succeeds"
+  silently (`decideInvite`). Pending invites are re-sent; active or mismatched accounts are refused
+  with a clear message.
+- [ ] **Owner:** custom SMTP and URL configuration on the hosted Supabase project (`docs/email.md`).
+  Optional: `[auth.email.smtp]` in `supabase/config.toml` for real mail from the local stack.
+  Then send yourself a real invite and a real reset.
+- [ ] Apply 0022–0024 to hosted databases, after approval.
+- [ ] Product decision: should independent mentors work with students outside academies? Today
+  they can't; it needs a new relationship model.
 **Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** LiveKit (open source; LiveKit Cloud, India
 region).
 **Requirements:**

@@ -5,7 +5,8 @@
 // by id from any page, so every call is fully re-authorized there.
 
 import { revalidatePath } from "next/cache";
-import { changeUserRole, changeUserStatus, type ServiceResult } from "@/lib/server/users/service";
+import { requestOrigin } from "@/lib/server/auth/request-origin";
+import { changeUserRole, changeUserStatus, inviteIndependentMentor, type ServiceResult } from "@/lib/server/users/service";
 
 function refresh(id: string) {
   revalidatePath("/admin");
@@ -22,5 +23,14 @@ export async function changeUserRoleAction(userId: string, role: string): Promis
 export async function changeUserStatusAction(userId: string, status: string): Promise<ServiceResult<null>> {
   const result = await changeUserStatus(userId, status);
   if (result.ok) refresh(userId);
+  return result;
+}
+
+export async function inviteIndependentMentorAction(input: { email: string; fullName: string }) {
+  const result = await inviteIndependentMentor(input, await requestOrigin());
+  if (result.ok) {
+    revalidatePath("/admin");
+    revalidatePath("/admin/users");
+  }
   return result;
 }

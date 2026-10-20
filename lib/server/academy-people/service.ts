@@ -5,7 +5,7 @@
 
 import { getActor, type Actor } from "@/lib/server/auth/guard";
 import * as repo from "@/lib/server/academy-people/repository";
-import { checkPersonInput, STUDENT_PAGE_SIZE } from "@/lib/server/academy-people/validation";
+import { checkPersonInput, STUDENT_PAGE_SIZE, decideInvite } from "@/lib/server/academy-people/validation";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
 import { isUuid } from "@/lib/server/users/validation";
 import type {
@@ -16,7 +16,7 @@ import type {
   AcademyStudentSummary,
 } from "@/types/academy-people";
 
-const fail = <T>(code: "validation_error" | "not_found" | "unauthorized", message: string): ServiceResult<T> => ({ ok: false, error: { code, message } });
+const fail = <T>(code: "validation_error" | "not_found" | "unauthorized" | "not_set_up" | "server_error", message: string): ServiceResult<T> => ({ ok: false, error: { code, message } });
 
 async function academyAdmin(): Promise<(Actor & { academyId: string }) | null> {
   const actor = await getActor();
@@ -115,17 +115,38 @@ export async function getAcademyMentors(): Promise<ServiceResult<AcademyMentorRe
   return { ok: true, data: found.data };
 }
 
-export async function inviteAcademyMentor(input: { email?: unknown; fullName?: unknown }, origin: string): Promise<ServiceResult<{ name: string }> & { field?: "email" | "fullName" }> {
+export const INVITE_UNAVAILABLE = "Invites need the server's SUPABASE_SERVICE_ROLE_KEY. Ask whoever runs this server to set it.";
+
+export async function inviteAcademyMentor(input: { email?: unknown; fullName?: unknown }, origin: string): Promise<ServiceResult<{ name: string; resent: boolean }> & { field?: "email" | "fullName" }> {
   const admin = await academyAdmin();
   if (!admin) return fail("unauthorized", "Only an academy admin can invite mentors.");
   const checked = checkPersonInput(input, true);
   if (!checked.ok) return { ...fail("validation_error", checked.message), field: checked.field };
+
+  // Invite, re-send a pending invite to this academy, or refuse — never a
+  // "sent" for an account that would stay a student or in another academy.
+  const existing = await repo.findAccountByEmail(checked.email);
+  if (existing.error) return existing.error.code === "admin_unavailable" ? fail("not_set_up", INVITE_UNAVAILABLE) : fail("server_error", "We couldn't check that email right now. Please try again.");
+  const decision = decideInvite(existing.data, { role: "mentor", academyId: admin.academyId });
+  if (decision.kind === "refuse") {
+    return {
+      ...fail(
+        "validation_error",
+        decision.reason === "same_academy_active"
+          ? "This person is already a mentor in your academy. They can log in, or use “Forgot password” on the login page."
+          : "This email already has an EliteCadet account. Ask the platform team to change their role or academy.",
+      ),
+      field: "email",
+    };
+  }
+
   const invited = await repo.inviteByEmail({ email: checked.email, fullName: checked.fullName, role: "mentor", academyId: admin.academyId, redirectTo: `${origin}/reset-password` });
   if (invited.error) {
-    const taken = invited.error.code === "email_exists" || /already/i.test(invited.error.message ?? "");
-    return { ...fail("validation_error", taken ? "An account with this email already exists. Ask the platform team to add them to your academy." : "We couldn't send the invite. Please try again."), field: "email" };
+    if (invited.error.code === "admin_unavailable") return fail("not_set_up", INVITE_UNAVAILABLE);
+    if (invited.error.code === "over_email_send_rate_limit" || invited.error.code === "over_request_rate_limit") return { ...fail("validation_error", "Too many emails were sent recently. Wait a few minutes and try again."), field: "email" };
+    return { ...fail("server_error", "We couldn't send the invite. Please try again; if it keeps failing, the email service may not be set up."), field: "email" };
   }
-  return { ok: true, data: { name: checked.fullName } };
+  return { ok: true, data: { name: checked.fullName, resent: decision.kind === "resend" } };
 }
 
 // ---- Mentor: own assigned students only -----------------------------------

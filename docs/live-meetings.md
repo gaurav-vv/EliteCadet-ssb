@@ -2,8 +2,8 @@
 
 Mentors and academy admins run **one-to-one** and **whole-batch** video meetings inside the app. Media goes over
 WebRTC through a **LiveKit** SFU (selective forwarding unit). LiveKit is open source, so you can
-self-host it or use LiveKit Cloud. Spec: `specs.md` §8a.4h. Schema: `supabase/migrations/0022_live_meetings.sql`
-and `0023_live_meetings_academy_admin.sql`.
+self-host it or use LiveKit Cloud. Spec: `specs.md` §8a.4h. Schema: `supabase/migrations/0022_live_meetings.sql`,
+`0023_live_meetings_academy_admin.sql` and `0025_meeting_chat_attendance.sql`.
 
 Nothing is recorded. No audio or video is stored anywhere.
 
@@ -15,22 +15,33 @@ Mentor schedules (Sessions → Schedule session → "Live video room")
 Academy admin schedules (Academy → Sessions → Schedule meeting), choosing a host mentor
   → admin_schedule_live_meeting()   [same rules + batch/student in the admin's academy,
                                      host is an active mentor of that batch]
+A batch meeting appears automatically for every student currently enrolled in that batch
+(RLS: can_see_session reads batch_students live). No per-student invitation exists or is needed.
 
 A host opens the room (the mentor or an academy admin; from 15 min before the start until the end)
   → joinMeetingAction → start_live_meeting()   [server clock; status becomes "live"]
-  → LiveKit createRoom(maxParticipants)        [2 for one-to-one, 101 for a batch]
+  → LiveKit createRoom(maxParticipants)        [3 for one-to-one, 102 for a batch]
   → 10-minute, single-room join token          [identity = the signed-in user's id]
 
-Student opens the room (once the mentor has started, until the scheduled end)
-  → same action: RLS decides who can see the session, plus a check against the removal list
-  → token: one-to-one students can publish camera and mic; batch students start listen-only
+Student opens the room (once a host has started, until the scheduled end)
+  → same action: RLS + enrollment decide who can see it, plus the removal list
+  → token: one-to-one students publish camera + mic; batch students start listen-only;
+    nobody can publish data (chat/reactions go through the server)
+
+In the room
+  → chat:      sendMeetingMessageAction → post_live_meeting_message() [member? live? rate?] → stored
+               → server broadcasts the stored row to the room (LiveKit sendData)
+  → reactions: sendReactionAction → allowed emoji? member? live? → server broadcast
+  → raise hand: setMyHandAction → server sets the participant attribute "hand"
+  → host controls: allow to speak / video, stop, mute, mute all students, lower hand(s), remove
 
 LiveKit → POST /api/livekit/webhook (signed with the API secret)
-  → record_live_meeting_event()  [service role: join/leave rows; a join after the start marks the student present]
+  → record_live_meeting_event()  [join/leave/room_finished with LiveKit's timestamps]
+  → finish_overdue_live_meetings() [server-side scheduled end, every event]
 
-Mentor ends the meeting (or the scheduled end passes)
-  → end_live_meeting()  [completed, actual end time, open rows closed, joiners marked present]
-  → LiveKit deleteRoom  [everyone is disconnected]
+The host ends it for everyone (or the scheduled end passes)
+  → end_live_meeting()   [completed, actual end, open intervals closed, 75% attendance finalized]
+  → LiveKit deleteRoom   [everyone disconnected; success only if this succeeded]
 ```
 
 ### Rules and where they're enforced
@@ -38,44 +49,99 @@ Mentor ends the meeting (or the scheduled end passes)
 | Rule | Enforced in |
 |---|---|
 | Two meeting types only: one-to-one (exactly one student of a batch the mentor teaches) or the whole batch | `save_live_meeting`, `sessions_meeting_audience` check, participant trigger |
-| Batch meetings: at most **100** enrolled students | `guard_live_meeting` (schedule), LiveKit `maxParticipants` 101 (join) |
+| Batch meetings: at most **100** enrolled students | `guard_live_meeting` (schedule), LiveKit `maxParticipants` (join) |
 | Length **15–120 minutes**; start in the future and at most 90 days ahead | form → `validateMeetingInput` → `sessions_meeting_duration` check + trigger |
-| At most **120 minutes per mentor per calendar day** (IST). Scheduled, live and completed meetings count their full scheduled length (ending early never frees time); cancelled meetings don't. A meeting that crosses midnight counts on both days | `guard_live_meeting`, under a per-mentor `pg_advisory_xact_lock`, so two simultaneous bookings can't both get through |
-| No overlapping meetings for a mentor | existing `sessions_no_overlap` exclusion constraint (0010) |
-| Actual start/end, cancellation time and attendance come from the server clock or the provider, never the browser | `guard_live_meeting` rejects client writes; the `SECURITY DEFINER` functions use `now()` |
-| The room opens 15 minutes before the start. Students can join only after the mentor starts. Nobody can join after the scheduled end | `getMeetingView` / `joinMeeting` (server time), `start_live_meeting` |
-| Only the meeting's mentor and its students get a token; anyone else gets a 404 | RLS `can_see_session` + role checks in `lib/server/meetings/service.ts` |
-| A student a host removed can't rejoin | `live_meeting_removals` |
-| Academy admins schedule, start, end, cancel, co-host and read attendance only in **their own** academy; only active admins | `admin_schedule_live_meeting`, `cancel_live_meeting`, `start/end_live_meeting` (all checking `current_active_admin_academy_id()`); no direct write policy on `sessions` for admins |
+| At most **120 minutes per mentor per calendar day** (IST). Scheduled, live and completed meetings count their full scheduled length; cancelled don't. Crossing midnight counts on both days | `guard_live_meeting`, under a per-mentor `pg_advisory_xact_lock` |
+| No overlapping meetings for a mentor | `sessions_no_overlap` exclusion constraint (0010) |
+| Who may take part: the host mentor, an active admin of the meeting's academy, or a student of its audience **as enrolled now**, never a removed student | `can_join_live_meeting` (0025), RLS `can_see_session`, `lib/server/meetings/service.ts` |
+| The room opens 15 minutes before the start; students join after a host starts; nobody joins after the scheduled end | `getMeetingView` / `joinMeeting` (server time), `start_live_meeting` |
+| Chat: only people in the meeting, only while it's live, 1–1000 characters, max 20 messages per 30 s; read by participants and staff who can see the session | `post_live_meeting_message`, `live_messages_read` policy (no client insert policy) |
+| Reactions: a fixed emoji set, members only, live only, 10 per 10 s per person | `sendReaction` (server); clients have no data-publish permission |
+| Actual start/end, cancellation, attendance and its finalization come from the server or LiveKit, never the browser | guard triggers (0022, 0025), `SECURITY DEFINER` functions, signed webhook |
+| Academy admins act only in **their own** academy | `admin_schedule_live_meeting`, `cancel_live_meeting`, `start/end_live_meeting` (check `current_active_admin_academy_id()`) |
 
 **Daily limit when an admin books:** a meeting always has a **host mentor** (`sessions.mentor_id`),
 and the 120 minutes are the host mentor's, whoever books. An admin's booking uses the mentor's
-allowance and is checked under the same per-mentor lock, so a mentor and an admin booking at the
-same moment can't go over the limit together. Admins have no allowance of their own. Joining as a
-co-host doesn't count. `created_by` records who booked.
+allowance and is checked under the same per-mentor lock. Admins have no allowance of their own.
+Joining as a co-host doesn't count. `created_by` records who booked.
 
 **Timezone:** academies don't have a timezone setting yet, so scheduling and the daily cap both use
-**IST (Asia/Kolkata, no DST)**, the same as every other session in the app. Each meeting stores its
-timezone. The `sessions_meeting_timezone` check keeps it at IST until academies get their own
-setting.
+**IST (Asia/Kolkata, no DST)**, the same as every other session in the app.
 
-**Host-led batch layout:** students join listen-only. The mentor's video (or screen share) is the
-main view. The mentor can, per student, *allow to speak*, *allow to speak and share video*, *stop*,
-*mute* or *remove*, through server actions that call LiveKit's RoomService with the API secret. Only
-students who are publishing produce streams, so nobody receives 99 other videos. Clients use
-adaptive stream and dynacast.
+## The meeting room (UI)
+
+Layout follows `session_ref.png`:
+- **Left:** session details (title, live/upcoming/ended/cancelled, date, time and duration, host,
+  audience, "You are in this batch" for students). It becomes a compact strip on screens narrower
+  than 1536px.
+- **Centre:** a dark video stage with Live, who's sharing, the time left and connection state.
+- **Grid:** a paged 3×3 grid (host first, raised hands next). Students who aren't publishing show
+  initials, so a batch room never streams 100 videos. A screen share takes the main area, with
+  cameras in a strip.
+- **Toolbar:** mic, camera, share screen (host only; disabled with the reason for others), raise
+  hand (students), chat with an unread badge, participants with a count, reactions, More (host:
+  mute all students, lower all hands; everyone: leave). Whiteboard, polls and breakout rooms are
+  listed there as not available yet.
+- **Leave / End:** **Leave** for everyone; **End meeting** (red) for hosts.
+- **Right:** Participants (search; host, hand, mic, camera and connection state; host actions per
+  student) and Chat (history, live messages, sending/failed/retry, empty state, emoji insert).
+- **Other states:** connecting, reconnecting, host not in the room, a 5-minute warning,
+  camera/microphone permission denied, and connection errors.
+
+### Leave vs End meeting for everyone
+
+- **Leave** (anyone) disconnects only you; the meeting continues and you can rejoin.
+- **End meeting** (host mentor or academy admin) asks for confirmation (*End for everyone* /
+  *Leave without ending* / *Cancel*), then:
+  1. `end_live_meeting()` marks it completed with the server time, closes open intervals and
+     finalizes attendance. This is idempotent: ending again re-runs finalization and creates no
+     duplicate rows.
+  2. LiveKit deletes the room, which disconnects every participant and stops their camera, mic and
+     screen share. Rejoining is refused ("This meeting has ended").
+  3. If the room couldn't be deleted (service down or timed out, 3 tries × 6 s), the host sees an
+     error and **Try again**, never a false success. Retrying is safe.
+- **At the scheduled end**, every client leaves and a host's client ends the meeting. Server-side,
+  the overdue sweep (`finish_overdue_live_meetings`) completes it even with no host connected:
+  the webhook runs it on every LiveKit event, and the worker runs it every minute.
+- **The original bug:** after a meeting ended, people could see "You left the meeting — rejoin
+  while it's still running". The screen depended on which disconnect reason arrived first, and at
+  the scheduled end every student's own timer produced "client initiated". Now the client records
+  that the meeting is over *before* disconnecting (`disconnectOutcome`,
+  `lib/meetings/room-logic.ts`).
+- **If the host disconnects** (closed browser, network), the meeting stays open until its
+  scheduled end. Students see "<host> isn't in the room right now", and a co-host (academy admin)
+  can take over.
 
 **Known limits:**
-- A student's speaking permission resets if they rejoin; the mentor grants it again.
-- At the scheduled end, the mentor's browser ends the meeting and students' browsers leave. If
-  nobody's browser is open at that moment, the room is closed the next time anyone opens the
-  meeting page. Nobody can get a new token after the end.
-- There is no chat. The spec mentions it; it was left out of this round.
-- Academy admins schedule, start, end, cancel and co-host meetings, but can't **edit** one; they
-  cancel and reschedule instead. They can't change a mentor's link or in-person sessions. Super
-  admins keep their existing read-only oversight and never join.
-- The room's cap is the students plus two hosts (the mentor and one admin). A second admin joining
-  a full batch room is refused by LiveKit.
+- A student's speaking permission and raised hand reset if they rejoin.
+- There's no whiteboard, polls or breakout rooms (shown as not available). There's no recording
+  (by decision).
+- Academy admins can't **edit** a meeting; they cancel and reschedule.
+- The room's cap is the students plus two hosts. A second academy admin joining a full batch room
+  is refused by LiveKit.
+
+## What attendance means (75% rule, 0025)
+
+- **Source:** only LiveKit's signed webhooks (join, leave, room finished), stored per LiveKit
+  participant session with **LiveKit's** timestamps. Duplicate and out-of-order events give the
+  same result. A missing leave event is closed at the meeting's end. Clients can't submit
+  attendance or durations.
+- **Eligible connected time:** the *union* of a person's visits (reconnects and two tabs count
+  once), clipped to the **scheduled** window (time before the start or after the end doesn't
+  count).
+- **Present:** eligible time ≥ **75% of the scheduled duration** (e.g. 45 of 60 minutes; exactly
+  75% counts). **Absent:** less, once the meeting has ended. Nothing is decided while it's in
+  progress.
+- **Same rule for one-to-one and batch meetings.** The audience is the batch as enrolled when the
+  meeting is finalized, or the one-to-one student. Students who never joined are absent with 0
+  seconds.
+- **Ended early:** the rule is literal. A 60-minute meeting the host ends after 30 minutes leaves
+  everyone absent (30 < 45).
+- **Stored** in the existing `session_attendance`: `status`, `connected_seconds`,
+  `required_seconds`, `computed_at`, `marked_by = NULL` (computed). A mentor's own mark is never
+  overwritten; their seconds are still recorded. Finalization is idempotent, and a late webhook
+  after finalization recomputes.
+- **Meetings that never started** (no host joined) get no attendance.
 
 ## Environment variables
 
@@ -97,7 +163,7 @@ every Supabase key must come from `npx supabase status`, not from the hosted pro
 
 ## Local setup
 
-1. **Database:** apply `supabase/migrations/0022_live_meetings.sql` to your local database. It's
+1. **Database:** apply `supabase/migrations/0022` through `0025` (in order) to your local database. They're
    already applied to the local Docker database used during development. For another database,
    paste the file into Studio's SQL editor (`http://127.0.0.1:54323`) or run
    `npx supabase migration up`. It's forward-only and doesn't change existing rows.
@@ -142,6 +208,9 @@ every Supabase key must come from `npx supabase status`, not from the hosted pro
   connect. LiveKit Cloud already includes TURN.
 - The app never uses localhost URLs at runtime. Every endpoint comes from env vars, and the room
   name and tokens come from the server.
-- Apply `0022_live_meetings.sql` to the hosted database **after** 0001–0021. If your database is
-  still on the 0005–0021 catch-up file, run that first, then 0022 on its own.
+- Apply `0022`, `0023`, `0024` and `0025` (in order) to the hosted database **after** 0001–0021,
+  and only once you've approved them. If your database is still on the 0005–0021 catch-up file, run
+  that first, then each of 0022–0025 on its own.
+- Optional but recommended: run the worker (`worker/`), which also runs the overdue-meeting sweep
+  every minute.
 - Recording (T095) is a separate, not-yet-built task. This feature never starts LiveKit Egress.

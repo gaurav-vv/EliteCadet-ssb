@@ -62,6 +62,19 @@ function sessionDbError(error: DbError, fallback: string): ServiceResult<never> 
   return mapDbError(error, fallback);
 }
 
+// Students can't read a mentor's profile row, so the embedded host name is
+// empty for them; session_host_names (0025) returns just the names, only for
+// sessions the caller can see.
+export async function withHostNames(records: SessionRecord[]): Promise<SessionRecord[]> {
+  const missing = records.filter((r) => !r.mentorName).map((r) => r.id);
+  if (missing.length === 0) return records;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("session_host_names", { p_sessions: missing });
+  if (error || !Array.isArray(data)) return records;
+  const names = new Map((data as { session_id: string; host_name: string | null }[]).map((r) => [r.session_id, r.host_name]));
+  return records.map((r) => (r.mentorName ? r : { ...r, mentorName: names.get(r.id) || null }));
+}
+
 // Query helper: one listing shape for every role. RLS decides visibility;
 // `scope` narrows it further to the caller's own view.
 async function listSessions(scope: { mentorId?: string; batchId?: string; academyId?: string }, filter: SessionFilter, nowIso: string): Promise<ServiceResult<SessionRecord[]>> {
@@ -75,7 +88,7 @@ async function listSessions(scope: { mentorId?: string; batchId?: string; academ
   else query = query.eq("status", "scheduled").gte("ends_at", nowIso).order("starts_at", { ascending: true });
   const { data, error } = await query.limit(200);
   if (error) return mapDbError(error, "We couldn't load sessions. Please try again.");
-  return { ok: true, data: (data ?? []).map(toSession).filter((s): s is SessionRecord => s !== null) };
+  return { ok: true, data: await withHostNames((data ?? []).map(toSession).filter((s): s is SessionRecord => s !== null)) };
 }
 
 async function mentor(): Promise<Actor | null> {
@@ -326,7 +339,7 @@ export async function getMyStudentSession(id: string): Promise<ServiceResult<Ses
   const { data, error } = await supabase.from("sessions").select(COLUMNS).eq("id", id).maybeSingle();
   if (error) return mapDbError(error);
   const session = data ? toSession(data) : null;
-  return session ? { ok: true, data: session } : fail("not_found", NOT_FOUND);
+  return session ? { ok: true, data: (await withHostNames([session]))[0] } : fail("not_found", NOT_FOUND);
 }
 
 // ---- Academy admin: live meetings on behalf of a mentor (0023) ------------------

@@ -1,5 +1,122 @@
 # Development Log
 
+## 2026-10-20 (evening) — Meetings production pass; End Meeting and invite bugs
+
+| Error | Root cause | Fix | Verification |
+|---|---|---|---|
+| After ending (or at the scheduled end) people could see "You left the meeting — rejoin while it's still running" | The outcome came only from LiveKit's disconnect reason. A client disconnecting itself after the end (the host's local disconnect, every student's end-time timer) reads as "client initiated" | `disconnectOutcome` + the shell records "meeting over" before disconnecting | Unit tests; e2e: host and student both see "The meeting has ended" |
+| End reported success while the video room was still open | `endMeeting` swallowed `deleteRoom` errors | Success only if the room closed; 3 tries; the error keeps the dialog open with **Try again** | Unit tests (failure, then a retry succeeds) |
+| The host could hang on "Working…" | No timeout on server→LiveKit requests (seen under load in the full e2e run) | `requestTimeout: 6` on RoomServiceClient | The full e2e suite passes |
+| Overdue meetings were never completed unless someone opened a page | No server-side end enforcement | `finish_overdue_live_meetings()` from every signed webhook event and the worker loop (each minute) | SQL §12 ("the sweep completes the overdue meeting") |
+| Attendance = "joined once" | Original 0022 design | 75% of scheduled duration from the union of signed intervals; finalized after the end; idempotent | SQL §12: exact 75%, 44:59, multiple visits, duplicates, overlap, out-of-order, early join, missing leave, never joined, retries, late event, ended early |
+| Mentor invite "sent" but the person stayed a student / in another academy | Supabase Auth only re-sends an invite to an unaccepted address and keeps its original metadata | `decideInvite`: re-send identical pending invites; refuse others with clear messages | Reproduced with Auth directly; unit tests; e2e re-send and refusal |
+| Students saw "Host: Mentor" and no host in lists | Students can't read the mentor's profile (RLS) | `session_host_names()` (visible sessions only, name only) | SQL checks (student yes, other academy no) |
+| Invite emails "not arriving" | Local Supabase has no SMTP: every email (incl. 16:18:53 and 16:19:22 today) is in Mailpit | Unchanged by design; honest local notice; SMTP steps in `docs/email.md` | Auth logs + Mailpit; e2e reads every email from Mailpit |
+
+## 2026-10-20 (later) — "No emails are working anywhere"
+
+**Diagnosis (no settings changed):**
+- **Delivery mode:**
+  - `.env.local` points at the LOCAL Supabase (`http://127.0.0.1:54321`).
+  - The Auth container sends mail to `supabase_inbucket_elitecadet-ssb` (Mailpit, running and
+    healthy). No `[auth.email.smtp]` is configured.
+  - The "Stopped services" from `supabase status` are realtime, storage, imgproxy, edge runtime,
+    analytics, vector and pooler. None of them handle email.
+- **Auth logs, today 16:01–16:02:**
+  - 2 invites refused with `422 email_exists` (that address already has an account; the form
+    shows "An account with this email already exists").
+  - 2 invites accepted (`200`). Both are in Mailpit addressed to the Gmail account.
+- **Resets:** no `/recover` request has reached Auth since 15:47 (those were the e2e runs). A
+  forgot-password attempt made since then didn't reach this Supabase.
+- **Probe:** forgot-password in a real browser now returns `/recover` 200, shows "Check your
+  email", and the email is in Mailpit.
+- **Root cause, shared by both flows:**
+  - Local Supabase captures every auth email in Mailpit. Nothing can reach Gmail without SMTP.
+  - The UI said "Invite sent" / "Check your email" with no hint of this, so a captured email
+    looked like a delivered one.
+- Hosted Supabase without custom SMTP only sends to organization members. Not testable from here
+  (no access, by instruction).
+
+**Fix:**
+- `localMailboxUrl()` (`lib/supabase/env.ts`) and `<LocalMailboxNote/>`: when connected to a local
+  stack, the reset confirmation, the mentor-invite success (academy and independent) and the
+  student-invite toast say the email was **not sent to a real inbox**, with a link to Mailpit.
+  Never shown against a hosted project.
+- `docs/email.md`: a one-minute diagnosis.
+
+**Verification:**
+- e2e: reset, academy invite, independent mentor invite, bad/expired/reused links, auth guards and
+  the LiveKit meeting: 15 passed, 1 skipped (dev-preview mode).
+- Vitest 568/568 (new localMailboxUrl tests).
+- SQL checks: all pass.
+- Lint, typecheck and build pass.
+
+**Not verified:** real external delivery. It needs an SMTP provider and credentials the owner must
+configure (`docs/email.md`).
+
+## 2026-10-20 — Email delivery (invites, password reset), independent mentors, live meeting test
+
+**Issue 1 — "invite and reset emails don't arrive".**
+- *Root cause (environment, not code):* the app runs against the **local** Supabase stack, which
+  has no outgoing SMTP. Auth sends every email to the bundled **Mailpit** catcher
+  (http://127.0.0.1:54324).
+  - Mailpit held the four invites sent today (to real Gmail addresses). None could ever leave the
+    machine.
+  - The one reset requested today (from a second dev server on :3100) was sent at 12:04. The
+    Supabase containers restarted at 12:06, and Mailpit keeps messages only in memory, so it was
+    lost.
+  - On a hosted project, Supabase's built-in mailer only sends to organization members, so
+    custom SMTP is needed there too (`docs/email.md`).
+- *Fix:* documented in `docs/email.md` (how to read local mail; exact production SMTP setup). No
+  credentials invented or committed.
+- *Verification:* every email below was found in Mailpit and opened in a real browser
+  (Playwright).
+
+**Issue 2 — a valid mentor invite showed "This reset link has expired".**
+- *Root cause (code):* the invite link lands on `/reset-password#access_token=…`.
+  `establishRecoverySession()` reads the tokens from the hash and strips them. In development,
+  React StrictMode runs the page effect twice:
+  - The second run found the hash already empty.
+  - It checked for a user before the first run's `setSession` had finished, saw none, and showed
+    "expired".
+  - Password resets were unaffected (they use `?code=` handled on the server).
+- *Fix:* `lib/api/auth.ts` — overlapping calls share one in-flight attempt.
+- *Verification:* a unit test reproduces the overlap. The new e2e test runs the full journey:
+  invite → Mailpit → set password → log in to `/mentor`, with reused and tampered links refused.
+
+**Issue 3 — batch access survived academy moves (isolation bug).**
+- *Root cause:* moving a person between academies (super admin) never removed their old
+  `batch_mentors` / `batch_students` rows. A moved mentor kept `is_batch_mentor()` access to the
+  old academy's rosters and sessions.
+- *Fix:* `0024_independent_mentors.sql` adds a trigger that drops batch rows not matching the
+  person's academy, plus a one-off repair (0 stale rows locally).
+- *Verification:* SQL harness §11.
+
+**Change — independent mentors.**
+- A mentor may have no academy. Super admins invite them (`users.invite_mentor`). Academy admins'
+  invites still always carry their own academy.
+- `roleRequiresAcademy` is now academy admins only. The dashboard tells independent mentors which
+  areas are academy-only.
+
+**Verification (all on the local stack):**
+- `supabase/tests/workflow-check.sql`: 200 checks, ALL PASSED (migrations 0001–0024 in a
+  throwaway DB).
+- Vitest: 566/566.
+- Playwright `auth-flows-local`: 6 passed ×3 consecutive runs (1 skipped: dev-preview mode).
+- **Live meeting** (`tests/e2e/live-meeting-local.spec.ts`): two Chromium sessions with fake
+  camera and mic against LiveKit 1.13.10. Passed:
+  - Video and audio flowed.
+  - Listen-only start, then "allow to speak", then the student's audio reached the mentor.
+  - The student had no host controls.
+  - Signed webhooks recorded both joins.
+  - "End for all" completed the meeting with server times, closed the attendance rows and marked
+    the student present.
+  - The webhook rejected unsigned and forged calls (401).
+- Lint, typecheck and build pass.
+
+**Not verified:** real-inbox delivery (needs a provider and credentials from the owner); a meeting
+over a real network with TURN.
+
 ## 2026-10-18 — Landing page: remove redundant duplicate content
 
 **Issue.** The landing page was to be checked for unintentionally duplicated content (repeated

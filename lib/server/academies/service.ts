@@ -158,7 +158,8 @@ export async function addAcademyMember(academyId: string, email: unknown, role: 
   return { ok: true, data: { name } };
 }
 
-// Only students can simply be removed; mentors/admins need a role change first.
+// Students and mentors can be removed (a removed mentor becomes independent;
+// 0024 drops their batch assignments). Academy admins need a role change first.
 export async function removeAcademyMember(academyId: string, userId: string): Promise<ServiceResult<null>> {
   const actor = await authorize("academies.manage");
   if (isGuardFailure(actor)) return actor;

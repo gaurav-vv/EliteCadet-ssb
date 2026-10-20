@@ -80,6 +80,9 @@ export function MeetingPanel({ session: s, join, role, roomHref, attendance }: M
       {attendance !== undefined && (
         <div className="flex flex-col gap-2">
           <h3 className="text-[13px] font-semibold tracking-[0.04em] text-ink-secondary uppercase">Who joined</h3>
+          <p className="text-[12px] text-ink-secondary">
+            Present = in the room for at least 75% of the scheduled time ({attendance?.[0]?.requiredMinutes ?? Math.ceil(((Date.parse(s.endsAt) - Date.parse(s.startsAt)) / 60_000) * 0.75)} min). Only time inside the scheduled window counts; overlapping visits count once. Decided when the meeting ends.
+          </p>
           {attendance === null ? (
             <p className="text-[13px] text-ink-secondary">We couldn&apos;t load who joined. Refresh to try again.</p>
           ) : attendance.length === 0 ? (
@@ -91,6 +94,7 @@ export function MeetingPanel({ session: s, join, role, roomHref, attendance }: M
                   <th scope="col" className="py-2 pr-3 font-semibold">Name</th>
                   <th scope="col" className="py-2 pr-3 font-semibold">First joined</th>
                   <th scope="col" className="py-2 pr-3 font-semibold">Time in room</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">Attendance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline">
@@ -104,6 +108,18 @@ export function MeetingPanel({ session: s, join, role, roomHref, attendance }: M
                     <td className="py-2 pr-3 text-ink-secondary">
                       {a.minutes} min{a.joins > 1 ? ` · ${a.joins} joins` : ""}
                       {a.lastLeftAt === null ? " · in the room" : ""}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {a.role !== "student" ? (
+                        <span className="text-ink-secondary">—</span>
+                      ) : a.status ? (
+                        <span className={a.status === "present" ? "text-success" : a.status === "absent" ? "text-danger" : "text-ink"}>
+                          {a.status === "present" ? "Present" : a.status === "absent" ? "Absent" : "Excused"}
+                          {a.markedByMentor ? " (set by mentor)" : ""}
+                        </span>
+                      ) : (
+                        <span className="text-ink-secondary">{live ? "In progress" : "Not decided yet"}</span>
+                      )}
                     </td>
                   </tr>
                 ))}

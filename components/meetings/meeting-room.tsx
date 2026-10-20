@@ -1,47 +1,52 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LiveKitRoom } from "@livekit/components-react";
-import { DisconnectReason, MediaDeviceFailure } from "livekit-client";
-import { CalendarClock, Mic, Video, VideoOff } from "lucide-react";
+import { MediaDeviceFailure, type DisconnectReason } from "livekit-client";
+import { CalendarClock, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { RoomStage } from "@/components/meetings/room-stage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { joinMeetingAction, meetingJoinStateAction } from "@/lib/actions/meetings";
+import { disconnectOutcome, type RoomOutcome } from "@/lib/meetings/room-logic";
 import type { JoinGrant, JoinState } from "@/lib/server/meetings/service";
 
 interface MeetingRoomProps {
   sessionId: string;
   title: string;
   role: "mentor" | "admin" | "student";
+  viewerId: string;
   kind: "one_to_one" | "batch";
   initialJoin: JoinState;
   opensAtLabel: string;
   backHref: string;
+  hostName: string;
 }
 
-type Phase =
-  | { name: "lobby" }
-  | { name: "connecting"; grant: JoinGrant }
-  | { name: "left" }
-  | { name: "ended" }
-  | { name: "removed" }
-  | { name: "error"; message: string };
+type Phase = { name: "lobby" } | { name: "connecting"; grant: JoinGrant } | { name: "outcome"; outcome: RoomOutcome; detail?: string } | { name: "error"; message: string };
 
 const WAITING: Partial<Record<JoinState, { title: string; description: string }>> = {
   too_early: { title: "The room isn't open yet", description: "" },
-  waiting_for_mentor: { title: "Waiting for the meeting to start", description: "You'll be able to join as soon as your mentor (or academy) starts the meeting. This page checks every few seconds." },
+  waiting_for_mentor: { title: "Waiting for the meeting to start", description: "You can join as soon as your mentor (or academy) starts it. This page checks every few seconds." },
   ended: { title: "This meeting has ended", description: "It's in your past sessions now." },
   cancelled: { title: "This meeting was cancelled", description: "Check your sessions for the reason and what's next." },
-  removed: { title: "You can't rejoin this meeting", description: "Your mentor removed you from it. Contact them if this was a mistake." },
+  removed: { title: "You can't rejoin this meeting", description: "The host removed you from it. Contact them if this was a mistake." },
   not_configured: { title: "Video meetings aren't set up yet", description: "This server has no video service configured. Ask your platform admin." },
+};
+
+const OUTCOME: Record<RoomOutcome, { title: string; description: string; rejoin: boolean }> = {
+  ended: { title: "The meeting has ended", description: "Thanks for joining. It's in your past sessions now.", rejoin: false },
+  left: { title: "You left the meeting", description: "The meeting is still running. You can rejoin until it ends.", rejoin: true },
+  removed: { title: "You were removed from the meeting", description: "Contact your host if this was a mistake.", rejoin: false },
+  duplicate: { title: "You joined from another tab or device", description: "This window was disconnected because the meeting is open somewhere else.", rejoin: true },
+  lost: { title: "Connection lost", description: "We couldn't keep you connected. Check your network and rejoin.", rejoin: true },
 };
 
 // Lobby → (token from the server) → LiveKit room → outcome. The media token
 // comes only from joinMeetingAction, which re-checks everything server-side.
-export function MeetingRoom({ sessionId, title, role, kind, initialJoin, opensAtLabel, backHref }: MeetingRoomProps) {
+export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoin, opensAtLabel, backHref, hostName }: MeetingRoomProps) {
   const [join, setJoin] = useState<JoinState>(initialJoin);
   const [phase, setPhase] = useState<Phase>({ name: "lobby" });
   const [pending, setPending] = useState(false);
@@ -50,6 +55,9 @@ export function MeetingRoom({ sessionId, title, role, kind, initialJoin, opensAt
   const publishesOnJoin = isHost || kind === "one_to_one";
   const [camera, setCamera] = useState(publishesOnJoin);
   const [mic, setMic] = useState(publishesOnJoin);
+  // Set BEFORE this client disconnects whenever the meeting is over for
+  // everyone, so the outcome can't depend on which disconnect reason wins.
+  const endedHere = useRef(false);
 
   // Waiting rooms poll the server (never the browser clock) for a change.
   useEffect(() => {
@@ -68,6 +76,7 @@ export function MeetingRoom({ sessionId, title, role, kind, initialJoin, opensAt
   async function enter() {
     setPending(true);
     setDeviceWarning(null);
+    endedHere.current = false;
     try {
       const result = await joinMeetingAction(sessionId);
       if (!result.ok || !result.data) {
@@ -83,22 +92,11 @@ export function MeetingRoom({ sessionId, title, role, kind, initialJoin, opensAt
   }
 
   const onDisconnected = useCallback((reason?: DisconnectReason) => {
-    switch (reason) {
-      case DisconnectReason.CLIENT_INITIATED:
-        setPhase({ name: "left" });
-        break;
-      case DisconnectReason.PARTICIPANT_REMOVED:
-        setPhase({ name: "removed" });
-        break;
-      case DisconnectReason.ROOM_DELETED:
-        setPhase({ name: "ended" });
-        break;
-      case DisconnectReason.DUPLICATE_IDENTITY:
-        setPhase({ name: "error", message: "You joined this meeting from another tab or device, so this one was disconnected." });
-        break;
-      default:
-        setPhase({ name: "error", message: "The connection to the meeting was lost. Check your network and rejoin." });
-    }
+    setPhase({ name: "outcome", outcome: disconnectOutcome(reason as number | undefined, endedHere.current) });
+  }, []);
+
+  const markEnded = useCallback(() => {
+    endedHere.current = true;
   }, []);
 
   const onDeviceFailure = useCallback((failure?: MediaDeviceFailure, kindOfDevice?: MediaDeviceKind) => {
@@ -134,32 +132,22 @@ export function MeetingRoom({ sessionId, title, role, kind, initialJoin, opensAt
         onDisconnected={onDisconnected}
         onMediaDeviceFailure={onDeviceFailure}
         onError={onError}
-        className="flex flex-col gap-4"
+        className="flex min-w-0 flex-col gap-3"
       >
         {deviceWarning && (
           <Alert role="alert">
             <AlertDescription>{deviceWarning}</AlertDescription>
           </Alert>
         )}
-        <RoomStage sessionId={sessionId} title={title} role={role} kind={grant.kind} endsAt={grant.endsAt} />
+        <RoomStage sessionId={sessionId} title={title} role={grant.role} viewerId={viewerId} kind={grant.kind} endsAt={grant.endsAt} hostName={hostName} onMeetingOver={markEnded} />
       </LiveKitRoom>
     );
   }
 
-  const outcome =
-    phase.name === "left"
-      ? { title: "You left the meeting", description: "You can rejoin while it's still running.", rejoin: true }
-      : phase.name === "ended"
-        ? { title: "The meeting has ended", description: "Thanks for joining. It's in your past sessions now.", rejoin: false }
-        : phase.name === "removed"
-          ? { title: "You were removed from the meeting", description: "Contact your mentor if this was a mistake.", rejoin: false }
-          : phase.name === "error"
-            ? { title: "Something went wrong", description: phase.message, rejoin: true }
-            : null;
-
+  const outcome = phase.name === "outcome" ? OUTCOME[phase.outcome] : phase.name === "error" ? { title: "Something went wrong", description: phase.message, rejoin: true } : null;
   if (outcome) {
     return (
-      <div className="glass-regular rounded-card">
+      <div className="glass-regular rounded-card" role="status">
         <EmptyState
           icon={<CalendarClock aria-hidden="true" size={22} />}
           title={outcome.title}
@@ -210,9 +198,9 @@ export function MeetingRoom({ sessionId, title, role, kind, initialJoin, opensAt
             ? "Starting opens the room for your students. Meetings aren't recorded."
             : role === "admin"
               ? "You join as a co-host with the same controls as the mentor. If the meeting hasn't started, joining starts it. Meetings aren't recorded."
-            : publishesOnJoin
-              ? "Your mentor will see and hear you. Meetings aren't recorded."
-              : "You'll join listening. Your mentor can let you speak or turn on your camera. Meetings aren't recorded."}
+              : publishesOnJoin
+                ? "Your mentor will see and hear you. Meetings aren't recorded."
+                : "You'll join listening. Your mentor can let you speak or turn on your camera. Chat, reactions and raise hand work for everyone. Meetings aren't recorded."}
         </p>
       </div>
       {publishesOnJoin && (
@@ -223,7 +211,7 @@ export function MeetingRoom({ sessionId, title, role, kind, initialJoin, opensAt
             {camera ? "Camera on" : "Camera off"}
           </Button>
           <Button type="button" variant="outline" className="min-h-11" aria-pressed={mic} onClick={() => setMic((v) => !v)}>
-            <Mic aria-hidden="true" size={16} />
+            {mic ? <Mic aria-hidden="true" size={16} /> : <MicOff aria-hidden="true" size={16} />}
             {mic ? "Microphone on" : "Microphone off"}
           </Button>
         </fieldset>

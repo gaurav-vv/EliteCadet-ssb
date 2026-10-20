@@ -139,8 +139,8 @@ describe("removeAcademyMember", () => {
     expect(repo.setMembership).toHaveBeenCalledWith(USER, { academy_id: null });
   });
 
-  it("refuses to strand a mentor without an academy, or a non-member", async () => {
-    vi.mocked(repo.findMembers).mockResolvedValue({ data: [{ id: USER, fullName: "M", email: null, role: "mentor", status: "active" }], error: null });
+  it("refuses to strand an academy admin without an academy, or a non-member", async () => {
+    vi.mocked(repo.findMembers).mockResolvedValue({ data: [{ id: USER, fullName: "M", email: null, role: "academy_admin", status: "active" }], error: null });
     expect((await service.removeAcademyMember(AC, USER)).error?.code).toBe("validation_error");
     vi.mocked(repo.findMembers).mockResolvedValue({ data: [], error: null });
     expect((await service.removeAcademyMember(AC, USER)).error?.code).toBe("not_found");
@@ -178,10 +178,10 @@ describe("academy admin: own academy only", () => {
 });
 
 describe("changeUserAcademy", () => {
-  it("refuses your own academy and stranding a mentor", async () => {
+  it("refuses your own academy and stranding an academy admin", async () => {
     vi.mocked(authorize).mockResolvedValue(superActor);
     expect((await service.changeUserAcademy(SUPER, AC, { role: "student", academyId: null })).error?.code).toBe("validation_error");
-    expect((await service.changeUserAcademy(USER, "", { role: "mentor", academyId: AC })).error?.code).toBe("validation_error");
+    expect((await service.changeUserAcademy(USER, "", { role: "academy_admin", academyId: AC })).error?.code).toBe("validation_error");
     expect(repo.setMembership).not.toHaveBeenCalled();
   });
 

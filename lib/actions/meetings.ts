@@ -35,3 +35,30 @@ export async function endMeetingAction(id: string) {
 export async function moderateParticipantAction(id: string, studentId: string, action: service.ModerationAction) {
   return service.moderateParticipant(id, studentId, action);
 }
+
+// In-meeting chat, reactions and raised hands — authorized per call in the
+// service (live meeting, caller in it, not removed) and broadcast by the server.
+export async function listMeetingMessagesAction(id: string) {
+  return service.listMessages(id);
+}
+
+export async function sendMeetingMessageAction(id: string, body: string) {
+  return service.sendMessage(id, body);
+}
+
+export async function sendReactionAction(id: string, emoji: string) {
+  return service.sendReaction(id, emoji);
+}
+
+export async function setMyHandAction(id: string, raised: boolean) {
+  return service.setMyHand(id, raised);
+}
+
+// Host only (mentor of the meeting or an admin of its academy).
+export async function muteAllStudentsAction(id: string) {
+  return service.muteAllStudents(id);
+}
+
+export async function lowerAllHandsAction(id: string) {
+  return service.lowerAllHands(id);
+}

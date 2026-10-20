@@ -113,11 +113,11 @@ describe("changeUserRole", () => {
     );
   });
 
-  it("refuses a self-change, and a mentor role without an academy, before writing", async () => {
+  it("refuses a self-change, and an academy admin role without an academy, before writing", async () => {
     vi.mocked(repo.findUserById).mockResolvedValue({ data: user({ id: SUPER, role: "super_admin" }), error: null });
     expect((await changeUserRole(SUPER, "student")).error?.code).toBe("validation_error");
     vi.mocked(repo.findUserById).mockResolvedValue({ data: user(), error: null });
-    expect((await changeUserRole(OTHER, "mentor")).error?.code).toBe("validation_error");
+    expect((await changeUserRole(OTHER, "academy_admin")).error?.code).toBe("validation_error");
     expect(repo.updateUserRole).not.toHaveBeenCalled();
     expect(repo.insertAudit).not.toHaveBeenCalled();
   });

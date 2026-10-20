@@ -313,6 +313,10 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-19 | **The roadmap is computed by fixed rules from current evidence on every view, not stored and not AI-written** (T105). Inputs: preferences (onboarding, now in `student_profiles`), the diagnostic (first attempt = immutable baseline, enforced by a partial unique index and no update/delete grants; weekly re-assessments kept separately), the readiness profile, the mentor's open work and journey progress. So it "recalculates when new evidence is recorded" (FR-PLAN-01) without a background job. The suggested stage is shown next to the student's self-reported stage, never merged (PRD §5.4); the Daily Mission is at most three actions, each with its reason (FR-DASH-01) | PRD §5.3, §9.3, §13; FR-ONB-01/02, FR-PLAN-01, FR-DASH-01 |
 | 2026-10-20 | **Live meetings are sessions with a `meeting_kind`** (`one_to_one` / `batch`), not a second meetings table (T094, `0022_live_meetings.sql`). Media is LiveKit (SFU) over WebRTC. Rules are enforced in Postgres: the 120-minute daily cap per mentor (IST calendar day; scheduled, live and completed count their full scheduled length, cancelled don't; crossing midnight counts on both days; per-mentor advisory lock against concurrent bookings), 15–120 minute meetings, batch ≤ 100 students, and server-clock actual start/end. The room closes at the scheduled end (not +30 min as the spec said earlier). Batch students join listen-only and the mentor grants speaking or video. Attendance comes from signed LiveKit webhooks. No recording. Academy admins read only | User brief 2026-10-20 + `specs.md` §8a.4h (updated) + `AGENTS.md` §19 (no parallel implementation) |
 | 2026-10-20 | **Academy admins schedule live meetings on behalf of a host mentor** (0023). `mentor_id` stays the host and the 120-minute day is the host mentor's, under the same lock, whoever books. Admins act only through SECURITY DEFINER functions that check "active admin of this session's academy" (`current_active_admin_academy_id()`). There is no direct write policy on `sessions` for admins. Admins co-host with the mentor's controls. They can't edit (they cancel and reschedule) and can't change a mentor's link or in-person sessions | User brief 2026-10-20 + `AGENTS.md` §10 (academy isolation is a security boundary) |
+| 2026-10-20 | **Mentors may be independent** (no academy). Only a Super Admin invites them (`users.invite_mentor`). Academy admins stay inside their own academy. Moving anyone between academies drops their old batch memberships in the same transaction (0024). Independent mentors get Library, own content, content requests, profile and notifications; batch-based areas stay empty. Replaces "a mentor can't be left without an academy" | User requirement 2026-10-20 + `AGENTS.md` §10 |
+| 2026-10-20 | **Meeting attendance = 75% of the scheduled duration in connected time** (0025). The union of LiveKit-webhook intervals, clipped to the scheduled window, finalized only after the end, stored in `session_attendance` (with seconds). A mentor's mark is kept. Replaces "present on join". Ended-early meetings are judged against the scheduled length (literal rule) | User requirement 2026-10-20 |
+| 2026-10-20 | **Chat is stored and server-broadcast**; clients never publish LiveKit data. Reactions and raise hand go through server actions as well | Authorization + history after reconnects |
+| 2026-10-20 | **Email: local = Mailpit only, hosted = custom SMTP required** (`docs/email.md`). An "invite sent" or "check your email" message means Auth handed the email to SMTP, not that it reached an inbox | Diagnosis 2026-10-20 |
 
 ---
 
@@ -433,6 +437,131 @@ Next task:
 ---
 
 ## 13a. Update Log
+
+```text
+Date: 2026-10-20 (evening)
+Task: T094 meetings production pass + T106 invite fix
+Status: Meetings verified locally with two real browsers; email local-only (real delivery needs owner SMTP)
+
+What changed:
+- End Meeting bug:
+  - Root cause: the client chose "ended" vs "You left — rejoin" from LiveKit's disconnect reason
+    alone, so ending (or the scheduled end, where every student's own timer disconnects them)
+    could show "you left" for a meeting that was over.
+  - endMeeting also reported success when the room couldn't be closed, and server→LiveKit calls
+    had no timeout (the host could be stuck on "Working…").
+  - Fix: the shell records "meeting over" before disconnecting (disconnectOutcome); ending reports
+    failure with a retry; 6 s request timeout, 3 tries; overdue sweep in the webhook and worker.
+- 0025_meeting_chat_attendance.sql (local only):
+  - can_join_live_meeting; chat table + post_live_meeting_message (member/live/rate limited);
+    provider-timestamped, order-independent events; live_meeting_connected_seconds (union,
+    clipped).
+  - finalize_live_attendance (75%), end_live_meeting (idempotent), finish_overdue_live_meetings,
+    live_meeting_attendance_summary, live_meeting_audience_count, session_host_names.
+- UI rebuilt per session_ref.png: info panel, paged grid, screen-share layout, dark toolbar
+  (mic/cam/share/hand/chat/participants/reactions/more/leave/end), Participants+Chat panel, every
+  state (connecting, reconnecting, host away, 5-min warning, device denied, errors).
+  - Disabled controls state why.
+  - Whiteboard, polls and breakout rooms are listed as "not available yet".
+- Invite bug: re-inviting an existing address as a mentor returned "sent" while the account stayed
+  a student / in another academy (Auth only re-sends). Now: re-send identical pending invites,
+  refuse anything else with a clear message.
+- Students now see host names (session_host_names), in lists and meeting pages.
+- Tests:
+  - SQL harness: 246 checks pass.
+  - Vitest: 598/598.
+  - Playwright: full suite 22 passed / 5 skipped (dev-preview/dev:local-only specs), including the
+    two-browser meeting (media, chat both ways, reaction, hand, allow-to-speak, leave vs end,
+    refusal after end, 75% → absent, outsider 404).
+  - lint, typecheck and build pass.
+  - The worker's typecheck can't run here (its deps aren't installed); only main.ts changed.
+
+What remains:
+- Owner: SMTP on the hosted project (docs/email.md); approve and apply 0022–0025 to hosted DBs.
+- Whiteboard, polls, breakout rooms; admin editing of meetings; a test over a real network/TURN.
+
+Blocker:
+- Real email delivery needs provider credentials (owner).
+
+Next task:
+- Owner review of migrations 0024–0025, SMTP setup, then a real-network meeting test.
+```
+
+```text
+Date: 2026-10-20 (later)
+Task: T106 — "no emails are working anywhere"
+Status: Local flows verified; real external delivery NOT verified (needs SMTP from the owner)
+
+What changed:
+- Diagnosis:
+  - The app uses LOCAL Supabase.
+  - Mailpit (supabase_inbucket) is running; the stopped services are unrelated to email.
+  - Auth logs: 2 invites refused with email_exists, 2 accepted and sitting in Mailpit.
+  - No reset request has reached Auth since 15:47.
+  - A browser probe of forgot-password works (email in Mailpit).
+- Root cause shared by both flows: local Supabase captures all auth email; no SMTP is configured.
+  The UI's "Invite sent" / "Check your email" hid that.
+- Fix: localMailboxUrl() + LocalMailboxNote. Local-only "not sent to a real inbox, open Mailpit"
+  on the reset, mentor-invite and student-invite confirmations.
+- docs/email.md: a one-minute diagnosis.
+- Tests: e2e 15 passed / 1 skipped (incl. the LiveKit meeting), Vitest 568/568, SQL checks pass,
+  lint, typecheck and build pass.
+
+What remains:
+- Owner: configure custom SMTP on the hosted project (or [auth.email.smtp] locally) to get real
+  delivery, then verify a real invite and reset arrive.
+
+Blocker:
+- Real delivery needs provider credentials (owner).
+
+Next task:
+- Owner SMTP setup; then a real-inbox check.
+```
+
+```text
+Date: 2026-10-20
+Task: T106 — email delivery, independent mentors; T094 — real meeting test
+Status: Done locally (verified); hosted SMTP is owner action
+
+What changed:
+- Root causes:
+  - (1) The local stack has no SMTP: all invite and reset mail went to Mailpit
+    (127.0.0.1:54324); 4 invites to Gmail addresses were sitting there.
+  - (2) Mailpit loses mail on a container restart (today's 12:04 reset email was lost at 12:06).
+  - (3) Code bug: a valid invite showed "This reset link has expired" (React StrictMode double
+    effect raced establishRecoverySession). Fixed in lib/api/auth.ts.
+  - (4) Isolation bug: academy moves left old batch_mentors/batch_students rows. Fixed by
+    0024_independent_mentors.sql.
+- Independent mentors:
+  - Super admin invite form on /admin/users (inviteIndependentMentor, audited).
+  - roleRequiresAcademy is now academy admins only.
+  - Mentor dashboard notice.
+  - specs.md §8a.1 updated.
+- Shared requestOrigin() helper for invite links.
+- docs/email.md (local Mailpit; exact hosted SMTP + URL settings), docs/live-meetings.md
+  (attendance semantics), docs/DEVELOPMENT_LOG.md.
+- Tests:
+  - SQL harness §11 (200 checks pass).
+  - Vitest 566/566 (new independent-mentor-invite tests; the recovery-race test; six tests updated
+    for the new mentor rule).
+  - e2e: academy invite, independent mentor, reset/expired/reused/tampered links — 6 passed ×3.
+  - Real two-browser LiveKit meeting — passed.
+  - lint, typecheck, build pass.
+- Migration 0024 applied to the local Docker DB only.
+
+What remains:
+- Owner: configure custom SMTP + Site URL/Redirect URLs on the hosted project (docs/email.md),
+  then confirm a real invite and reset arrive.
+- Apply 0022–0024 to hosted databases (needs approval).
+- Live meetings over a real network/TURN (LiveKit Cloud) not tested.
+- Attendance has no minimum-time rule (only "joined").
+
+Blocker:
+- None locally. Real-inbox email needs provider credentials (owner).
+
+Next task:
+- Owner SMTP setup; then T094 tests over a real network.
+```
 
 ```text
 Date: 2026-10-20

@@ -6,11 +6,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LocalMailboxNote } from "@/components/auth/local-mailbox-note";
 import { inviteAcademyMentorAction } from "@/lib/actions/academy-people";
 
 // A real invite: the mentor gets an email to set their password, and joins
-// this academy as a mentor (supabase/migrations/0007 signup trigger).
-export function InviteMentorForm() {
+// this academy as a mentor (supabase/migrations/0007 signup trigger). The super
+// admin's User Management passes its own action to invite an independent
+// mentor (no academy) with the same form.
+export function InviteMentorForm({
+  action = inviteAcademyMentorAction,
+  title = "Invite a mentor",
+  description,
+}: {
+  action?: typeof inviteAcademyMentorAction;
+  title?: string;
+  description?: string;
+}) {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,12 +33,17 @@ export function InviteMentorForm() {
     setPending(true);
     setOutcome(null);
     try {
-      const result = await inviteAcademyMentorAction({ fullName, email });
+      const result = await action({ fullName, email });
       if (!result.ok) {
         setOutcome({ tone: "error", message: result.error?.message ?? "Something went wrong. Please try again." });
         return;
       }
-      setOutcome({ tone: "success", message: `Invite sent to ${result.data?.name ?? email}.` });
+      setOutcome({
+        tone: "success",
+        message: result.data?.resent
+          ? `Invite re-sent to ${result.data.name}. They hadn't accepted the first one yet.`
+          : `Invite sent to ${result.data?.name ?? email}. They'll get an email to set their password.`,
+      });
       setFullName("");
       setEmail("");
       router.refresh();
@@ -40,12 +56,16 @@ export function InviteMentorForm() {
 
   return (
     <div className="glass-regular flex flex-col gap-4 rounded-card px-6 py-6">
-      <h2 className="text-[18px] font-semibold text-ink">Invite a mentor</h2>
+      <div>
+        <h2 className="text-[18px] font-semibold text-ink">{title}</h2>
+        {description && <p className="mt-1 text-[14px] text-ink-secondary">{description}</p>}
+      </div>
       {outcome && (
         <Alert variant={outcome.tone === "error" ? "destructive" : "default"} role={outcome.tone === "error" ? "alert" : "status"}>
           <AlertDescription>{outcome.message}</AlertDescription>
         </Alert>
       )}
+      {outcome?.tone === "success" && <LocalMailboxNote />}
       <form onSubmit={handleSubmit} noValidate className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="mentorName">Full name</Label>

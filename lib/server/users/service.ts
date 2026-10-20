@@ -3,6 +3,8 @@
 // the repository. No UI component touches Postgres directly (AGENTS.md §6/§9).
 
 import { authorize, isGuardFailure } from "@/lib/server/auth/guard";
+import { findAccountByEmail, inviteByEmail } from "@/lib/server/academy-people/repository";
+import { checkPersonInput, decideInvite } from "@/lib/server/academy-people/validation";
 import * as repo from "@/lib/server/users/repository";
 import { checkRoleChange, checkStatusChange, isUuid, USER_PAGE_SIZE } from "@/lib/server/users/validation";
 import { ROLE_LABELS } from "@/types/auth";
@@ -129,4 +131,45 @@ export async function changeUserStatus(targetId: string, newStatus: unknown): Pr
     details: { summary: check.status === "suspended" ? "Account suspended" : "Account reactivated" },
   });
   return { ok: true, data: null };
+}
+
+// Super admin only: invite a mentor who belongs to no academy (independent
+// mentor, specs.md §8a.1). The invite carries role "mentor" and no academy, so
+// the signup trigger (0007) creates them with academy_id null. Academy admins
+// can't reach this: their invites always carry their own academy.
+export async function inviteIndependentMentor(input: { email?: unknown; fullName?: unknown }, origin: string): Promise<ServiceResult<{ name: string; resent: boolean }> & { field?: "email" | "fullName" }> {
+  const actor = await authorize("users.invite_mentor");
+  if (isGuardFailure(actor)) return actor;
+  const checked = checkPersonInput(input, true);
+  if (!checked.ok) return { ...fail("validation_error", checked.message), field: checked.field };
+  const existing = await findAccountByEmail(checked.email);
+  if (existing.error) return existing.error.code === "admin_unavailable" ? fail("not_set_up", "Invites need the server's SUPABASE_SERVICE_ROLE_KEY. Ask whoever runs this server to set it.") : fail("server_error", "We couldn't check that email right now. Please try again.");
+  const decision = decideInvite(existing.data, { role: "mentor", academyId: null });
+  if (decision.kind === "refuse") {
+    const who = existing.data!;
+    const label = who.role === "academy_admin" ? "an academy admin" : who.role === "super_admin" ? "a super admin" : `a ${who.role}`;
+    return {
+      ...fail(
+        "validation_error",
+        decision.reason === "same_academy_active"
+          ? "This person is already an independent mentor. They can log in, or use “Forgot password”."
+          : `This email already belongs to ${label}${who.academyId ? " in an academy" : ""}${who.pending ? " (invite not yet accepted)" : ""}. Change their role or academy from their user page instead.`,
+      ),
+      field: "email",
+    };
+  }
+  const invited = await inviteByEmail({ email: checked.email, fullName: checked.fullName, role: "mentor", academyId: null, redirectTo: `${origin}/reset-password` });
+  if (invited.error) {
+    if (invited.error.code === "admin_unavailable") return fail("not_set_up", "Invites need the server's SUPABASE_SERVICE_ROLE_KEY. Ask whoever runs this server to set it.");
+    const taken = invited.error.code === "email_exists" || /already/i.test(invited.error.message ?? "");
+    return { ...fail("validation_error", taken ? "An account with this email already exists. Change their role from their user page instead." : "We couldn't send the invite. Please try again."), field: "email" };
+  }
+  await repo.insertAudit({
+    actorId: actor.id,
+    action: "user.invited",
+    targetType: "user",
+    targetId: invited.data.id,
+    details: { role: "mentor", academy: null, summary: `${decision.kind === "resend" ? "Re-sent the invite to" : "Invited"} ${checked.fullName} as an independent mentor` },
+  });
+  return { ok: true, data: { name: checked.fullName, resent: decision.kind === "resend" } };
 }

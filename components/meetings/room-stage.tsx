@@ -1,128 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  RoomAudioRenderer,
-  VideoTrack,
-  isTrackReference,
-  useConnectionState,
-  useIsSpeaking,
-  useLocalParticipant,
-  useLocalParticipantPermissions,
-  useParticipants,
-  useRoomContext,
-  useTracks,
-  type TrackReferenceOrPlaceholder,
-} from "@livekit/components-react";
-import { ConnectionState, Track, type Participant } from "livekit-client";
-import { Mic, MicOff, MonitorUp, MoreHorizontal, PhoneOff, Users, Video, VideoOff } from "lucide-react";
-import { cn } from "cn";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RoomAudioRenderer, useConnectionState, useLocalParticipant, useLocalParticipantPermissions, useParticipants, useRoomContext, useTracks } from "@livekit/components-react";
+import { ConnectionState, RoomEvent, Track, type RemoteParticipant } from "livekit-client";
+import { Signal } from "lucide-react";
+import { MeetingSidePanel, type HostAction, type PanelTab } from "@/components/meetings/meeting-side-panel";
+import { MeetingToolbar } from "@/components/meetings/meeting-toolbar";
+import { allows, handRaised, isHostRole, SOURCE, type Perm } from "@/components/meetings/participant-utils";
+import { VideoGrid } from "@/components/meetings/video-grid";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { endMeetingAction, moderateParticipantAction } from "@/lib/actions/meetings";
-
-// @livekit/protocol TrackSource values, as found in participant permissions.
-const SOURCE = { camera: 1, microphone: 2, screen: 3 } as const;
-
-type Perm = { canPublish?: boolean; canPublishSources?: number[] } | undefined;
-const allows = (perm: Perm, source: number) => Boolean(perm?.canPublish) && (!perm?.canPublishSources?.length || perm.canPublishSources.includes(source));
-
-// From the server-signed token metadata (never client-set: canUpdateOwnMetadata is off).
-function roleOf(p: Participant): "mentor" | "admin" | "student" {
-  try {
-    const role = (JSON.parse(p.metadata ?? "{}") as { role?: string }).role;
-    return role === "mentor" || role === "admin" ? role : "student";
-  } catch {
-    return "student";
-  }
-}
-const isHostRole = (p: Participant) => roleOf(p) !== "student";
-
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
-
-function Tile({ trackRef, large }: { trackRef: TrackReferenceOrPlaceholder; large?: boolean }) {
-  const p = trackRef.participant;
-  const speaking = useIsSpeaking(p);
-  const name = p.name || "Participant";
-  const showVideo = isTrackReference(trackRef) && !trackRef.publication.isMuted;
-  const isScreen = trackRef.source === Track.Source.ScreenShare;
-  return (
-    <figure
-      className={cn(
-        "relative m-0 flex aspect-video items-center justify-center overflow-hidden rounded-card bg-ink outline-2 outline-offset-2",
-        speaking && !isScreen ? "outline-brand-accent" : "outline-transparent",
-        large && "w-full",
-      )}
-    >
-      {showVideo ? (
-        <VideoTrack trackRef={trackRef} className={cn("size-full", isScreen ? "object-contain" : "object-cover")} />
-      ) : (
-        <span aria-hidden="true" className={cn("flex items-center justify-center rounded-full bg-ink-secondary font-semibold text-white", large ? "size-24 text-[28px]" : "size-12 text-[15px]")}>
-          {initials(name)}
-        </span>
-      )}
-      <figcaption className="absolute bottom-2 left-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-pill bg-ink/70 px-2.5 py-1 text-[12px] text-white">
-        {!isScreen && (p.isMicrophoneEnabled ? <Mic aria-hidden="true" size={12} /> : <MicOff aria-hidden="true" size={12} />)}
-        <span className="truncate">
-          {isScreen ? `${name}'s screen` : name}
-          {p.isLocal ? " (you)" : ""}
-        </span>
-        <span className="sr-only">{isScreen ? "" : p.isMicrophoneEnabled ? (speaking ? ", speaking" : ", microphone on") : ", muted"}</span>
-      </figcaption>
-    </figure>
-  );
-}
-
-function RosterRow({ p, isHost, canModerate, kind, onAction }: { p: Participant; isHost: boolean; canModerate: boolean; kind: "one_to_one" | "batch"; onAction: (id: string, name: string, action: "allow_audio" | "allow_video" | "revoke" | "mute" | "remove") => void }) {
-  const speaking = useIsSpeaking(p);
-  const name = p.name || "Participant";
-  const perm = p.permissions as Perm;
-  const canSpeak = allows(perm, SOURCE.microphone);
-  const canVideo = allows(perm, SOURCE.camera);
-  return (
-    <li className="flex min-h-11 items-center justify-between gap-2 px-4 py-2">
-      <span className="min-w-0">
-        <span className="block truncate text-sm text-ink">
-          {name}
-          {p.isLocal ? " (you)" : ""}
-        </span>
-        <span className="block text-[12px] text-ink-secondary">
-          {isHost ? (roleOf(p) === "admin" ? "Co-host (academy)" : "Host") : kind === "batch" ? (canVideo ? "Can speak and share video" : canSpeak ? "Can speak" : "Listening") : "Student"}
-          {speaking ? " · Speaking" : ""}
-        </span>
-      </span>
-      <span className="flex shrink-0 items-center gap-1">
-        <span className="inline-flex size-8 items-center justify-center text-ink-secondary" aria-label={p.isMicrophoneEnabled ? "Microphone on" : "Muted"} role="img">
-          {p.isMicrophoneEnabled ? <Mic aria-hidden="true" size={16} className={speaking ? "text-brand-accent" : undefined} /> : <MicOff aria-hidden="true" size={16} />}
-        </span>
-        <span className="inline-flex size-8 items-center justify-center text-ink-secondary" aria-label={p.isCameraEnabled ? "Camera on" : "Camera off"} role="img">
-          {p.isCameraEnabled ? <Video aria-hidden="true" size={16} /> : <VideoOff aria-hidden="true" size={16} />}
-        </span>
-        {canModerate && !isHost && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" className="size-11" aria-label={`Actions for ${name}`}>
-                <MoreHorizontal aria-hidden="true" size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {kind === "batch" && !canSpeak && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "allow_audio")}>Allow to speak</DropdownMenuItem>}
-              {kind === "batch" && !canVideo && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "allow_video")}>Allow to speak and share video</DropdownMenuItem>}
-              {kind === "batch" && (canSpeak || canVideo) && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "revoke")}>Stop speaking and video</DropdownMenuItem>}
-              {p.isMicrophoneEnabled && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "mute")}>Mute microphone</DropdownMenuItem>}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => onAction(p.identity, name, "remove")}>
-                Remove from meeting
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </span>
-    </li>
-  );
-}
+import {
+  endMeetingAction,
+  listMeetingMessagesAction,
+  lowerAllHandsAction,
+  moderateParticipantAction,
+  muteAllStudentsAction,
+  sendMeetingMessageAction,
+  sendReactionAction,
+  setMyHandAction,
+} from "@/lib/actions/meetings";
+import { formatClock, mergeMessages, parseRoomMessage, type ChatItem } from "@/lib/meetings/room-logic";
 
 function useSecondsUntil(iso: string): number {
   const [left, setLeft] = useState(() => Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 1000)));
@@ -133,20 +32,27 @@ function useSecondsUntil(iso: string): number {
   return left;
 }
 
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+type Notice = { tone: "status" | "alert"; text: string } | null;
+type Reaction = { key: string; name: string; emoji: string };
 
 interface RoomStageProps {
   sessionId: string;
   title: string;
   role: "mentor" | "admin" | "student";
+  viewerId: string;
   kind: "one_to_one" | "batch";
   endsAt: string;
+  hostName: string;
+  // Tells the shell the meeting is over for everyone BEFORE this client
+  // disconnects, so it shows "ended" rather than "you left".
+  onMeetingOver: () => void;
 }
 
-// Host-led layout: the mentor (or their screen share) is the main video. In a
-// batch meeting only students the mentor allowed can publish, so students never
-// receive a wall of 100 videos — just the mentor and whoever has the floor.
-export function RoomStage({ sessionId, title, role, kind, endsAt }: RoomStageProps) {
+// The live room (session_ref.png): video stage + toolbar, Participants/Chat
+// panel. Media is host-led: in a batch meeting only the host (and students the
+// host allows) publish. Chat, reactions and raised hands go through the server
+// (authorized per call) and arrive here as server-sent data.
+export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, hostName, onMeetingOver }: RoomStageProps) {
   const room = useRoomContext();
   const connection = useConnectionState();
   const participants = useParticipants();
@@ -159,18 +65,91 @@ export function RoomStage({ sessionId, title, role, kind, endsAt }: RoomStagePro
     ],
     { onlySubscribed: false },
   );
-  const [notice, setNotice] = useState<{ tone: "status" | "alert"; text: string } | null>(null);
-  const [confirm, setConfirm] = useState<null | { kind: "end" } | { kind: "remove"; id: string; name: string }>(null);
+  const isHost = role !== "student";
+  const [notice, setNotice] = useState<Notice>(null);
+  const [panel, setPanel] = useState<PanelTab | null>("participants");
+  const [lastTab, setLastTab] = useState<PanelTab>("participants");
+  const [messages, setMessages] = useState<ChatItem[]>([]);
+  const [chatState, setChatState] = useState<"loading" | "ready" | "error">("loading");
+  const [unread, setUnread] = useState(0);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [confirm, setConfirm] = useState<null | { kind: "end" } | { kind: "remove"; identity: string; name: string }>(null);
   const [busy, setBusy] = useState(false);
-  const [rosterOpen, setRosterOpen] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
+  const [, setTick] = useState(0);
   const secondsLeft = useSecondsUntil(endsAt);
-  const endedRef = useRef(false);
+  const over = useRef(false);
+  const panelRef = useRef<PanelTab | null>(panel);
+  useEffect(() => {
+    panelRef.current = panel;
+  }, [panel]);
 
   const canMic = allows(perm, SOURCE.microphone);
   const canCamera = allows(perm, SOURCE.camera);
   const canScreen = allows(perm, SOURCE.screen);
+  const handUp = handRaised(localParticipant);
+  const sharer = tracks.find((t) => t.source === Track.Source.ScreenShare && t.publication);
+  const hostPresent = participants.some(isHostRole);
 
-  // Tell a batch student when the mentor gives or takes the floor.
+  // ---- Chat history (on join and after every reconnect) ----
+  const loadHistory = useCallback(async () => {
+    try {
+      const result = await listMeetingMessagesAction(sessionId);
+      if (!result.ok || !result.data) throw new Error("load failed");
+      setMessages((current) => mergeMessages(current, result.data!));
+      setChatState("ready");
+    } catch {
+      setChatState("error");
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (connection !== ConnectionState.Connected) return;
+    let cancelled = false;
+    listMeetingMessagesAction(sessionId)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok || !result.data) throw new Error("load failed");
+        setMessages((current) => mergeMessages(current, result.data!));
+        setChatState("ready");
+      })
+      .catch(() => !cancelled && setChatState("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, sessionId]);
+
+  // ---- Server-sent data: chat + reactions; attribute changes: hands ----
+  useEffect(() => {
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const onData = (payload: Uint8Array, participant?: RemoteParticipant) => {
+      if (participant) return; // only the server publishes data in these rooms
+      const message = parseRoomMessage(payload);
+      if (!message) return;
+      if (message.type === "chat") {
+        setMessages((current) => mergeMessages(current, [message]));
+        if (panelRef.current !== "chat" && message.senderId !== viewerId) setUnread((n) => n + 1);
+      } else {
+        const key = `${message.senderId}-${message.at}-${Math.random()}`;
+        setReactions((list) => [...list.slice(-5), { key, name: message.senderId === viewerId ? "You" : message.senderName, emoji: message.emoji }]);
+        const timer = setTimeout(() => {
+          timers.delete(timer);
+          setReactions((list) => list.filter((r) => r.key !== key));
+        }, 4000);
+        timers.add(timer);
+      }
+    };
+    const rerender = () => setTick((n) => n + 1);
+    room.on(RoomEvent.DataReceived, onData);
+    room.on(RoomEvent.ParticipantAttributesChanged, rerender);
+    return () => {
+      room.off(RoomEvent.DataReceived, onData);
+      room.off(RoomEvent.ParticipantAttributesChanged, rerender);
+      for (const t of timers) clearTimeout(t);
+    };
+  }, [room, viewerId]);
+
+  // Tell a batch student when the host gives or takes the floor.
   const prevCanMic = useRef(canMic);
   useEffect(() => {
     if (role === "student" && kind === "batch" && prevCanMic.current !== canMic) {
@@ -179,30 +158,23 @@ export function RoomStage({ sessionId, title, role, kind, endsAt }: RoomStagePro
     prevCanMic.current = canMic;
   }, [canMic, kind, role]);
 
-  // Hard stop at the scheduled end: a host's client ends the meeting for
-  // everyone; a student's client leaves. The server refuses new tokens anyway.
+  // ---- Hard stop at the scheduled end ----
+  // Everyone's client leaves; a host's client also ends it on the server. The
+  // server refuses new tokens after the end, and its sweep (0025) completes the
+  // meeting even if no host is connected.
   useEffect(() => {
-    if (secondsLeft > 0 || endedRef.current) return;
-    endedRef.current = true;
-    if (role !== "student") void endMeetingAction(sessionId).finally(() => room.disconnect());
+    if (secondsLeft > 0 || over.current) return;
+    over.current = true;
+    onMeetingOver();
+    if (isHost) void endMeetingAction(sessionId).finally(() => room.disconnect());
     else void room.disconnect();
-  }, [role, room, secondsLeft, sessionId]);
+  }, [isHost, onMeetingOver, room, secondsLeft, sessionId]);
 
-  const host = participants.find(isHostRole);
-  const { main, strip } = useMemo(() => {
-    const screen = tracks.find((t) => t.source === Track.Source.ScreenShare && isTrackReference(t));
-    const cams = tracks.filter((t) => t.source === Track.Source.Camera);
-    // The main view: a screen share, else the mentor, else an academy co-host.
-    const mentorCam = cams.find((t) => roleOf(t.participant) === "mentor") ?? cams.find((t) => roleOf(t.participant) === "admin");
-    const hostCams = cams.filter((t) => isHostRole(t.participant) && t !== mentorCam);
-    const students = cams.filter((t) => !isHostRole(t.participant));
-    // One-to-one: everyone gets a tile. Batch: only students who are actually
-    // publishing video (a host allowed them), plus your own tile if you are.
-    const visibleStudents = kind === "one_to_one" ? students : students.filter((t) => isTrackReference(t) && !t.publication.isMuted);
-    const mainTrack = screen ?? mentorCam ?? null;
-    const stripTracks = [...(screen && mentorCam ? [mentorCam] : []), ...hostCams, ...visibleStudents];
-    return { main: mainTrack, strip: stripTracks };
-  }, [kind, tracks]);
+  function openPanel(tab: PanelTab) {
+    setPanel((current) => (current === tab ? null : tab));
+    setLastTab(tab);
+    if (tab === "chat") setUnread(0);
+  }
 
   async function toggle(what: "mic" | "camera" | "screen") {
     try {
@@ -212,64 +184,100 @@ export function RoomStage({ sessionId, title, role, kind, endsAt }: RoomStagePro
     } catch (error) {
       const denied = (error as Error)?.name === "NotAllowedError";
       const device = what === "mic" ? "microphone" : what === "camera" ? "camera" : "screen sharing";
-      setNotice({ tone: "alert", text: denied ? `Your browser blocked the ${device}. Allow it in the site settings and try again.` : `We couldn't turn on your ${device}.` });
+      setNotice({ tone: "alert", text: denied ? `Your browser blocked ${device}. Allow it in the site settings and try again.` : `We couldn't turn on your ${device}.` });
     }
   }
 
-  async function moderate(id: string, name: string, action: "allow_audio" | "allow_video" | "revoke" | "mute" | "remove") {
+  async function act(run: () => Promise<{ ok: boolean; error?: { message: string } }>, success?: string) {
+    try {
+      const result = await run();
+      setNotice(result.ok ? (success ? { tone: "status", text: success } : null) : { tone: "alert", text: result.error?.message ?? "That didn't work. Try again." });
+      return result.ok;
+    } catch {
+      setNotice({ tone: "alert", text: "We couldn't reach the server. Check your connection and try again." });
+      return false;
+    }
+  }
+
+  async function sendChat(body: string): Promise<boolean> {
+    const localId = `local-${Date.now()}`;
+    const pendingItem: ChatItem = { id: localId, senderId: viewerId, senderName: "You", body, at: new Date().toISOString(), pending: true };
+    setMessages((m) => mergeMessages(m, [pendingItem]));
+    try {
+      const result = await sendMeetingMessageAction(sessionId, body);
+      if (!result.ok || !result.data) throw new Error(result.error?.message ?? "");
+      setMessages((m) => mergeMessages(m, [result.data!], localId));
+    } catch (error) {
+      setMessages((m) => m.map((x) => (x.id === localId ? { ...x, pending: false, failed: true } : x)));
+      setNotice({ tone: "alert", text: (error as Error)?.message || "Your message wasn't sent. Tap it in the chat to retry." });
+    }
+    return true; // the draft lives on in the list (sent, or failed with retry)
+  }
+
+  async function retryChat(item: ChatItem) {
+    setMessages((m) => m.filter((x) => x.id !== item.id));
+    await sendChat(item.body);
+  }
+
+  function hostAction(identity: string, name: string, action: HostAction) {
     if (action === "remove") {
-      setConfirm({ kind: "remove", id, name });
+      setConfirm({ kind: "remove", identity, name });
       return;
     }
-    const result = await moderateParticipantAction(sessionId, id, action).catch(() => null);
-    setNotice(result?.ok ? { tone: "status", text: `Updated ${name}.` } : { tone: "alert", text: result?.error?.message ?? "We couldn't reach the server. Try again." });
+    void act(() => moderateParticipantAction(sessionId, identity, action), `Updated ${name}.`);
   }
 
   async function runConfirm() {
     if (!confirm) return;
     setBusy(true);
+    setEndError(null);
     try {
       if (confirm.kind === "end") {
         const result = await endMeetingAction(sessionId);
         if (!result.ok) {
-          setNotice({ tone: "alert", text: result.error?.message ?? "We couldn't end the meeting." });
+          // Nothing pretends to have worked: the dialog stays open with the
+          // reason and a retry (ending is safe to repeat).
+          setEndError(result.error?.message ?? "We couldn't end the meeting. Try again.");
           return;
         }
-        endedRef.current = true;
+        over.current = true;
+        onMeetingOver();
+        setConfirm(null);
         await room.disconnect();
       } else {
-        const result = await moderateParticipantAction(sessionId, confirm.id, "remove");
-        setNotice(result.ok ? { tone: "status", text: `${confirm.name} was removed and can't rejoin.` } : { tone: "alert", text: result.error?.message ?? "We couldn't remove them." });
+        const ok = await act(() => moderateParticipantAction(sessionId, confirm.identity, "remove"), `${confirm.name} was removed and can't rejoin.`);
+        if (ok) setConfirm(null);
       }
     } catch {
-      setNotice({ tone: "alert", text: "We couldn't reach the server. Try again." });
+      setEndError("We couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
-      setConfirm(null);
     }
   }
 
-  const controlClass = "min-h-11 min-w-11";
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <RoomAudioRenderer />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[13px] text-ink-secondary">
-          <span className="inline-flex items-center gap-1.5 text-ink">
-            <span aria-hidden="true" className="size-2 rounded-full bg-success" />
-            Live
-          </span>
-          {` · ${participants.length} in the room · ${secondsLeft > 0 ? `${mmss(secondsLeft)} left` : "Ending"}`}
-        </p>
-        <Button type="button" variant="outline" className="min-h-11 lg:hidden" aria-expanded={rosterOpen} aria-controls="meeting-roster" onClick={() => setRosterOpen((v) => !v)}>
-          <Users aria-hidden="true" size={16} />
-          Participants ({participants.length})
-        </Button>
-      </div>
-
       {connection === ConnectionState.Reconnecting && (
         <Alert role="status">
-          <AlertDescription>Connection lost. Reconnecting…</AlertDescription>
+          <AlertDescription>Connection lost. Reconnecting… You&apos;ll be back in the room automatically.</AlertDescription>
+        </Alert>
+      )}
+      {connection === ConnectionState.Connecting && (
+        <Alert role="status">
+          <AlertDescription>Connecting to the meeting…</AlertDescription>
+        </Alert>
+      )}
+      {!hostPresent && connection === ConnectionState.Connected && (
+        <Alert role="status">
+          <AlertDescription>{`${hostName} isn't in the room right now. The meeting stays open until its scheduled end.`}</AlertDescription>
+        </Alert>
+      )}
+      {secondsLeft > 0 && secondsLeft <= 300 && (
+        <Alert role="status">
+          <AlertDescription>
+            The meeting ends in {Math.ceil(secondsLeft / 60)} {Math.ceil(secondsLeft / 60) === 1 ? "minute" : "minutes"}, at its scheduled time.
+          </AlertDescription>
         </Alert>
       )}
       {notice && (
@@ -278,66 +286,88 @@ export function RoomStage({ sessionId, title, role, kind, endsAt }: RoomStagePro
         </Alert>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-        <div className="flex min-w-0 flex-col gap-3">
-          <h2 className="sr-only">{title} — video</h2>
-          {main ? (
-            <Tile trackRef={main} large />
-          ) : (
-            <div className="flex aspect-video items-center justify-center rounded-card bg-ink px-6 text-center text-sm text-white">
-              {host ? "The host's camera is off." : "Waiting for the host to join…"}
-            </div>
-          )}
-          {strip.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {strip.map((t) => (
-                <Tile key={`${t.participant.identity}-${t.source}`} trackRef={t} />
-              ))}
-            </div>
-          )}
-          <div role="toolbar" aria-label="Meeting controls" className="glass-regular flex flex-wrap items-center justify-center gap-2 rounded-panel px-4 py-3">
-            {canMic ? (
-              <Button type="button" variant={isMicrophoneEnabled ? "outline" : "secondary"} className={controlClass} aria-pressed={isMicrophoneEnabled} onClick={() => toggle("mic")}>
-                {isMicrophoneEnabled ? <Mic aria-hidden="true" size={16} /> : <MicOff aria-hidden="true" size={16} />}
-                {isMicrophoneEnabled ? "Mute" : "Unmute"}
-              </Button>
-            ) : (
-              <span className="px-2 text-[13px] text-ink-secondary">You&apos;re listening. Your mentor can let you speak.</span>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section aria-label={`${title} — video`} className="flex min-w-0 flex-col rounded-card bg-ink">
+          <div className="flex items-center justify-between gap-2 px-3 pt-3 text-[12px] text-white">
+            <span className="inline-flex items-center gap-1.5 rounded-pill bg-danger px-2 py-0.5 font-semibold">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-white" /> Live
+            </span>
+            {sharer && (
+              <span className="truncate" role="status">
+                {sharer.participant.isLocal ? "You are sharing your screen" : `${sharer.participant.name || "Someone"} is sharing their screen`}
+              </span>
             )}
-            {canCamera && (
-              <Button type="button" variant={isCameraEnabled ? "outline" : "secondary"} className={controlClass} aria-pressed={isCameraEnabled} onClick={() => toggle("camera")}>
-                {isCameraEnabled ? <Video aria-hidden="true" size={16} /> : <VideoOff aria-hidden="true" size={16} />}
-                {isCameraEnabled ? "Stop video" : "Start video"}
-              </Button>
-            )}
-            {canScreen && (
-              <Button type="button" variant="outline" className={controlClass} aria-pressed={isScreenShareEnabled} onClick={() => toggle("screen")}>
-                <MonitorUp aria-hidden="true" size={16} />
-                {isScreenShareEnabled ? "Stop sharing" : "Share screen"}
-              </Button>
-            )}
-            <Button type="button" variant="outline" className={controlClass} onClick={() => room.disconnect()}>
-              <PhoneOff aria-hidden="true" size={16} />
-              Leave
-            </Button>
-            {role !== "student" && (
-              <Button type="button" variant="destructive" className={controlClass} onClick={() => setConfirm({ kind: "end" })}>
-                End meeting for all
-              </Button>
+            <span className="inline-flex items-center gap-2">
+              <span>{formatClock(secondsLeft)} left</span>
+              <Signal aria-hidden="true" size={14} className={connection === ConnectionState.Connected ? "text-success" : "text-warning"} />
+              <span className="sr-only">{connection === ConnectionState.Connected ? "Connected" : "Reconnecting"}</span>
+            </span>
+          </div>
+          <div className="relative flex min-h-[260px] flex-1 flex-col p-3 sm:min-h-[360px]">
+            <VideoGrid tracks={tracks} />
+            {reactions.length > 0 && (
+              <ul aria-live="polite" aria-label="Reactions" className="pointer-events-none absolute bottom-4 left-4 flex flex-col gap-1">
+                {reactions.map((r) => (
+                  <li key={r.key} className="inline-flex w-fit items-center gap-1.5 rounded-pill bg-ink/80 px-2.5 py-1 text-[13px] text-white motion-safe:animate-in motion-safe:fade-in">
+                    <span className="text-[18px]" aria-hidden="true">
+                      {r.emoji}
+                    </span>
+                    {r.name}
+                    <span className="sr-only">reacted {r.emoji}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
+          <MeetingToolbar
+            isHost={isHost}
+            micOn={isMicrophoneEnabled}
+            camOn={isCameraEnabled}
+            sharing={isScreenShareEnabled}
+            canMic={canMic}
+            canCamera={canCamera}
+            canScreen={canScreen}
+            someoneElseSharing={sharer && !sharer.participant.isLocal ? sharer.participant.name || "Someone" : null}
+            handUp={handUp}
+            panelOpen={panel}
+            participantCount={participants.length}
+            unread={unread}
+            onMic={() => toggle("mic")}
+            onCamera={() => toggle("camera")}
+            onShare={() => toggle("screen")}
+            onHand={() => void act(() => setMyHandAction(sessionId, !handUp), handUp ? undefined : "Your hand is raised. The host can see it.")}
+            onPanel={openPanel}
+            onReact={(emoji) => void act(() => sendReactionAction(sessionId, emoji))}
+            onMuteAll={() => void act(() => muteAllStudentsAction(sessionId), "Muted every student's microphone.")}
+            onLowerAll={() => void act(() => lowerAllHandsAction(sessionId), "Lowered all hands.")}
+            onLeave={() => room.disconnect()}
+            onEnd={() => {
+              setEndError(null);
+              setConfirm({ kind: "end" });
+            }}
+          />
+        </section>
+        <div className={panel ? "block" : "hidden"}>
+          <MeetingSidePanel
+            tab={panel ?? lastTab}
+            onTab={(t) => {
+              setPanel(t);
+              setLastTab(t);
+              if (t === "chat") setUnread(0);
+            }}
+            participants={participants}
+            kind={kind}
+            canModerate={isHost}
+            onHostAction={hostAction}
+            messages={messages}
+            chatState={chatState}
+            onReloadChat={loadHistory}
+            onSend={sendChat}
+            onRetry={retryChat}
+            viewerId={viewerId}
+            unread={unread}
+          />
         </div>
-
-        <aside id="meeting-roster" aria-label="Participants" className={cn("glass-regular flex-col rounded-card lg:flex", rosterOpen ? "flex" : "hidden")}>
-          <h2 className="px-4 pt-4 pb-2 text-[13px] font-semibold tracking-[0.04em] text-ink-secondary uppercase">Participants ({participants.length})</h2>
-          <ul className="flex max-h-[60vh] flex-col divide-y divide-hairline overflow-y-auto pb-2">
-            {[...participants]
-              .sort((a, b) => Number(isHostRole(b)) - Number(isHostRole(a)) || (a.name ?? "").localeCompare(b.name ?? ""))
-              .map((p) => (
-                <RosterRow key={p.identity} p={p} isHost={isHostRole(p)} canModerate={role !== "student"} kind={kind} onAction={moderate} />
-              ))}
-          </ul>
-        </aside>
       </div>
 
       <Dialog open={confirm !== null} onOpenChange={(open) => !open && !busy && setConfirm(null)}>
@@ -345,16 +375,39 @@ export function RoomStage({ sessionId, title, role, kind, endsAt }: RoomStagePro
           <DialogHeader>
             <DialogTitle>{confirm?.kind === "end" ? "End the meeting for everyone?" : `Remove ${confirm?.kind === "remove" ? confirm.name : ""}?`}</DialogTitle>
             <DialogDescription>
-              {confirm?.kind === "end" ? "Everyone is disconnected and the meeting moves to Past. Attendance is saved." : "They're disconnected and can't rejoin this meeting."}
+              {confirm?.kind === "end"
+                ? "Everyone is disconnected, no one can join again, and attendance is finalized (present = 75% of the scheduled time). To step out without ending it, choose Leave without ending."
+                : "They're disconnected and can't rejoin this meeting."}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          {endError && (
+            <Alert variant="destructive" role="alert">
+              <AlertDescription>{endError}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter className="gap-2 sm:justify-between">
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setConfirm(null)} disabled={busy}>
-              Keep going
+              Cancel
             </Button>
-            <Button type="button" variant="destructive" className="min-h-11" onClick={runConfirm} disabled={busy}>
-              {busy ? "Working…" : confirm?.kind === "end" ? "End meeting" : "Remove"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {confirm?.kind === "end" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={busy}
+                  onClick={() => {
+                    setConfirm(null);
+                    void room.disconnect();
+                  }}
+                >
+                  Leave without ending
+                </Button>
+              )}
+              <Button type="button" variant="destructive" className="min-h-11" onClick={runConfirm} disabled={busy}>
+                {busy ? "Working…" : confirm?.kind === "end" ? (endError ? "Try again" : "End for everyone") : "Remove"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

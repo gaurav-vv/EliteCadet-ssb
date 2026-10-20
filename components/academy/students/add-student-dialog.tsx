@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addAcademyStudentAction } from "@/lib/actions/academy-people";
+import { localMailboxUrl } from "@/lib/supabase/env";
 
 const TOAST_MS = 5000;
 
@@ -49,7 +50,8 @@ export function AddStudentDialog({ variant = "primary" }: { variant?: "primary" 
       }
       setOpen(false);
       reset();
-      setToast(result.data?.invited ? `Invite sent to ${result.data.name}.` : `${result.data?.name ?? "The student"} joined your academy.`);
+      const captured = localMailboxUrl() ? ` Local development: the email is in Mailpit (${localMailboxUrl()}), not a real inbox.` : "";
+      setToast(result.data?.invited ? `Invite sent to ${result.data.name}.${captured}` : `${result.data?.name ?? "The student"} joined your academy.`);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setToast(null), TOAST_MS);
       router.refresh();

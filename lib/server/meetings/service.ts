@@ -1,12 +1,13 @@
 // Live meeting rooms (T094, specs.md §8a.4h): who may join, when, with which
 // media permissions, and the mentor's controls. Everything is decided here on
 // the server from the signed-in account and the server clock; the database
-// (0022_live_meetings.sql) enforces the same rules again.
+// (0022–0025 migrations) enforces the same rules again. Chat and reactions are
+// authorized here and broadcast by the server; clients cannot publish data.
 
 import { getActor, type Actor } from "@/lib/server/auth/guard";
 import * as livekit from "@/lib/server/meetings/livekit";
 import { meetingDbError } from "@/lib/server/meetings/errors";
-import { SESSION_COLUMNS, toSession } from "@/lib/server/sessions/service";
+import { SESSION_COLUMNS, toSession, withHostNames } from "@/lib/server/sessions/service";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
 import { isUuid } from "@/lib/server/users/validation";
 import { createClient } from "@/lib/supabase/server";
@@ -35,7 +36,7 @@ async function loadMeeting(actor: Actor, id: string): Promise<ServiceResult<Sess
   const session = data ? toSession(data) : null;
   if (!session || !session.meetingKind) return fail("not_found", NOT_FOUND);
   if (role === "mentor" && session.mentorId !== actor.id) return fail("not_found", NOT_FOUND);
-  return { ok: true, data: session };
+  return { ok: true, data: (await withHostNames([session]))[0] };
 }
 
 function participantRole(actor: Actor): livekit.ParticipantRole {
@@ -73,6 +74,8 @@ export interface MeetingView {
   viewer: { id: string; role: livekit.ParticipantRole };
   join: JoinState;
   opensAt: string;
+  // How many students the meeting is for (whole batch as enrolled now, or 1).
+  audienceCount: number | null;
 }
 
 export async function getMeetingView(id: string): Promise<ServiceResult<MeetingView>> {
@@ -98,7 +101,9 @@ export async function getMeetingView(id: string): Promise<ServiceResult<MeetingV
 
   if (join === "open" && role === "student" && (await isRemoved(s.id, actor.id))) join = "removed";
   if (join === "open" && !livekit.liveKitConfig()) join = "not_configured";
-  return { ok: true, data: { session: s, viewer: { id: actor.id, role }, join, opensAt } };
+  const supabase = await createClient();
+  const { data: count } = await supabase.rpc("live_meeting_audience_count", { p_session: s.id });
+  return { ok: true, data: { session: s, viewer: { id: actor.id, role }, join, opensAt, audienceCount: typeof count === "number" ? count : null } };
 }
 
 async function isRemoved(sessionId: string, userId: string): Promise<boolean> {
@@ -177,25 +182,40 @@ async function myLiveMeeting(id: string): Promise<ServiceResult<{ session: Sessi
   return { ok: true, data: { session: found.data, cfg } };
 }
 
+export const ROOM_CLOSE_FAILED = "The meeting is ended in EliteCadet, but the video service didn't confirm that everyone was disconnected. Press End again to retry.";
+
+// Ends the meeting for everyone. Two steps, both safe to repeat:
+//  1. the database (end_live_meeting): completed, server end time, open
+//     attendance closed, 75% attendance finalized — idempotent;
+//  2. the video room is deleted, which disconnects every participant.
+// Success is reported only when BOTH succeeded; if the room couldn't be
+// deleted the caller gets an error and can simply retry.
 export async function endMeeting(id: string): Promise<ServiceResult<null>> {
   const actor = await hostActor();
   if (!actor) return fail("unauthorized", "Only the meeting's mentor or academy admin can end it.");
   const found = await loadMeeting(actor, id);
   if (!found.ok || !found.data) return found as ServiceResult<never>;
   if (!found.data.actualStartedAt) return fail("validation_error", "This meeting hasn't started. Cancel it instead if it isn't happening.");
+  if (found.data.status === "cancelled") return fail("validation_error", "This meeting was cancelled.");
   const supabase = await createClient();
   const { error } = await supabase.rpc("end_live_meeting", { p_session: id });
   if (error) return meetingDbError(error, "We couldn't end the meeting. Please try again.");
   const cfg = livekit.liveKitConfig();
-  if (cfg) {
-    // The record is already final; a provider hiccup only delays the hang-up.
-    await livekit.closeRoom(cfg, id).catch((e: Error) => console.error(`[meetings] close room failed: ${e?.message ?? "unknown"}`));
+  if (!cfg) return { ok: true, data: null }; // no video service = no room to close
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await livekit.closeRoom(cfg, id);
+      return { ok: true, data: null };
+    } catch (e) {
+      console.error(`[meetings] close room failed (attempt ${attempt}): ${(e as Error)?.message ?? "unknown"}`);
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+    }
   }
-  return { ok: true, data: null };
+  return fail("server_error", ROOM_CLOSE_FAILED);
 }
 
-export type ModerationAction = "allow_audio" | "allow_video" | "revoke" | "mute" | "remove";
-const ACTIONS: ModerationAction[] = ["allow_audio", "allow_video", "revoke", "mute", "remove"];
+export type ModerationAction = "allow_audio" | "allow_video" | "revoke" | "mute" | "remove" | "lower_hand";
+const ACTIONS: ModerationAction[] = ["allow_audio", "allow_video", "revoke", "mute", "remove", "lower_hand"];
 
 // Only students in this meeting's audience can be targeted, never the mentor.
 async function isAudienceMember(session: SessionRecord, studentId: string): Promise<boolean> {
@@ -229,6 +249,9 @@ export async function moderateParticipant(id: string, studentId: string, action:
       case "mute":
         await livekit.muteAudio(cfg, s.id, studentId);
         break;
+      case "lower_hand":
+        await livekit.setHandRaised(cfg, s.id, studentId, false);
+        break;
       case "remove": {
         const actor = await getActor();
         const supabase = await createClient();
@@ -247,6 +270,150 @@ export async function moderateParticipant(id: string, studentId: string, action:
   return { ok: true, data: null };
 }
 
+// ---- Host: whole-room controls ----------------------------------------------------
+
+export async function muteAllStudents(id: string): Promise<ServiceResult<{ muted: number }>> {
+  const live = await myLiveMeeting(id);
+  if (!live.ok || !live.data) return live as ServiceResult<never>;
+  const { session: s, cfg } = live.data;
+  if (s.status !== "scheduled" || !s.actualStartedAt || s.actualEndedAt) return fail("validation_error", "This meeting isn't live.");
+  try {
+    const people = await livekit.connectedIdentities(cfg, s.id);
+    const students = [];
+    for (const p of people) if (await isAudienceMember(s, p.identity)) students.push(p.identity);
+    await Promise.all(students.map((identity) => livekit.muteAudio(cfg, s.id, identity).catch(() => undefined)));
+    return { ok: true, data: { muted: students.length } };
+  } catch (error) {
+    console.error(`[meetings] mute all failed: ${(error as Error)?.message ?? "unknown"}`);
+    return fail("server_error", PROVIDER_DOWN);
+  }
+}
+
+export async function lowerAllHands(id: string): Promise<ServiceResult<{ lowered: number }>> {
+  const live = await myLiveMeeting(id);
+  if (!live.ok || !live.data) return live as ServiceResult<never>;
+  const { session: s, cfg } = live.data;
+  try {
+    const raised = (await livekit.connectedIdentities(cfg, s.id)).filter((p) => p.handRaised);
+    await Promise.all(raised.map((p) => livekit.setHandRaised(cfg, s.id, p.identity, false).catch(() => undefined)));
+    return { ok: true, data: { lowered: raised.length } };
+  } catch (error) {
+    console.error(`[meetings] lower hands failed: ${(error as Error)?.message ?? "unknown"}`);
+    return fail("server_error", PROVIDER_DOWN);
+  }
+}
+
+// ---- Everyone in the meeting: chat, reactions, raise hand ------------------------
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  body: string;
+  at: string;
+}
+
+// Someone who may take part right now: the meeting is live and they are its
+// host mentor, an admin of its academy, or a (not removed) student of it.
+async function liveParticipant(id: string): Promise<ServiceResult<{ actor: Actor; session: SessionRecord; cfg: livekit.LiveKitConfig }>> {
+  const actor = await getActor();
+  if (!actor) return fail("unauthorized", "Please sign in again.");
+  const found = await loadMeeting(actor, id);
+  if (!found.ok || !found.data) return found as ServiceResult<never>;
+  const s = found.data;
+  if (s.status !== "scheduled" || !s.actualStartedAt || s.actualEndedAt || Date.now() >= Date.parse(s.endsAt)) return fail("validation_error", "This meeting isn't live.");
+  if (actor.profile.role === "student" && (await isRemoved(s.id, actor.id))) return fail("not_found", NOT_FOUND);
+  const cfg = livekit.liveKitConfig();
+  if (!cfg) return fail("not_set_up", NOT_CONFIGURED);
+  return { ok: true, data: { actor, session: s, cfg } };
+}
+
+const toMessage = (r: Record<string, unknown>): ChatMessage => ({
+  id: String(r.id),
+  senderId: String(r.sender_id),
+  senderName: typeof r.sender_name === "string" ? r.sender_name : typeof r.full_name === "string" && r.full_name ? r.full_name : "Participant",
+  body: String(r.body),
+  at: String(r.created_at),
+});
+
+// History for this meeting (RLS: live_messages_read), oldest first.
+export async function listMessages(id: string): Promise<ServiceResult<ChatMessage[]>> {
+  const actor = await getActor();
+  if (!actor) return fail("unauthorized", "Please sign in again.");
+  const found = await loadMeeting(actor, id);
+  if (!found.ok || !found.data) return found as ServiceResult<never>;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("live_meeting_messages")
+    .select("id, sender_id, body, created_at, sender:profiles!live_meeting_messages_sender_id_fkey(full_name)")
+    .eq("session_id", id)
+    .order("created_at", { ascending: true })
+    .limit(500);
+  if (error) return mapDbError(error, "We couldn't load the chat. Please try again.");
+  return {
+    ok: true,
+    data: (data ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      const sender = (Array.isArray(row.sender) ? row.sender[0] : row.sender) as Record<string, unknown> | null;
+      return toMessage({ ...row, full_name: sender?.full_name });
+    }),
+  };
+}
+
+// Stored first (post_live_meeting_message checks membership, live state and
+// rate), then broadcast. If the broadcast fails the message is still saved and
+// everyone gets it on their next history load.
+export async function sendMessage(id: string, body: unknown): Promise<ServiceResult<ChatMessage>> {
+  const text = typeof body === "string" ? body.trim() : "";
+  if (text.length < 1 || text.length > 1000) return fail("validation_error", "Messages are 1–1,000 characters.");
+  const live = await liveParticipant(id);
+  if (!live.ok || !live.data) return live as ServiceResult<never>;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("post_live_meeting_message", { p_session: id, p_body: text });
+  const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+  if (error || !row) return error?.code === "MT010" ? fail("validation_error", "You're sending messages very fast. Wait a moment.") : meetingDbError(error ?? {}, "We couldn't send your message. Please try again.");
+  const message = toMessage(row);
+  await livekit
+    .broadcast(live.data.cfg, id, { type: "chat", ...message })
+    .catch((e: Error) => console.error(`[meetings] chat broadcast failed: ${e?.message ?? "unknown"}`));
+  return { ok: true, data: message };
+}
+
+export const REACTIONS = ["👍", "👏", "❤️", "😂", "😮", "🎉", "✅", "❌", "❓", "🙏", "💡", "☕"] as const;
+const recentReactions = new Map<string, number[]>();
+
+export async function sendReaction(id: string, emoji: unknown): Promise<ServiceResult<null>> {
+  if (!REACTIONS.includes(emoji as (typeof REACTIONS)[number])) return fail("validation_error", "Choose one of the reactions.");
+  const live = await liveParticipant(id);
+  if (!live.ok || !live.data) return live as ServiceResult<never>;
+  const { actor, cfg } = live.data;
+  const now = Date.now();
+  const mine = (recentReactions.get(actor.id) ?? []).filter((t) => now - t < 10_000);
+  if (mine.length >= 10) return fail("validation_error", "That's a lot of reactions. Wait a moment.");
+  recentReactions.set(actor.id, [...mine, now]);
+  try {
+    await livekit.broadcast(cfg, id, { type: "reaction", senderId: actor.id, senderName: actor.profile.fullName?.trim() || "Participant", emoji: emoji as string, at: new Date(now).toISOString() });
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error(`[meetings] reaction failed: ${(error as Error)?.message ?? "unknown"}`);
+    return fail("server_error", PROVIDER_DOWN);
+  }
+}
+
+// Raise or lower your own hand (shown to everyone; hosts can lower it).
+export async function setMyHand(id: string, raised: unknown): Promise<ServiceResult<null>> {
+  const live = await liveParticipant(id);
+  if (!live.ok || !live.data) return live as ServiceResult<never>;
+  try {
+    await livekit.setHandRaised(live.data.cfg, id, live.data.actor.id, raised === true);
+    return { ok: true, data: null };
+  } catch (error) {
+    if ((error as { status?: number })?.status === 404) return fail("validation_error", "Join the meeting first.");
+    console.error(`[meetings] raise hand failed: ${(error as Error)?.message ?? "unknown"}`);
+    return fail("server_error", PROVIDER_DOWN);
+  }
+}
+
 // ---- Attendance -------------------------------------------------------------------
 
 export interface MeetingAttendanceRow {
@@ -255,12 +422,18 @@ export interface MeetingAttendanceRow {
   role: "mentor" | "admin" | "student";
   firstJoinedAt: string;
   lastLeftAt: string | null; // null = still in the room
-  minutes: number;
+  minutes: number; // eligible connected time (union of visits inside the scheduled window)
+  requiredMinutes: number; // 75% of the scheduled duration
   joins: number;
+  // Students only, once the meeting has ended: the 75% rule's result, or the
+  // mentor's own mark (which is never overwritten).
+  status: "present" | "absent" | "excused" | null;
+  markedByMentor: boolean;
 }
 
-// From LiveKit's signed webhooks (record_live_meeting_event). The mentor of the
-// meeting and their academy admin can read it (RLS: live_attendance_read).
+// Connected time from LiveKit's signed webhooks, computed in the database
+// (live_meeting_attendance_summary, 0025). The meeting's mentor and their
+// academy admin can read it.
 export async function getMeetingAttendance(id: string): Promise<ServiceResult<MeetingAttendanceRow[]>> {
   const actor = await getActor();
   if (!actor || (actor.profile.role !== "mentor" && actor.profile.role !== "academy_admin")) return fail("unauthorized", "Only staff can view meeting attendance.");
@@ -269,9 +442,10 @@ export async function getMeetingAttendance(id: string): Promise<ServiceResult<Me
   if (!found.ok || !found.data) return found as ServiceResult<never>;
   const supabase = await createClient();
   const mentorId = found.data.mentorId;
-  const rows = await supabase.from("live_meeting_attendance").select("user_id, joined_at, left_at").eq("session_id", id).order("joined_at");
+  const rows = await supabase.rpc("live_meeting_attendance_summary", { p_session: id });
   if (rows.error) return mapDbError(rows.error, "We couldn't load attendance. Please try again.");
-  const ids = [...new Set((rows.data ?? []).map((r) => r.user_id as string))];
+  const list = (rows.data ?? []) as Record<string, unknown>[];
+  const ids = list.map((r) => String(r.user_id));
   const names = new Map<string, string>();
   const admins = new Set<string>();
   if (ids.length > 0) {
@@ -281,20 +455,25 @@ export async function getMeetingAttendance(id: string): Promise<ServiceResult<Me
       if (p.role === "academy_admin") admins.add(p.id as string);
     }
   }
-
-  const now = Date.now();
-  const byUser = new Map<string, MeetingAttendanceRow>();
-  for (const r of (rows.data ?? []) as { user_id: string; joined_at: string; left_at: string | null }[]) {
-    const end = r.left_at ? Date.parse(r.left_at) : now;
-    const minutes = Math.max(0, (end - Date.parse(r.joined_at)) / 60_000);
-    const cur = byUser.get(r.user_id);
-    if (!cur) {
-      byUser.set(r.user_id, { userId: r.user_id, name: names.get(r.user_id) ?? "Participant", role: r.user_id === mentorId ? "mentor" : admins.has(r.user_id) ? "admin" : "student", firstJoinedAt: r.joined_at, lastLeftAt: r.left_at, minutes, joins: 1 });
-    } else {
-      cur.minutes += minutes;
-      cur.joins += 1;
-      cur.lastLeftAt = cur.lastLeftAt === null || r.left_at === null ? null : r.left_at > cur.lastLeftAt ? r.left_at : cur.lastLeftAt;
-    }
-  }
-  return { ok: true, data: [...byUser.values()].map((r) => ({ ...r, minutes: Math.round(r.minutes) })).sort((a, b) => Number(b.role !== "student") - Number(a.role !== "student") || a.name.localeCompare(b.name)) };
+  return {
+    ok: true,
+    data: list
+      .map((r): MeetingAttendanceRow => {
+        const userId = String(r.user_id);
+        const role = userId === mentorId ? "mentor" : admins.has(userId) ? "admin" : "student";
+        return {
+          userId,
+          name: names.get(userId) ?? "Participant",
+          role,
+          firstJoinedAt: String(r.first_joined_at),
+          lastLeftAt: r.still_connected === true ? null : typeof r.last_left_at === "string" ? r.last_left_at : null,
+          minutes: Math.floor(Number(r.connected_seconds ?? 0) / 60),
+          requiredMinutes: Math.ceil(Number(r.required_seconds ?? 0) / 60),
+          joins: Number(r.joins ?? 1),
+          status: role === "student" && (r.status === "present" || r.status === "absent" || r.status === "excused") ? r.status : null,
+          markedByMentor: r.marked_by_mentor === true,
+        };
+      })
+      .sort((a, b) => Number(b.role !== "student") - Number(a.role !== "student") || a.name.localeCompare(b.name)),
+  };
 }

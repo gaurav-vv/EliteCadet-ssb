@@ -3,7 +3,7 @@
 // lib/server/meetings/service.ts and the webhook route, never by a
 // "use client" file.
 
-import { AccessToken, RoomServiceClient, TrackSource, TrackType, WebhookReceiver, type VideoGrant } from "livekit-server-sdk";
+import { AccessToken, DataPacket_Kind, RoomServiceClient, TrackSource, TrackType, WebhookReceiver, type VideoGrant } from "livekit-server-sdk";
 import type { MeetingKind } from "@/types/sessions";
 
 export interface LiveKitConfig {
@@ -73,8 +73,12 @@ export async function createJoinToken(cfg: LiveKitConfig, input: { sessionId: st
   return token.toJwt();
 }
 
+// Every server→LiveKit call is bounded: a hung video service must surface as
+// an error the host can retry (End meeting, moderation), never a spinner.
+const REQUEST_TIMEOUT_SECONDS = 6;
+
 function rooms(cfg: LiveKitConfig) {
-  return new RoomServiceClient(httpUrl(cfg.url), cfg.apiKey, cfg.apiSecret);
+  return new RoomServiceClient(httpUrl(cfg.url), cfg.apiKey, cfg.apiSecret, { requestTimeout: REQUEST_TIMEOUT_SECONDS });
 }
 
 // Created by the mentor's start, with a hard participant cap (students + the
@@ -114,6 +118,31 @@ export async function removeFromRoom(cfg: LiveKitConfig, sessionId: string, iden
     await rooms(cfg).removeParticipant(roomNameFor(sessionId), identity);
   } catch (error) {
     if (!isNotFound(error)) throw error;
+  }
+}
+
+// Server-to-room messages (chat rows, reactions). Clients have no data-publish
+// permission, so every message in a room was authorized and sent from here.
+export type RoomMessage =
+  | { type: "chat"; id: string; senderId: string; senderName: string; body: string; at: string }
+  | { type: "reaction"; senderId: string; senderName: string; emoji: string; at: string };
+
+export async function broadcast(cfg: LiveKitConfig, sessionId: string, message: RoomMessage): Promise<void> {
+  await rooms(cfg).sendData(roomNameFor(sessionId), new TextEncoder().encode(JSON.stringify(message)), DataPacket_Kind.RELIABLE, { topic: message.type });
+}
+
+// Raised hand = a participant attribute every client sees (late joiners too).
+export async function setHandRaised(cfg: LiveKitConfig, sessionId: string, identity: string, raised: boolean): Promise<void> {
+  await rooms(cfg).updateParticipant(roomNameFor(sessionId), identity, { attributes: { hand: raised ? "raised" : "" } });
+}
+
+export async function connectedIdentities(cfg: LiveKitConfig, sessionId: string): Promise<{ identity: string; handRaised: boolean }[]> {
+  try {
+    const list = await rooms(cfg).listParticipants(roomNameFor(sessionId));
+    return list.map((p) => ({ identity: p.identity, handRaised: p.attributes?.hand === "raised" }));
+  } catch (error) {
+    if (isNotFound(error)) return [];
+    throw error;
   }
 }
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LocalMailboxNote } from "@/components/auth/local-mailbox-note";
 import { requestPasswordReset } from "@/lib/api/auth";
 
 const REASON_MESSAGES: Record<string, string> = {
@@ -40,6 +41,7 @@ export function ForgotPasswordForm({ reason }: { reason?: string }) {
         <p className="text-sm text-ink-secondary">
           If an account exists for {email}, we&apos;ve sent a link to reset your password.
         </p>
+        <LocalMailboxNote />
         <Button asChild variant="outline" size="sm">
           <Link href="/login">Back to login</Link>
         </Button>

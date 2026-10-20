@@ -649,11 +649,31 @@ workspaces:
 |---|---|---|
 | `SUPER_ADMIN` | `/admin` | The entire platform: all users, academies, global learning content, permissions, platform analytics, system configuration |
 | `ACADEMY_ADMIN` | `/academy` | Their own academy only: batches, students, mentor-to-batch assignment, academy content, academy/batch performance |
-| `MENTOR` | `/mentor` | Their own teaching content and schedule; evaluates and monitors only the batches/students assigned to them |
+| `MENTOR` | `/mentor` | Their own teaching content and schedule; evaluates and monitors only the batches/students assigned to them. Two kinds (decided 2026-10-20): **academy mentors** (belong to an academy, assigned to its batches) and **independent mentors** (no academy) |
 | `STUDENT` | `/student` | Their own academy, batch, mentors, available content, sessions, assessments, submissions, feedback, progress, notifications |
 
 The UI must make it immediately clear which role is signed in (sidebar and header role label) and
 what that role may manage.
+
+**Mentor types (decided 2026-10-20).**
+- **Academy mentor:**
+  - Invited by an academy admin, always into that admin's own academy.
+  - Assigned to its batches; sees only those batches' students.
+- **Independent mentor:**
+  - Belongs to no academy. Only a Super Admin invites one (User Management → "Invite an
+    independent mentor").
+  - Never added to an academy automatically. Sees no academy's batches, students, sessions or
+    data.
+  - Can use: the Library (platform content for mentors), their own content, content requests,
+    profile and notifications.
+  - Mentees, sessions and live meetings, assessments, evaluations and assigning content come from
+    an academy's batches, so they stay empty, with a dashboard notice saying so.
+  - A Super Admin can later move them into an academy, which makes them an academy mentor.
+  - Working with students without an academy is not part of the product yet.
+- **Rules for both:**
+  - Moving anyone into, out of, or between academies removes their batch memberships in the old
+    academy in the same database transaction (0024).
+  - Academy admins can't see, invite or assign independent mentors.
 
 ### 8a.2 Authorization chain
 
@@ -699,7 +719,8 @@ batches, content or analytics.
   - Suspend or reactivate an academy, with confirmation.
   - Manage members: add an existing account by email as Student, Mentor or Academy Admin; move
     someone between academies; remove a student.
-  - A Mentor or Academy Admin can't be left without an academy: change their role first.
+  - An Academy Admin can't be left without an academy: change their role first. A mentor removed
+    from an academy becomes an independent mentor, and their batch assignments are dropped.
   - A user's academy can also be changed from their User Management page.
   - Every change is audited.
 - **Academy Admin** (`/academy/settings`): edits their own academy's name, description and contact
@@ -1094,13 +1115,29 @@ WebRTC, LiveKit Cloud, India region), instead of a pasted meeting link.
   - Nobody else can join, even with the link. Cancelled sessions issue no tokens.
   - The LiveKit API secret stays on the server.
 - **In the room:**
-  - Camera, microphone, screen share and chat. Chat is deferred, see T094.
+  - Camera, microphone, screen share (host), stored chat, emoji reactions, raise hand.
+  - Layout: `session_ref.png` (session details | video grid | Participants/Chat).
+  - Chat and reactions are authorized and broadcast by the server; clients can't publish data.
   - The mentor is the host and can mute or remove a participant. A removed student can't rejoin.
   - Students join muted.
   - In batch meetings, students join listen-only. The mentor lets an individual student speak or
     share video, and can take it back.
-- **Attendance:** joining a room counts as being present for attendance. The mentor can still
-  correct it.
+- **Attendance (decided 2026-10-20, replaces "joining counts as present"):**
+  - Present means eligible connected time is at least **75% of the scheduled duration**.
+    - Eligible time is the union of the student's visits inside the scheduled window, taken from
+      LiveKit's signed webhooks.
+  - Absent otherwise, decided only once the meeting has ended.
+  - Stored in `session_attendance` with the seconds kept for audit.
+  - A mentor's own mark is kept.
+  - Same rule for one-to-one and batch meetings.
+- **Ending (decided 2026-10-20):**
+  - **Leave** disconnects only you.
+  - **End meeting for everyone** (host mentor or academy admin, with confirmation): completes the
+    meeting, disconnects everyone, refuses rejoining and finalizes attendance.
+  - It reports failure if the video room couldn't be closed, and is safe to retry.
+  - The scheduled end is enforced on the server too.
+- **Batch meetings** appear automatically for every student currently enrolled in the batch (no
+  per-student invitation). Students who leave the batch lose access; new ones gain it.
 - **Existing links:** a pasted external link stays possible as a fallback for sessions created
   before rooms existed.
 

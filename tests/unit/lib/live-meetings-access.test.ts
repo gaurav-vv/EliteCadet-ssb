@@ -16,6 +16,9 @@ vi.mock("@/lib/server/meetings/livekit", () => ({
   setPublishLevel: vi.fn(async () => undefined),
   muteAudio: vi.fn(async () => undefined),
   removeFromRoom: vi.fn(async () => undefined),
+  broadcast: vi.fn(async () => undefined),
+  setHandRaised: vi.fn(async () => undefined),
+  connectedIdentities: vi.fn(async () => []),
 }));
 
 import { getActor } from "@/lib/server/auth/guard";
@@ -62,6 +65,10 @@ beforeEach(() => {
   vi.mocked(getActor).mockReset();
   vi.mocked(livekit.createJoinToken).mockClear();
   vi.mocked(livekit.setPublishLevel).mockClear();
+  vi.mocked(livekit.closeRoom).mockReset();
+  vi.mocked(livekit.closeRoom).mockResolvedValue(undefined);
+  vi.mocked(livekit.broadcast).mockClear();
+  vi.mocked(livekit.setHandRaised).mockClear();
   db.queue = [];
   db.eqCalls = [];
   db.from.mockReset();
@@ -206,5 +213,112 @@ describe("academy admin scheduling", () => {
     expect((await sessions.cancelAcademyMeeting(MEETING, "Room clash")).ok).toBe(true);
     expect(db.rpc).toHaveBeenCalledWith("cancel_live_meeting", { p_session: MEETING, p_reason: "Room clash" });
     expect(db.eqCalls).toContainEqual(["academy_id", ACADEMY]);
+  });
+});
+
+describe("ending a meeting", () => {
+  const live = () => meetingRow({ actual_started_at: new Date().toISOString() });
+
+  it("lets the host end it: database first, then the room is closed for everyone", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor", MENTOR));
+    db.queue.push({ data: live(), error: null });
+    db.rpc.mockResolvedValue({ data: true, error: null });
+    expect((await meetings.endMeeting(MEETING)).ok).toBe(true);
+    expect(db.rpc).toHaveBeenCalledWith("end_live_meeting", { p_session: MEETING });
+    expect(livekit.closeRoom).toHaveBeenCalledWith(expect.anything(), MEETING);
+  });
+
+  it("never lets a student end it for everyone", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student", STUDENT));
+    expect((await meetings.endMeeting(MEETING)).error?.code).toBe("unauthorized");
+    expect(db.rpc).not.toHaveBeenCalled();
+    expect(livekit.closeRoom).not.toHaveBeenCalled();
+  });
+
+  it("treats another mentor's meeting as not found", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor", OTHER_MENTOR));
+    db.queue.push({ data: live(), error: null });
+    expect((await meetings.endMeeting(MEETING)).error?.code).toBe("not_found");
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a meeting that never started (cancel it instead)", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor", MENTOR));
+    db.queue.push({ data: meetingRow(), error: null });
+    expect((await meetings.endMeeting(MEETING)).error?.message).toMatch(/hasn't started/);
+  });
+
+  it("reports failure — never success — when the video room can't be closed, and a retry succeeds", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor", MENTOR));
+    db.rpc.mockResolvedValue({ data: true, error: null });
+    vi.mocked(livekit.closeRoom).mockRejectedValue(new Error("connect ECONNREFUSED"));
+    db.queue.push({ data: live(), error: null });
+    const failed = await meetings.endMeeting(MEETING);
+    expect(failed.ok).toBe(false);
+    expect(failed.error?.message).toBe(meetings.ROOM_CLOSE_FAILED);
+    expect(livekit.closeRoom).toHaveBeenCalledTimes(3);
+
+    // Retrying is safe: the database step is idempotent (already completed).
+    vi.mocked(livekit.closeRoom).mockReset();
+    vi.mocked(livekit.closeRoom).mockResolvedValue(undefined);
+    db.queue.push({ data: meetingRow({ actual_started_at: new Date().toISOString(), status: "completed", actual_ended_at: new Date().toISOString() }), error: null });
+    expect((await meetings.endMeeting(MEETING)).ok).toBe(true);
+    expect(db.rpc).toHaveBeenLastCalledWith("end_live_meeting", { p_session: MEETING });
+  });
+
+  it("surfaces a database refusal instead of closing the room", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("academy_admin"));
+    db.queue.push({ data: live(), error: null });
+    db.rpc.mockResolvedValue({ data: null, error: { code: "P0002" } });
+    expect((await meetings.endMeeting(MEETING)).error?.code).toBe("not_found");
+    expect(livekit.closeRoom).not.toHaveBeenCalled();
+  });
+});
+
+describe("chat, reactions and raised hands", () => {
+  const live = () => meetingRow({ actual_started_at: new Date().toISOString() });
+
+  it("stores then broadcasts a chat message from someone in the meeting", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student", STUDENT));
+    db.queue.push({ data: live(), error: null }, { data: null, error: null }); // meeting, not removed
+    db.rpc.mockResolvedValue({ data: [{ id: "m1", sender_id: STUDENT, sender_name: "Asha", body: "Hello", created_at: "2026-10-20T10:00:00Z" }], error: null });
+    const res = await meetings.sendMessage(MEETING, "  Hello  ");
+    expect(res.data).toMatchObject({ id: "m1", body: "Hello", senderId: STUDENT });
+    expect(db.rpc).toHaveBeenCalledWith("post_live_meeting_message", { p_session: MEETING, p_body: "Hello" });
+    expect(livekit.broadcast).toHaveBeenCalledWith(expect.anything(), MEETING, expect.objectContaining({ type: "chat", id: "m1" }));
+  });
+
+  it("refuses chat from outside the meeting, from a removed student, or when it isn't live", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student", STUDENT));
+    db.queue.push({ data: null, error: null }); // RLS: not their meeting
+    expect((await meetings.sendMessage(MEETING, "hi")).error?.code).toBe("not_found");
+    db.queue.push({ data: live(), error: null }, { data: { user_id: STUDENT }, error: null }); // removed
+    expect((await meetings.sendMessage(MEETING, "hi")).error?.code).toBe("not_found");
+    db.queue.push({ data: meetingRow(), error: null }); // not started
+    expect((await meetings.sendMessage(MEETING, "hi")).error?.message).toMatch(/isn't live/);
+    expect(db.rpc).not.toHaveBeenCalledWith("post_live_meeting_message", expect.anything());
+    expect(livekit.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("explains the chat rate limit", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student", STUDENT));
+    db.queue.push({ data: live(), error: null }, { data: null, error: null });
+    db.rpc.mockResolvedValue({ data: null, error: { code: "MT010" } });
+    expect((await meetings.sendMessage(MEETING, "hi")).error?.message).toMatch(/very fast/);
+  });
+
+  it("only broadcasts reactions from the allowed set, as the signed-in user", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student", STUDENT));
+    expect((await meetings.sendReaction(MEETING, "<script>")).error?.code).toBe("validation_error");
+    db.queue.push({ data: live(), error: null }, { data: null, error: null });
+    expect((await meetings.sendReaction(MEETING, "👏")).ok).toBe(true);
+    expect(livekit.broadcast).toHaveBeenCalledWith(expect.anything(), MEETING, expect.objectContaining({ type: "reaction", emoji: "👏", senderId: STUDENT }));
+  });
+
+  it("raises the caller's own hand only (identity from the session, never the client)", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student", STUDENT));
+    db.queue.push({ data: live(), error: null }, { data: null, error: null });
+    expect((await meetings.setMyHand(MEETING, true)).ok).toBe(true);
+    expect(livekit.setHandRaised).toHaveBeenCalledWith(expect.anything(), MEETING, STUDENT, true);
   });
 });

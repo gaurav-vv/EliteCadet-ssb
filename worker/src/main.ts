@@ -39,10 +39,27 @@ async function main() {
     log.error("could not listen for new jobs; polling only");
   }
 
+  // Live meetings (T094, 0025): complete meetings whose scheduled end has
+  // passed and finalize their 75% attendance, even when no host or webhook
+  // traffic is around. Rooms close via the app's webhook / clients' timers.
+  let lastSweep = 0;
+  const sweepMeetings = async () => {
+    if (Date.now() - lastSweep < 60_000) return;
+    lastSweep = Date.now();
+    try {
+      const { rowCount } = await pool.query("select public.finish_overdue_live_meetings()");
+      if (rowCount) log.info("meetings finished", { count: rowCount });
+    } catch (error) {
+      // Databases without migration 0025 simply skip this.
+      log.error("meeting sweep failed", { error: error instanceof Error ? error.name : "unknown" });
+    }
+  };
+
   const routes = { evaluation: config.evaluation, question: config.question };
   log.info("worker started", { worker: config.workerId, evaluation: config.evaluation.model, question: config.question.model, concurrency: config.concurrency });
   while (!stopping) {
     let handled = 0;
+    await sweepMeetings();
     try {
       handled = await runOnce(pool, client, config.workerId, config.concurrency, routes, log);
     } catch (error) {

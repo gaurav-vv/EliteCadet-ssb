@@ -106,18 +106,20 @@ test.describe("auth flows on a local Supabase stack", () => {
     await page.getByLabel("Email").fill(email);
     await page.getByRole("button", { name: /send reset link/i }).click();
     await expect(page.getByText(/check your email/i)).toBeVisible();
+    // Local stack: the page must say the email was captured, not delivered.
+    await expect(page.getByText(/not sent to a real inbox/i)).toBeVisible();
 
     const link = await emailLink(email);
     // "commit": the callback redirects twice; waiting for "load" on the first
     // URL can abort while the dev server compiles the next route.
     await page.goto(link, { waitUntil: "commit" });
-    await expect(page).toHaveURL(/\/reset-password$/);
+    await expect(page).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
     await page.getByLabel("New password").fill(NEW_PASSWORD);
     await page.getByRole("button", { name: /save new password/i }).click();
     await expect(page).toHaveURL(/\/login\?reason=password_updated$/);
 
     await logIn(page, email, NEW_PASSWORD);
-    await expect(page).toHaveURL(/\/student$/);
+    await expect(page).toHaveURL(/\/student$/, { timeout: 20_000 });
 
     const again = await (await browser.newContext()).newPage();
     await again.goto(link, { waitUntil: "commit" });
@@ -126,9 +128,10 @@ test.describe("auth flows on a local Supabase stack", () => {
   });
 
   test("mentor invite: academy admin invites → email → set password → mentor dashboard; bad or reused links fail", async ({ browser }) => {
+    test.setTimeout(90_000); // six routes, each compiled on first use by `next dev`
     const admin = await (await browser.newContext()).newPage();
-    await signUp(admin, uniqueEmail("inviter"), { academy: "E2E Invite Academy" });
-    await expect(admin).toHaveURL(/\/academy$/);
+    await signUp(admin, uniqueEmail("inviter"), { academy: `E2E Invite Academy ${Date.now()}` });
+    await expect(admin).toHaveURL(/\/academy$/, { timeout: 20_000 });
 
     const mentorEmail = uniqueEmail("mentor");
     await admin.goto("/academy/mentors");
@@ -136,6 +139,13 @@ test.describe("auth flows on a local Supabase stack", () => {
     await admin.getByLabel("Email").fill(mentorEmail);
     await admin.getByRole("button", { name: /send invite/i }).click();
     await expect(admin.getByRole("status")).toContainText(/invite sent/i);
+    await expect(admin.getByText(/not sent to a real inbox/i)).toBeVisible();
+
+    // Inviting the same person again before they accept re-sends it (no duplicate account).
+    await admin.getByLabel("Full name").fill("E2E Mentor");
+    await admin.getByLabel("Email").fill(mentorEmail);
+    await admin.getByRole("button", { name: /send invite/i }).click();
+    await expect(admin.getByRole("status").filter({ hasText: /re-sent/i })).toBeVisible({ timeout: 15_000 });
 
     // Captured by the local Mailpit inbox — proof an email was generated and
     // handed to SMTP, not just that the API said "ok".
@@ -147,17 +157,17 @@ test.describe("auth flows on a local Supabase stack", () => {
     tampered.searchParams.set("token", "0".repeat(56));
     const forged = await (await browser.newContext()).newPage();
     await forged.goto(tampered.toString(), { waitUntil: "commit" });
-    await expect(forged.getByText(/this reset link has expired/i)).toBeVisible();
+    await expect(forged.getByText(/this link has expired or was already used/i)).toBeVisible();
 
     // Invite link → signed in → choose a password (tokens never stay in the URL).
     const mentor = await (await browser.newContext()).newPage();
     await mentor.goto(link, { waitUntil: "commit" });
-    await expect(mentor).toHaveURL(/\/reset-password$/);
+    await expect(mentor).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
     await mentor.getByLabel("New password").fill(NEW_PASSWORD);
     await mentor.getByRole("button", { name: /save new password/i }).click();
     await expect(mentor).toHaveURL(/\/login\?reason=password_updated$/);
     await logIn(mentor, mentorEmail, NEW_PASSWORD);
-    await expect(mentor).toHaveURL(/\/mentor$/);
+    await expect(mentor).toHaveURL(/\/mentor$/, { timeout: 20_000 });
     await expectHealthyPage(mentor);
 
     // The admin now sees them as a mentor of this academy.
@@ -167,7 +177,60 @@ test.describe("auth flows on a local Supabase stack", () => {
     // The same link a second time fails safely.
     const again = await (await browser.newContext()).newPage();
     await again.goto(link, { waitUntil: "commit" });
-    await expect(again.getByText(/this reset link has expired/i)).toBeVisible();
+    await expect(again.getByText(/this link has expired or was already used/i)).toBeVisible();
+
+    // Inviting them now (an active mentor of this academy) is refused with a clear message.
+    await admin.getByLabel("Full name").fill("E2E Mentor");
+    await admin.getByLabel("Email").fill(mentorEmail);
+    await admin.getByRole("button", { name: /send invite/i }).click();
+    await expect(admin.getByRole("alert").filter({ hasText: /already a mentor in your academy/i })).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("independent mentor: super admin invites (no academy) → set password → mentor workspace, academy-only areas empty", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    test.skip(!supabaseUrl || !serviceKey || !/^http:\/\/(127\.0\.0\.1|localhost):/.test(supabaseUrl), "needs the LOCAL stack's URL + service key in the environment");
+
+    // A local super admin, created the way the service role / dev preview does.
+    const superEmail = uniqueEmail("super");
+    const created = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: { apikey: serviceKey!, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: superEmail, password: PASSWORD, email_confirm: true, app_metadata: { role: "super_admin" }, user_metadata: { full_name: "E2E Super" } }),
+    });
+    expect(created.ok).toBe(true);
+
+    const admin = await (await browser.newContext()).newPage();
+    await logIn(admin, superEmail, PASSWORD);
+    await expect(admin).toHaveURL(/\/admin$/, { timeout: 20_000 });
+    const mentorEmail = uniqueEmail("indie");
+    await admin.goto("/admin/users");
+    await admin.getByRole("textbox", { name: "Full name", exact: true }).fill("E2E Indie Mentor");
+    await admin.getByRole("textbox", { name: "Email", exact: true }).fill(mentorEmail);
+    await admin.getByRole("button", { name: /send invite/i }).click();
+    await expect(admin.getByRole("status").filter({ hasText: /invite sent/i })).toBeVisible({ timeout: 15_000 });
+
+    const link = await emailLink(mentorEmail);
+    const mentor = await (await browser.newContext()).newPage();
+    await mentor.goto(link, { waitUntil: "commit" });
+    await expect(mentor).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
+    await mentor.getByLabel("New password").fill(NEW_PASSWORD);
+    await mentor.getByRole("button", { name: /save new password/i }).click();
+    await expect(mentor).toHaveURL(/\/login\?reason=password_updated$/, { timeout: 15_000 });
+    await logIn(mentor, mentorEmail, NEW_PASSWORD);
+    await expect(mentor).toHaveURL(/\/mentor$/, { timeout: 20_000 });
+    await expect(mentor.getByText(/independent mentor/i)).toBeVisible();
+
+    // Every mentor area renders (academy-only ones are simply empty).
+    for (const path of ["/mentor/mentees", "/mentor/sessions", "/mentor/sessions/new", "/mentor/evaluations", "/mentor/assessments", "/mentor/content", "/mentor/library", "/mentor/profile", "/mentor/notifications"]) {
+      await mentor.goto(path);
+      await expect(mentor).toHaveURL(new RegExp(`${path}$`));
+      await expectHealthyPage(mentor);
+    }
+    // ...and no academy workspace.
+    await mentor.goto("/academy");
+    await expect(mentor).toHaveURL(/\/forbidden$/);
   });
 
   test("dev preview signs into every role's own dashboard", async ({ browser }) => {

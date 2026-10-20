@@ -9,6 +9,7 @@ import { sanitizeSearch } from "@/lib/server/users/validation";
 import { STUDENT_PAGE_SIZE } from "@/lib/server/academy-people/validation";
 import type { DbResult } from "@/lib/server/users/repository";
 import type { AcademyMentorRecord, AcademyStudentListParams, AcademyStudentRecord, AcademyStudentSummary } from "@/types/academy-people";
+import type { ExistingAccount } from "@/lib/server/academy-people/validation";
 
 const STUDENT_COLUMNS = "id, full_name, email, status, batch_id, batch_name, last_login_at, created_at";
 
@@ -96,7 +97,8 @@ export async function removeStudent(id: string): Promise<DbResult<null>> {
 
 // Service role, server-side only: the signup trigger (0007) trusts role +
 // academy_id from an INVITE (invited_at is set), never from a browser signup.
-export async function inviteByEmail(input: { email: string; fullName: string; role: "student" | "mentor"; academyId: string; redirectTo: string }): Promise<DbResult<{ id: string }>> {
+// academyId null = an independent mentor (super admin invites only).
+export async function inviteByEmail(input: { email: string; fullName: string; role: "student" | "mentor"; academyId: string | null; redirectTo: string }): Promise<DbResult<{ id: string }>> {
   let admin: ReturnType<typeof createAdminClient>;
   try {
     admin = createAdminClient();
@@ -106,11 +108,38 @@ export async function inviteByEmail(input: { email: string; fullName: string; ro
     return { data: null, error: { code: "admin_unavailable", message: error.message } };
   }
   const { data, error } = await admin.auth.admin.inviteUserByEmail(input.email, {
-    data: { full_name: input.fullName, role: input.role, academy_id: input.academyId },
+    data: input.academyId ? { full_name: input.fullName, role: input.role, academy_id: input.academyId } : { full_name: input.fullName, role: input.role },
     redirectTo: input.redirectTo,
   });
-  if (error || !data.user) return { data: null, error: { code: (error as { code?: string } | null)?.code ?? "invite_failed", message: error?.message } };
+  if (error || !data.user) {
+    // Safe diagnostic: code and HTTP status only — never the address or a token.
+    console.error(`[invite] auth invite failed: code=${(error as { code?: string } | null)?.code ?? "none"} status=${(error as { status?: number } | null)?.status ?? "none"}`);
+    return { data: null, error: { code: (error as { code?: string } | null)?.code ?? "invite_failed", message: error?.message } };
+  }
   return { data: { id: data.user.id }, error: null };
+}
+
+// Service role, server-side only, after the caller was authorized: the account
+// (if any) that already uses this email, and whether its invite is still
+// unaccepted. Used to decide invite / re-send / refuse (decideInvite).
+export async function findAccountByEmail(email: string): Promise<DbResult<ExistingAccount | null>> {
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    if (!(error instanceof AdminClientConfigError)) throw error;
+    return { data: null, error: { code: "admin_unavailable", message: error.message } };
+  }
+  const { data: profile, error } = await admin.from("profiles").select("id, role, academy_id").ilike("email", email).maybeSingle();
+  if (error) return { data: null, error };
+  if (!profile) return { data: null, error: null };
+  const { data: auth, error: authError } = await admin.auth.admin.getUserById(profile.id as string);
+  if (authError || !auth.user) return { data: null, error: { code: "lookup_failed", message: authError?.message } };
+  const u = auth.user;
+  return {
+    data: { id: profile.id as string, role: String(profile.role), academyId: (profile.academy_id as string | null) ?? null, pending: Boolean(u.invited_at) && !u.email_confirmed_at && !u.last_sign_in_at },
+    error: null,
+  };
 }
 
 export async function findMentors(academyId: string): Promise<DbResult<AcademyMentorRecord[]>> {

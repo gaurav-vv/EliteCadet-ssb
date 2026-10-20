@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0023 under real RLS.
+-- End-to-end workflow check of migrations 0001–0025 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -529,13 +529,13 @@ reset role;
 
 -- Webhook writes: service role only; staff and the audience recorded, outsiders ignored.
 select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
-select t.fails(format('select public.record_live_meeting_event(%L, %L, %L, %L)', :'M3', :'ADMIN_A', 'PA_x', 'participant_joined'), 'a signed-in user cannot write attendance');
+select t.fails(format('select public.record_live_meeting_event(%L, %L, %L, %L, now(), now())', :'M3', :'ADMIN_A', 'PA_x', 'participant_joined'), 'a signed-in user cannot write attendance');
 reset role;
 set role service_role;
-select public.record_live_meeting_event(:'M3', :'ADMIN_A', 'PA_admin', 'participant_joined');
-select public.record_live_meeting_event(:'M3', :'S1', 'PA_s1', 'participant_joined');
-select public.record_live_meeting_event(:'M3', :'MENT_B', 'PA_mb', 'participant_joined');
-select public.record_live_meeting_event(:'M3', :'S3', 'PA_s3', 'participant_joined');
+select public.record_live_meeting_event(:'M3', :'ADMIN_A', 'PA_admin', 'participant_joined', now(), now());
+select public.record_live_meeting_event(:'M3', :'S1', 'PA_s1', 'participant_joined', now(), now());
+select public.record_live_meeting_event(:'M3', :'MENT_B', 'PA_mb', 'participant_joined', now(), now());
+select public.record_live_meeting_event(:'M3', :'S3', 'PA_s3', 'participant_joined', now(), now());
 reset role;
 select t.eq(t.cnt(format('select count(*) from public.live_meeting_attendance where session_id = %L', :'M3')), 2, 'webhook: academy A admin + S1 recorded, academy B mentor/student ignored');
 
@@ -555,6 +555,237 @@ select id as "BIG" from public.batches where name = 'Alpha big' \gset
 insert into public.batch_students (batch_id, student_id) select :'BIG', p.id from public.profiles p where p.email like 'big%@x.test';
 insert into public.batch_mentors (batch_id, mentor_id) values (:'BIG', :'MENT_A');
 select t.fails_with(format('select public.admin_schedule_live_meeting(%L, %L, null, %L, %L, null, t.ist(25, %L), t.ist(25, %L))', 'batch', :'BIG', :'MENT_A', 'Too big', '10:00', '11:00'), 'MT002', 'batch meeting refused for 101 enrolled students');
+reset role;
+
+-- ---------- 11. Independent mentors and academy moves (0024) ----------
+\set INDIE '00000000-0000-4000-8000-0000000000c1'
+-- A super admin's invite (service role): role mentor, no academy.
+insert into auth.users (id, email, invited_at, raw_user_meta_data) values (:'INDIE', 'indie@x.test', now(), '{"role":"mentor","full_name":"Indie Mentor"}');
+select t.eq((select count(*) from public.profiles where id = :'INDIE' and role = 'mentor' and academy_id is null), 1, 'an invite without an academy creates an independent mentor');
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-4000-8000-0000000000c2', 'fakementor@x.test', '{"role":"mentor"}');
+select t.eq((select count(*) from public.profiles where id = '00000000-0000-4000-8000-0000000000c2' and role = 'student'), 1, 'a browser signup claiming mentor (no invite) is still a student');
+
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.fails(format('insert into public.batch_mentors (batch_id, mentor_id) values (%L, %L)', :'BA', :'INDIE'), 'an academy admin cannot put an independent mentor on their batch');
+select t.eq((select count(*) from public.profiles where id = :'INDIE'), 0, 'an academy admin cannot see independent mentors');
+reset role;
+
+select set_config('request.jwt.claim.sub', :'INDIE', false); set role authenticated;
+select t.eq((select count(*) from public.batches), 0, 'independent mentor sees no batches');
+select t.eq((select count(*) from public.batch_students), 0, '...no rosters');
+select t.eq((select count(*) from public.profiles where role = 'student'), 0, '...no students');
+select t.eq((select count(*) from public.sessions), 0, '...no sessions');
+select t.eq((select count(*) from public.academies), 0, '...no academies');
+select t.fails_with(format('select public.save_live_meeting(null, %L, %L, null, %L, null, t.ist(30, %L), t.ist(30, %L))', 'batch', :'BA', 'Indie call', '10:00', '11:00'), 'MT003', '...and cannot schedule for an academy batch');
+insert into public.contents (title, category, type, status, body, created_by, owner_type, owner_id, visibility, target_role) values ('Indie notes', 'gto', 'article', 'draft', 'Mine.', :'INDIE', 'mentor', :'INDIE', 'assigned', 'student');
+select t.eq((select count(*) from public.contents where created_by = :'INDIE'), 1, 'independent mentor creates their own content');
+reset role;
+
+-- A super admin moves mentor A out of academy A: their batch access goes with it.
+select t.eq(t.cnt(format('select count(*) from public.batch_mentors where mentor_id = %L', :'MENT_A')), 2, 'mentor A teaches two batches before the move');
+select set_config('request.jwt.claim.sub', :'SUPER', false); set role authenticated;
+update public.profiles set academy_id = null where id = :'MENT_A';
+update public.profiles set academy_id = :'AC_B' where id = :'S2';
+reset role;
+select t.eq(t.cnt(format('select count(*) from public.batch_mentors where mentor_id = %L', :'MENT_A')), 0, 'moving a mentor out drops their batch assignments');
+select t.eq(t.cnt(format('select count(*) from public.batch_students where student_id = %L', :'S2')), 0, 'moving a student to another academy drops their old batch');
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.batch_students where batch_id = :'BA'), 0, 'the now-independent mentor no longer reads the old roster');
+select t.eq((select count(*) from public.profiles where id = :'S1'), 0, '...or its students');
+reset role;
+
+-- ---------- 12. Connected-time attendance (75% rule), chat, enrollment (0025) ----------
+\set MENT_C '00000000-0000-4000-8000-0000000000d0'
+insert into auth.users (id, email, raw_app_meta_data, raw_user_meta_data) values
+  (:'MENT_C', 'mentc@x.test', json_build_object('role','mentor','academy_id',:'AC_A')::jsonb, '{"full_name":"Mentor C"}');
+insert into auth.users (id, email, raw_app_meta_data, raw_user_meta_data)
+  select ('00000000-0000-4000-8000-0000000000e' || g)::uuid, format('att%s@x.test', g), json_build_object('role','student','academy_id',:'AC_A')::jsonb, json_build_object('full_name', 'Att ' || g)
+  from generate_series(1, 9) g;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+insert into public.batches (academy_id, name) values (:'AC_A', 'Alpha 75');
+select id as "BC" from public.batches where name = 'Alpha 75' \gset
+insert into public.batch_students (batch_id, student_id) select :'BC', ('00000000-0000-4000-8000-0000000000e' || g)::uuid from generate_series(1, 9) g;
+insert into public.batch_mentors (batch_id, mentor_id) values (:'BC', :'MENT_C');
+reset role;
+
+-- A 60-minute meeting that started 70 minutes ago (test-only: the schedule
+-- guard forbids past times, so it is switched off for this insert).
+create table t.base as select date_trunc('second', now()) - interval '70 minutes' as t0;
+create function t.m(n numeric) returns timestamptz language sql stable as $$ select t0 + make_interval(secs => n * 60) from t.base $$;
+grant select on t.base to authenticated, service_role;
+grant execute on function t.m(numeric) to authenticated, service_role;
+\set M75 '00000000-0000-4000-8000-00000000f075'
+alter table public.sessions disable trigger sessions_live_guard;
+insert into public.sessions (id, batch_id, mentor_id, created_by, title, starts_at, ends_at, mode, meeting_kind, for_whole_batch, actual_started_at)
+  values (:'M75', :'BC', :'MENT_C', :'MENT_C', '75 rule', t.m(0), t.m(60), 'online', 'batch', true, t.m(-3));
+alter table public.sessions enable trigger sessions_live_guard;
+
+set role service_role;
+-- e1: exactly 45:00 → present
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e1', 'e1a', 'participant_joined', t.m(0), t.m(0));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e1', 'e1a', 'participant_left', t.m(0), t.m(45));
+-- e2: 44:59 → absent
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e2', 'e2a', 'participant_joined', t.m(0), t.m(0));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e2', 'e2a', 'participant_left', t.m(0), t.m(44 + 59/60.0));
+-- e3: two visits 20 + 26 = 46 → present; every event delivered twice
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e3', 'e3a', 'participant_joined', t.m(0), t.m(0));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e3', 'e3a', 'participant_joined', t.m(0), t.m(0));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e3', 'e3a', 'participant_left', t.m(0), t.m(20));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e3', 'e3a', 'participant_left', t.m(0), t.m(20));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e3', 'e3b', 'participant_joined', t.m(30), t.m(30));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e3', 'e3b', 'participant_left', t.m(30), t.m(56));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e3', 'e3b', 'participant_left', t.m(30), t.m(56));
+-- e4: two tabs overlapping 0–30 and 10–40 → union 40 (not 60) → absent
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e4', 'e4a', 'participant_joined', t.m(0), t.m(0));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e4', 'e4b', 'participant_joined', t.m(10), t.m(10));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e4', 'e4a', 'participant_left', t.m(0), t.m(30));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e4', 'e4b', 'participant_left', t.m(10), t.m(40));
+-- e5: leave arrives BEFORE its join (out of order): 5–55 = 50 → present
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e5', 'e5a', 'participant_left', t.m(5), t.m(55));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e5', 'e5a', 'participant_joined', t.m(5), t.m(5));
+-- e6: joined 20 min early, left at 40 → only 0–40 counts → absent
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e6', 'e6a', 'participant_joined', t.m(-20), t.m(-20));
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e6', 'e6a', 'participant_left', t.m(-20), t.m(40));
+-- e7: late join at 20, browser closed, no leave event → clipped at the end: 40 → absent
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e7', 'e7a', 'participant_joined', t.m(20), t.m(20));
+-- e8: joined at 10, no leave event, stayed to the end → 50 → present
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e8', 'e8a', 'participant_joined', t.m(10), t.m(10));
+-- e9: never joined → absent (0). An outsider's event is ignored.
+select public.record_live_meeting_event(:'M75', :'S3', 'sx', 'participant_joined', t.m(0), t.m(0));
+reset role;
+
+select t.eq(t.cnt(format('select count(*) from public.session_attendance where session_id = %L', :'M75')), 0, 'nobody is marked while the meeting is still in progress');
+select t.eq(t.cnt(format('select count(*) from public.live_meeting_attendance where session_id = %L and user_id = %L', :'M75', :'S3')), 0, 'an outsider''s webhook event is ignored');
+
+-- The mentor marks e2 present by hand before the end: kept, seconds still recorded.
+select set_config('request.jwt.claim.sub', :'MENT_C', false); set role authenticated;
+insert into public.session_attendance (session_id, student_id, status, marked_by) values (:'M75', '00000000-0000-4000-8000-0000000000e2', 'present', :'MENT_C');
+select t.fails(format('update public.sessions set attendance_finalized_at = now() where id = %L', :'M75'), 'a client cannot mark attendance as finalized');
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000e2', false); set role authenticated;
+select t.fails(format('select public.record_live_meeting_event(%L, %L, %L, %L, now(), now())', :'M75', '00000000-0000-4000-8000-0000000000e2', 'fake', 'participant_joined'), 'a student cannot submit their own attendance events');
+select t.eq(t.affected(format('update public.session_attendance set connected_seconds = 9999, status = %L where session_id = %L', 'present', :'M75')), 0, 'a student cannot change attendance or durations');
+select t.fails('select public.finish_overdue_live_meetings()', 'a signed-in user cannot run the end-of-meeting sweep');
+reset role;
+
+-- The scheduled end passed with nobody ending it: the server sweep finishes it.
+set role service_role;
+select t.eq((select count(*) from public.finish_overdue_live_meetings() x where x = :'M75'::uuid), 1, 'the sweep completes the overdue meeting');
+reset role;
+select t.eq(t.cnt(format('select count(*) from public.sessions where id = %L and status = %L and actual_ended_at = ends_at and attendance_finalized_at is not null', :'M75', 'completed')), 1, '...ending it at the scheduled end, attendance finalized');
+create function t.att(n int) returns text language sql security definer as $$
+  select status::text || ':' || connected_seconds || '/' || required_seconds from public.session_attendance
+  where session_id = '00000000-0000-4000-8000-00000000f075' and student_id = ('00000000-0000-4000-8000-0000000000e' || n)::uuid $$;
+grant execute on function t.att(int) to authenticated, service_role;
+create function t.is(actual text, expected text, label text) returns void language plpgsql as $$
+begin
+  if actual is distinct from expected then raise exception 'FAIL %: expected %, got %', label, expected, actual; end if;
+  raise notice 'pass  %', label;
+end $$;
+select t.is(t.att(1), 'present:2700/2700', 'exactly 75% (45:00 of 60) → present');
+select t.is(t.att(2), 'present:2699/2700', '44:59 recorded; the mentor''s own "present" mark is kept');
+select t.is(t.att(3), 'present:2760/2700', 'two visits add up (46 min); duplicate events not double-counted');
+select t.is(t.att(4), 'absent:2400/2700', 'overlapping tabs count once (40 min, not 60) → absent');
+select t.is(t.att(5), 'present:3000/2700', 'leave-before-join events give the same 50 min → present');
+select t.is(t.att(6), 'absent:2400/2700', 'time before the scheduled start does not count → absent');
+select t.is(t.att(7), 'absent:2400/2700', 'late join + missing leave event, clipped at the end (40 min) → absent');
+select t.is(t.att(8), 'present:3000/2700', 'missing leave event, stayed to the end (50 min) → present');
+select t.is(t.att(9), 'absent:0/2700', 'never joined → absent with 0 seconds');
+
+-- Idempotent: sweeping again, or ending again, changes nothing and adds no rows.
+set role service_role;
+select count(*) from public.finish_overdue_live_meetings();
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_C', false); set role authenticated;
+select t.eq((select count(*) from (select public.end_live_meeting(:'M75')) x), 1, 'ending a finished meeting again is safe');
+select t.eq((select count(*) from public.session_attendance where session_id = :'M75'), 9, 'still exactly one attendance row per student');
+select t.eq((select count(*) from public.live_meeting_attendance_summary(:'M75')), 8, 'the host sees connected time for the 8 who joined');
+reset role;
+select t.is(t.att(1) || ' ' || t.att(4), 'present:2700/2700 absent:2400/2700', 'results unchanged after retries');
+
+-- A late webhook after finalization recomputes: e9's late-delivered 0–50 visit → present.
+set role service_role;
+select public.record_live_meeting_event(:'M75', '00000000-0000-4000-8000-0000000000e9', 'e9a', 'participant_left', t.m(0), t.m(50));
+reset role;
+select t.is(t.att(9), 'present:3000/2700', 'a late event after finalization is recomputed idempotently');
+
+-- A meeting ended early by the host: judged against the SCHEDULED 60 minutes.
+\set MEARLY '00000000-0000-4000-8000-00000000f076'
+alter table public.sessions disable trigger sessions_live_guard;
+insert into public.sessions (id, batch_id, mentor_id, created_by, title, starts_at, ends_at, mode, meeting_kind, for_whole_batch, actual_started_at)
+  values (:'MEARLY', :'BC', :'MENT_C', :'MENT_C', 'Ended early', now() - interval '30 minutes', now() + interval '30 minutes', 'online', 'batch', true, now() - interval '31 minutes');
+alter table public.sessions enable trigger sessions_live_guard;
+set role service_role;
+select public.record_live_meeting_event(:'MEARLY', '00000000-0000-4000-8000-0000000000e1', 'early1', 'participant_joined', now() - interval '30 minutes', now() - interval '30 minutes');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_C', false); set role authenticated;
+select public.end_live_meeting(:'MEARLY');
+reset role;
+select t.eq(t.cnt(format('select count(*) from public.session_attendance where session_id = %L and student_id = %L and status = %L and connected_seconds between 1795 and 1805', :'MEARLY', '00000000-0000-4000-8000-0000000000e1', 'absent')), 1, 'ended after 30 of 60 scheduled minutes → absent (30 min < 45)');
+
+-- Chat: only people in the meeting, only while it is live.
+\set MLIVE '00000000-0000-4000-8000-00000000f077'
+alter table public.sessions disable trigger sessions_live_guard;
+insert into public.sessions (id, batch_id, mentor_id, created_by, title, starts_at, ends_at, mode, meeting_kind, for_whole_batch, actual_started_at)
+  values (:'MLIVE', :'BC', :'MENT_C', :'MENT_C', 'Live chat', now() + interval '31 minutes', now() + interval '60 minutes', 'online', 'batch', true, now());
+alter table public.sessions enable trigger sessions_live_guard;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000e1', false); set role authenticated;
+select t.eq((select count(*) from public.post_live_meeting_message(:'MLIVE', '  Hello everyone  ')), 1, 'a batch student posts in the live meeting');
+select t.eq((select count(*) from public.live_meeting_messages where session_id = :'MLIVE' and body = 'Hello everyone'), 1, '...stored trimmed, readable by them');
+select t.fails('insert into public.live_meeting_messages (session_id, sender_id, body) select ''00000000-0000-4000-8000-00000000f077'', auth.uid(), ''direct''', 'messages cannot be inserted directly');
+select t.fails_with(format('select * from public.post_live_meeting_message(%L, %L)', :'M75', 'late'), 'MT008', 'no chat in a meeting that has ended');
+select t.eq((select public.live_meeting_audience_count(:'MLIVE')), 9, 'a participant sees the audience size (9)');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_C', false); set role authenticated;
+select t.eq((select count(*) from public.post_live_meeting_message(:'MLIVE', 'Welcome!')), 1, 'the host posts');
+select t.eq((select count(*) from public.live_meeting_messages where session_id = :'MLIVE'), 2, 'the host reads the chat');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from public.live_meeting_messages where session_id = :'MLIVE'), 2, 'the academy admin reads it');
+reset role;
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.fails_with(format('select * from public.post_live_meeting_message(%L, %L)', :'MLIVE', 'hi'), 'P0002', 'a student of another batch cannot post');
+select t.eq((select count(*) from public.live_meeting_messages where session_id = :'MLIVE'), 0, '...or read');
+select t.eq((select count(*) from (select public.live_meeting_audience_count(:'MLIVE') c) x where c is not null), 0, '...or see the audience size');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_B', false); set role authenticated;
+select t.eq((select count(*) from public.live_meeting_messages where session_id = :'MLIVE'), 0, 'another academy''s admin cannot read it');
+select t.fails_with(format('select * from public.post_live_meeting_message(%L, %L)', :'MLIVE', 'hi'), 'P0002', '...or post');
+reset role;
+insert into public.live_meeting_removals (session_id, user_id, removed_by) values (:'MLIVE', '00000000-0000-4000-8000-0000000000e2', :'MENT_C');
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000e2', false); set role authenticated;
+select t.fails_with(format('select * from public.post_live_meeting_message(%L, %L)', :'MLIVE', 'still here?'), 'P0002', 'a removed student cannot post');
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000e3', false); set role authenticated;
+select count(*) from (select public.post_live_meeting_message(:'MLIVE', 'spam ' || g) from generate_series(1, 20) g) x;
+select t.fails_with(format('select * from public.post_live_meeting_message(%L, %L)', :'MLIVE', 'one more'), 'MT010', 'chat is rate-limited (20 per 30 s)');
+reset role;
+
+-- Enrollment decides access, live: a newly enrolled student can join; one who
+-- left the batch cannot.
+insert into auth.users (id, email, raw_app_meta_data, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-0000000000ea', 'newbie@x.test', json_build_object('role','student','academy_id',:'AC_A')::jsonb, '{"full_name":"Newbie"}');
+select t.eq((select count(*) from (select public.can_join_live_meeting(:'MLIVE', '00000000-0000-4000-8000-0000000000ea') ok) x where ok), 0, 'not in the batch yet → cannot join');
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+insert into public.batch_students (batch_id, student_id) values (:'BC', '00000000-0000-4000-8000-0000000000ea');
+delete from public.batch_students where student_id = '00000000-0000-4000-8000-0000000000e4';
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000ea', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id = :'MLIVE'), 1, 'newly enrolled student sees the batch meeting at once');
+select t.eq((select count(*) from (select public.can_join_live_meeting(:'MLIVE', auth.uid()) ok) x where ok), 1, '...and may join it');
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000e4', false); set role authenticated;
+select t.eq((select count(*) from public.sessions where id = :'MLIVE'), 0, 'a student who left the batch no longer sees it');
+select t.eq((select count(*) from (select public.can_join_live_meeting(:'MLIVE', auth.uid()) ok) x where ok), 0, '...or may join');
+reset role;
+
+-- Host names for students (session_host_names, 0025): only for visible sessions.
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000ea', false); set role authenticated;
+select t.eq((select count(*) from public.session_host_names(array[:'MLIVE'::uuid]) where host_name = 'Mentor C'), 1, 'a batch student sees the host''s name');
+select t.eq((select count(*) from public.profiles where id = :'MENT_C'), 0, '...without being able to read the mentor''s profile');
+reset role;
+select set_config('request.jwt.claim.sub', :'S3', false); set role authenticated;
+select t.eq((select count(*) from public.session_host_names(array[:'MLIVE'::uuid])), 0, 'another academy''s student gets no host name');
 reset role;
 
 \echo

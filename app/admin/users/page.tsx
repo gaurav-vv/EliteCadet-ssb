@@ -6,6 +6,8 @@ import { Pagination } from "@/components/academy/shared/pagination";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { RoleTag, UserStatusTag } from "@/components/admin/users/user-tags";
 import { UserToolbar } from "@/components/admin/users/user-toolbar";
+import { InviteMentorForm } from "@/components/academy/invite-mentor-form";
+import { inviteIndependentMentorAction } from "@/lib/actions/users";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { getUserList } from "@/lib/server/users/service";
@@ -23,6 +25,11 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   return (
     <div className="flex flex-col gap-6 pb-10 lg:gap-8">
       <PageHeader title="User Management" subtitle="Every student, mentor, academy admin and super admin on the platform." />
+      <InviteMentorForm
+        action={inviteIndependentMentorAction}
+        title="Invite an independent mentor"
+        description="For a mentor who works on their own, not for an academy. They get an email to set their password. Academy admins invite their own mentors from their Mentors page."
+      />
 
       {!result.ok || !result.data ? (
         <RetryErrorState message={result.error?.message ?? "We couldn't load users. Please try again."} />

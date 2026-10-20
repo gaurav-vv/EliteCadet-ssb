@@ -72,7 +72,7 @@ export function checkRoleChange(input: { actorId: string; targetId: string; targ
   if (roleRequiresAcademy(input.newRole) && !input.targetAcademyId) {
     return {
       ok: false,
-      message: "Mentors and academy admins must belong to an academy. Use “Change academy” first.",
+      message: "Academy admins must belong to an academy. Use “Change academy” first.",
     };
   }
   return { ok: true, role: input.newRole };
@@ -80,14 +80,15 @@ export function checkRoleChange(input: { actorId: string; targetId: string; targ
 
 export type AcademyChangeCheck = { ok: true; academyId: string | null } | { ok: false; message: string };
 
-// Moving a user between academies (or out of one). Mentors and academy admins
-// must always belong to an academy; super admins never do.
+// Moving a user between academies (or out of one). Academy admins must always
+// belong to an academy; super admins never do; a mentor moved out of one
+// becomes independent (0024 drops their batch assignments in the same update).
 export function checkAcademyChange(input: { role: Role; currentAcademyId: string | null; newAcademyId: unknown }): AcademyChangeCheck {
   const next = input.newAcademyId === "" || input.newAcademyId === null ? null : input.newAcademyId;
   if (next !== null && !isUuid(next)) return { ok: false, message: "Choose a valid academy." };
   if (input.role === "super_admin") return { ok: false, message: "Super admins don't belong to an academy." };
   if (next === null && roleRequiresAcademy(input.role)) {
-    return { ok: false, message: "Mentors and academy admins must belong to an academy. Change their role first." };
+    return { ok: false, message: "Academy admins must belong to an academy. Change their role first." };
   }
   if (next === input.currentAcademyId) return { ok: false, message: "They're already in that academy." };
   return { ok: true, academyId: next };

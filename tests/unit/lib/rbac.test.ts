@@ -34,8 +34,8 @@ describe("rbac", () => {
     expect(WORKSPACE_PATH).toEqual({ student: "/student", mentor: "/mentor", academy_admin: "/academy", super_admin: "/admin" });
   });
 
-  it("requires an academy for mentors and academy admins only", () => {
-    expect(roleRequiresAcademy("mentor")).toBe(true);
+  it("requires an academy for academy admins only (mentors may be independent)", () => {
+    expect(roleRequiresAcademy("mentor")).toBe(false);
     expect(roleRequiresAcademy("academy_admin")).toBe(true);
     expect(roleRequiresAcademy("student")).toBe(false);
     expect(roleRequiresAcademy("super_admin")).toBe(false);

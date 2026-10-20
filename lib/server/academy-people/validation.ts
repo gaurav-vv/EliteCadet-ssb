@@ -59,3 +59,26 @@ export function checkPersonInput(input: { email?: unknown; fullName?: unknown },
   if (needName && (fullName.length < 2 || fullName.length > 80)) return { ok: false, field: "fullName", message: "Enter their full name (2–80 characters)." };
   return { ok: true, email, fullName };
 }
+
+// An account that already uses the email being invited (service-role lookup).
+export interface ExistingAccount {
+  id: string;
+  role: string;
+  academyId: string | null;
+  // Invited but never accepted: no confirmed email and never signed in.
+  pending: boolean;
+}
+
+export type InviteDecision = { kind: "invite" } | { kind: "resend" } | { kind: "refuse"; reason: "same_academy_active" | "other_account" };
+
+// Supabase Auth only RE-SENDS an invite to an unaccepted account and never
+// changes its role or academy, so inviting an existing address as a mentor
+// used to "succeed" while the person stayed a student (or in another academy).
+// Decide up front: invite, re-send the identical pending invite, or refuse.
+export function decideInvite(existing: ExistingAccount | null, wanted: { role: "mentor" | "student"; academyId: string | null }): InviteDecision {
+  if (!existing) return { kind: "invite" };
+  const sameTarget = existing.role === wanted.role && existing.academyId === wanted.academyId;
+  if (sameTarget && existing.pending) return { kind: "resend" };
+  if (sameTarget) return { kind: "refuse", reason: "same_academy_active" };
+  return { kind: "refuse", reason: "other_account" };
+}

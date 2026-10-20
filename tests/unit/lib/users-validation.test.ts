@@ -74,8 +74,8 @@ describe("checkRoleChange", () => {
     expect(checkRoleChange({ ...base, newRole: "student" }).ok).toBe(false);
   });
 
-  it("requires an academy for mentor and academy admin", () => {
-    expect(checkRoleChange({ ...base, newRole: "mentor" }).ok).toBe(false);
+  it("requires an academy for academy admin only; a mentor may be independent", () => {
+    expect(checkRoleChange({ ...base, newRole: "mentor" })).toEqual({ ok: true, role: "mentor" });
     expect(checkRoleChange({ ...base, newRole: "academy_admin" }).ok).toBe(false);
     expect(checkRoleChange({ ...base, targetAcademyId: "acad-1", newRole: "mentor" })).toEqual({ ok: true, role: "mentor" });
   });
@@ -101,8 +101,8 @@ describe("checkAcademyChange", () => {
     expect(checkAcademyChange({ role: "student", currentAcademyId: AC, newAcademyId: "" })).toEqual({ ok: true, academyId: null });
   });
 
-  it("keeps mentors and academy admins in an academy, and super admins out", () => {
-    expect(checkAcademyChange({ role: "mentor", currentAcademyId: AC, newAcademyId: null }).ok).toBe(false);
+  it("keeps academy admins in an academy and super admins out; a mentor can leave (independent)", () => {
+    expect(checkAcademyChange({ role: "mentor", currentAcademyId: AC, newAcademyId: null })).toEqual({ ok: true, academyId: null });
     expect(checkAcademyChange({ role: "academy_admin", currentAcademyId: AC, newAcademyId: "" }).ok).toBe(false);
     expect(checkAcademyChange({ role: "super_admin", currentAcademyId: null, newAcademyId: AC }).ok).toBe(false);
   });

@@ -4,13 +4,8 @@
 // lib/server/academy-people/service.ts and are re-checked on every call.
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { requestOrigin as origin } from "@/lib/server/auth/request-origin";
 import * as service from "@/lib/server/academy-people/service";
-
-async function origin(): Promise<string> {
-  const h = await headers();
-  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
-}
 
 function refresh() {
   revalidatePath("/academy/students", "layout");

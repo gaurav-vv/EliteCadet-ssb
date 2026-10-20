@@ -12,6 +12,7 @@ export type Permission =
   | "users.read"
   | "users.change_role"
   | "users.change_status"
+  | "users.invite_mentor"
   | "academies.read_all"
   | "academies.manage"
   | "academy.update_own"
@@ -19,7 +20,7 @@ export type Permission =
   | "audit.read";
 
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  super_admin: ["users.read", "users.change_role", "users.change_status", "academies.read_all", "academies.manage", "content.manage", "audit.read"],
+  super_admin: ["users.read", "users.change_role", "users.change_status", "users.invite_mentor", "academies.read_all", "academies.manage", "content.manage", "audit.read"],
   academy_admin: ["academy.update_own"],
   mentor: [],
   student: [],
@@ -43,7 +44,9 @@ export const WORKSPACE_PATH: Record<Role, string> = {
   super_admin: "/admin",
 };
 
-// Roles that must belong to an academy to be meaningful.
+// Roles that must belong to an academy to be meaningful. Mentors may be
+// independent (no academy) since 2026-10-20 (specs.md §8a.1); academy-only
+// features simply have no batches for them.
 export function roleRequiresAcademy(role: Role): boolean {
-  return role === "mentor" || role === "academy_admin";
+  return role === "academy_admin";
 }
