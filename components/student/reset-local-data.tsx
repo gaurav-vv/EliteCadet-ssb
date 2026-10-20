@@ -5,9 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const LOCAL_KEYS = [
-  "ssb-onboarding-draft",
-  "ssb-onboarding-complete",
-  "ssb-student-profile",
   "ssb-resources-read",
   "ssb-interview-piq",
   "ssb-piq-answers",
@@ -31,8 +28,8 @@ export function ResetLocalData() {
       <div>
         <h2 className="text-sm font-medium text-ink-secondary">Demo data</h2>
         <p className="text-xs text-ink-secondary">
-          Your onboarding draft, profile, PIQ form and self-assessment are stored in this browser only. Clearing
-          them doesn&apos;t touch your saved practice, which is kept in your account.
+          Your PIQ form and self-assessment are stored in this browser only. Clearing them doesn&apos;t touch your
+          profile, practice or diagnostic, which are kept in your account.
         </p>
       </div>
       {message && (

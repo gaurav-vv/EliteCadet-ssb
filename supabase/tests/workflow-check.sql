@@ -1,4 +1,4 @@
--- End-to-end workflow check of migrations 0001–0014 under real RLS.
+-- End-to-end workflow check of migrations 0001–0021 under real RLS.
 -- Run with supabase/tests/run-workflow-check.sh (local throwaway database only).
 \set ON_ERROR_STOP 1
 \set QUIET 1
@@ -234,7 +234,8 @@ select id as "TAT1" from public.practice_items where bank_slug = 'tat' and key =
 select id as "OIRT1" from public.practice_items where bank_slug = 'oir-verbal-test' and key = 'oir-t-1' \gset
 select correct_option_id as "OIRT1_OK" from public.practice_items where id = :'OIRT1' \gset
 select id as "OIRT2" from public.practice_items where bank_slug = 'oir-verbal-test' and key = 'oir-t-2' \gset
-select t.eq((select count(*) from public.practice_items), 209, 'seed: 209 practice questions in 11 banks');
+select t.eq((select count(*) from public.practice_items where bank_slug not like 'diagnostic-%'), 209, 'seed: 209 practice questions in 11 banks');
+select t.eq((select count(*) from public.practice_items where bank_slug like 'diagnostic-%'), 12, 'seed: 12 diagnostic questions (8 multiple choice, 4 written)');
 
 select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
 select t.eq((select count(*) from public.practice_items where bank_slug = 'tat'), 13, 'student reads the TAT bank');
@@ -284,6 +285,155 @@ select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated
 select t.eq((select count(*) from public.practice_items where id = :'TAT1'), 0, 'a hidden question disappears for students');
 select t.eq((select count(*) from public.practice_answers where item_id = :'TAT1'), 1, '...and their saved answer is kept');
 select t.fails('select public.practice_move_item(gen_random_uuid(), 1)', 'only a super admin can reorder');
+reset role;
+
+-- ---------- 10. AI jobs and evaluations (0017) ----------
+select public.enqueue_ai_evaluation('practice_attempt', gen_random_uuid(), :'S1', 'general-response', 1, '{"items":[{"prompt":"Q","response":"My answer"}]}') as "AIJOB" \gset
+select id as "AIJOB2" from public.ai_claim_jobs('w-check', 1) \gset
+select public.ai_complete_job(:'AIJOB2', 'w-check', 'claude-opus-5-5',
+  '[{"dimension":"relevance","rating":"strong","confidence":"high","evidence":["My answer"],"note":"ok"}]',
+  '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'high');
+select t.eq((select count(*) from public.ai_evaluations where job_id = :'AIJOB'), 1, 'worker stores an evaluation for the claimed job');
+
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 1, 'student reads their own AI evaluation');
+select t.eq((select count(*) from public.ai_jobs where student_id = :'S1'), 1, 'student sees their job status');
+select t.fails(format('insert into public.ai_evaluations (job_id, subject_type, subject_id, student_id, rubric_id, rubric_version, model, dimensions, feedback, overall_confidence) values (%L, %L, gen_random_uuid(), %L, %L, 1, %L, %L, %L, %L)', :'AIJOB', 'x_x', :'S1', 'general-response', 'm', '[{}]', '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'high'), 'students cannot write AI evaluations');
+select t.fails(format('select public.enqueue_ai_evaluation(%L, gen_random_uuid(), %L, %L, 1, %L)', 'practice_attempt', :'S1', 'general-response', '{"items":[]}'), 'clients cannot enqueue AI jobs');
+select t.fails('select * from public.ai_claim_jobs(''me'', 1)', 'clients cannot claim AI jobs');
+select t.eq((select count(*) from public.ai_usage), 0, 'students cannot read AI cost data');
+reset role;
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 0, 'another student cannot read it');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 1, 'their mentor reads it');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 0, 'another academy''s mentor cannot');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from public.ai_evaluations where student_id = :'S1'), 0, 'academy admin cannot read AI feedback text');
+reset role;
+select t.fails(format('insert into public.ai_evaluations (job_id, subject_type, subject_id, student_id, rubric_id, rubric_version, model, label, dimensions, feedback, overall_confidence) values (gen_random_uuid(), %L, gen_random_uuid(), %L, %L, 1, %L, %L, %L, %L, %L)', 'x_x', :'S1', 'r', 'm', 'Official SSB score', '[{}]', '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'high'), 'every evaluation must carry the AI practice label');
+
+-- ---------- 11. Psychology AI feedback (0018) ----------
+select id as "TAT2" from public.practice_items where bank_slug = 'tat' and key = 'tat-2' \gset
+select id as "WAT1" from public.practice_items where bank_slug = 'wat' and key = 'wat-1' \gset
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers)
+  values (:'S1', 'tat', 'test', 'psy-0000000001', json_build_array(json_build_object('itemId', :'TAT2', 'response', 'Ravi calls a meeting and plans the relief work.'))::jsonb);
+select id as "PSY_ATT" from public.practice_attempts where client_key = 'psy-0000000001' \gset
+insert into public.practice_attempts (student_id, bank_slug, mode, client_key, answers)
+  values (:'S1', 'wat', 'test', 'psy-0000000002', json_build_array(json_build_object('itemId', :'WAT1', 'response', '   '))::jsonb);
+reset role;
+select t.eq((select count(*) from public.ai_jobs where subject_id = :'PSY_ATT' and rubric_id = 'psychology-tat' and rubric_version = 1), 1, 'submitting a TAT test queues one AI evaluation');
+select t.eq((select count(*) from public.ai_jobs where subject_id = :'PSY_ATT' and input->'items'->0->>'response' = 'Ravi calls a meeting and plans the relief work.' and input->'items'->0->>'prompt' <> ''), 1, '...with the question and answer snapshotted');
+select t.eq((select count(*) from public.ai_jobs j join public.practice_attempts a on a.id = j.subject_id where a.client_key = 'psy-0000000002'), 0, 'a test with nothing written is not queued');
+select t.eq((select count(*) from public.ai_jobs j join public.practice_attempts a on a.id = j.subject_id where a.client_key in ('run-0000000001', 'run-0000000004')), 0, 'OIR tests and mock interviews are not queued for psychology feedback');
+
+select id as "PSYJOB" from public.ai_claim_jobs('w-psy', 5) where subject_id = :'PSY_ATT' \gset
+select public.ai_complete_job(:'PSYJOB', 'w-psy', 'claude-opus-5-5',
+  '[{"dimension":"action","name":"Action toward the goal","rating":"strong","confidence":"medium","evidence":["plans the relief work"],"note":"The character acts."}]',
+  '{"observation":"o","evidence":"e","impact":"i","improvement_action":"a","recommended_practice":"p"}', 'medium');
+select t.eq(t.n(:'S1', 'ai_feedback_ready'), 1, 'notify: student told their practice feedback is ready');
+select t.eq((select count(*) from public.notifications where recipient_id = :'S1' and kind = 'ai_feedback_ready' and href = '/student/practice/psychology/results/' || :'PSY_ATT'), 1, '...linking to the results page');
+
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.fails('select public.set_practice_bank_timing(''srt'', ''{"mode":"budget","totalSeconds":1200}'')', 'a student cannot change timers');
+reset role;
+select set_config('request.jwt.claim.sub', :'SUPER', false); set role authenticated;
+select public.set_practice_bank_timing('srt', '{"mode":"budget","totalSeconds":1200}');
+select t.eq((select (timing->>'totalSeconds')::bigint from public.practice_banks where slug = 'srt'), 1200, 'super admin sets the SRT timer');
+select t.fails('select public.set_practice_bank_timing(''wat'', ''{"mode":"carousel","responseSeconds":1}'')', 'an out-of-range timer is refused');
+reset role;
+
+-- ---------- 12. AI interview (0019) ----------
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select public.start_interview_session('topic', 'hobbies', '{}') as "INT_S" \gset
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S' and seq = 1 and question = 'What do you do in your free time, and how did you get into it?'), 1, 'a topic interview opens with that topic''s question');
+select id as "INT_T1" from public.interview_turns where session_id = :'INT_S' and seq = 1 \gset
+select t.fails('select public.start_interview_session(''topic'', null, ''{}'')', 'a topic interview needs a topic');
+select public.answer_interview_turn(:'INT_T1', 'I play hockey; I started at school.');
+select t.fails(format('select public.answer_interview_turn(%L, %L)', :'INT_T1', 'again'), 'a question can be answered only once');
+reset role;
+select t.eq((select count(*) from public.ai_jobs where kind = 'interview_question' and subject_id = :'INT_T1'), 1, 'answering queues the next AI question');
+
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S'), 0, 'another student cannot read the interview');
+select t.fails(format('select public.skip_interview_wait(%L)', :'INT_S'), 'another student cannot change it');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S'), 1, 'their mentor reads the interview');
+select t.fails('select public.start_interview_session(''mock'', null, ''{}'')', 'a mentor cannot start a student interview');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.interview_sessions where id = :'INT_S'), 0, 'another academy''s mentor cannot');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S'), 0, 'the academy admin cannot read interview answers');
+reset role;
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.fails(format('select public.interview_append_question(%L, %L, ''new_topic'', null)', :'INT_S', 'Any question?'), 'students cannot write questions themselves');
+select t.fails(format('update public.interview_turns set answer = %L where id = %L', 'changed', :'INT_T1'), 'answers cannot be edited afterwards');
+select public.skip_interview_wait(:'INT_S');
+select t.eq((select count(*) from public.interview_turns where session_id = :'INT_S' and seq = 2 and kind = 'bank'), 1, 'skipping the wait continues from the question bank');
+reset role;
+
+-- ---------- 13. Readiness signals (0020) ----------
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select public.readiness_signals(:'S1') as "RS" \gset
+select t.eq(((:'RS')::jsonb -> 'mentor' -> 0 ->> 'n')::bigint, 1, 'readiness: the student''s mentor review is counted');
+select t.eq(((:'RS')::jsonb -> 'mentor' -> 0 ->> 'avg_pct')::numeric::bigint, 70, '...with its average');
+select t.eq((select count(*) from jsonb_array_elements((:'RS')::jsonb -> 'ai') x where x->>'rubric_id' = 'psychology-tat'), 1, 'readiness: AI practice feedback ratings are counted');
+select t.eq((case when ((:'RS')::jsonb ->> 'active_days_28')::int >= 1 then 1 else 0 end), 1, 'readiness: active days are counted');
+select t.eq((case when (:'RS')::jsonb::text ~ '(Ravi calls|plans the relief|My answer)' then 1 else 0 end), 0, 'readiness signals contain no answer or feedback text');
+select t.fails(format('select public.readiness_signals(%L)', :'S2'), 'a student cannot read another student''s signals');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from (select public.readiness_signals(:'S1')) x), 1, 'their mentor reads the signals');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_A', false); set role authenticated;
+select t.eq((select count(*) from (select public.readiness_signals(:'S1')) x), 1, 'their academy admin reads the signals (states only in the app)');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.fails(format('select public.readiness_signals(%L)', :'S1'), 'another academy''s mentor cannot');
+reset role;
+select set_config('request.jwt.claim.sub', :'ADMIN_B', false); set role authenticated;
+select t.fails(format('select public.readiness_signals(%L)', :'S1'), 'another academy''s admin cannot');
+reset role;
+
+-- ---------- 14. Preferences and diagnostic (0021) ----------
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select public.save_student_preferences('cds', current_date + 60, 'in_progress', 'en', 60, 'Clear the SSB');
+select t.fails('select public.save_student_preferences(''cds'', current_date - 1, ''in_progress'', ''en'', 60, null)', 'a target date in the past is refused');
+select t.fails('select public.save_student_preferences(''army'', null, ''in_progress'', ''en'', 60, null)', 'an unknown entry scheme is refused');
+select public.submit_diagnostic('[{"key":"dk-1","optionId":"dk-1-a"},{"key":"dk-2","optionId":"dk-2-a"},{"key":"dr-1","optionId":"dr-1-c"},{"key":"dw-sit-1","response":"I give first aid and send two people for help."}]') as "DIAG1" \gset
+select t.fails('select public.submit_diagnostic(''[]'')', 'the diagnostic can be retaken only once a week');
+select t.fails(format('update public.diagnostic_attempts set kind = ''reassessment'' where id = %L', :'DIAG1'), 'the baseline can never be changed');
+reset role;
+select t.eq((select count(*) from public.student_profiles where user_id = :'S2' and entry_scheme = 'cds' and daily_study_minutes = 60 and onboarded_at is not null), 1, 'onboarding preferences are saved to the account');
+select t.eq((select count(*) from public.diagnostic_attempts where id = :'DIAG1' and kind = 'baseline'), 1, 'the first diagnostic is the baseline');
+select t.eq((select (sections->'knowledge'->>'correct')::bigint from public.diagnostic_attempts where id = :'DIAG1'), 1, 'knowledge is scored by the database (1 of 4)');
+select t.eq((select (sections->'reasoning'->>'correct')::bigint from public.diagnostic_attempts where id = :'DIAG1'), 1, 'reasoning is scored by the database (1 of 4)');
+select t.eq((select count(*) from public.ai_jobs where subject_type = 'diagnostic_attempt' and subject_id = :'DIAG1' and rubric_id = 'diagnostic'), 1, 'the written part is queued for AI feedback');
+update public.diagnostic_attempts set submitted_at = now() - interval '8 days' where id = :'DIAG1';
+select set_config('request.jwt.claim.sub', :'S2', false); set role authenticated;
+select public.submit_diagnostic('[{"key":"dk-1","optionId":"dk-1-a"}]') as "DIAG2" \gset
+reset role;
+select t.eq((select count(*) from public.diagnostic_attempts where id = :'DIAG2' and kind = 'reassessment'), 1, 'later attempts are re-assessments, kept separately');
+select t.eq((select count(*) from public.ai_jobs where subject_id = :'DIAG2'), 0, 'a re-assessment with nothing written is not queued');
+select set_config('request.jwt.claim.sub', :'S1', false); set role authenticated;
+select t.eq((select count(*) from public.diagnostic_attempts where student_id = :'S2'), 0, 'another student cannot read the diagnostic');
+select t.eq((select count(*) from public.student_profiles where user_id = :'S2'), 0, '...or the preferences');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_A', false); set role authenticated;
+select t.eq((select count(*) from public.diagnostic_attempts where student_id = :'S2'), 2, 'their mentor reads the diagnostic');
+select t.eq((select count(*) from public.student_profiles where user_id = :'S2'), 1, 'their mentor reads the preferences');
+select t.fails('select public.submit_diagnostic(''[]'')', 'a mentor cannot take a student diagnostic');
+reset role;
+select set_config('request.jwt.claim.sub', :'MENT_B', false); set role authenticated;
+select t.eq((select count(*) from public.diagnostic_attempts where student_id = :'S2'), 0, 'another academy''s mentor cannot');
 reset role;
 \echo
 \echo ALL CHECKS PASSED

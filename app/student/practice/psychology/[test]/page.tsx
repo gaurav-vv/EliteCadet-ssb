@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { PracticeSession } from "@/components/practice/practice-session";
 import { isPsychologyTest, PSYCHOLOGY_ACTIVITIES } from "@/lib/practice/activities";
+import { timingFor } from "@/lib/practice/config";
 import { getBank } from "@/lib/server/practice/service";
 
 export async function generateMetadata({ params }: { params: Promise<{ test: string }> }): Promise<Metadata> {
@@ -29,5 +30,5 @@ export default async function PsychologyTestPage({ params }: { params: Promise<{
     );
   }
 
-  return <PracticeSession testType={test} summary={summary} items={bank.data.items} />;
+  return <PracticeSession testType={test} summary={summary} items={bank.data.items} timing={timingFor(test, bank.data.timing)} />;
 }

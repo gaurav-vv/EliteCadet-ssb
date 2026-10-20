@@ -9,7 +9,7 @@ import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
 import { isUuid } from "@/lib/server/users/validation";
 import type { NotificationFeed, NotificationKind, NotificationRecord } from "@/types/notifications";
 
-const KINDS: NotificationKind[] = ["session_scheduled", "session_cancelled", "assessment_published", "submission_received", "feedback_reviewed", "batch_assigned", "content_request_new", "content_request_update"];
+const KINDS: NotificationKind[] = ["session_scheduled", "session_cancelled", "assessment_published", "submission_received", "feedback_reviewed", "batch_assigned", "content_request_new", "content_request_update", "ai_feedback_ready"];
 const COLUMNS = "id, kind, title, body, href, read_at, created_at";
 export const FEED_LIMIT = 10;
 export const PAGE_LIMIT = 100;

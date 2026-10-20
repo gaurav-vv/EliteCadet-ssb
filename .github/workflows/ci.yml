@@ -70,3 +70,43 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  database-and-worker:
+    name: Database checks & AI worker tests
+    runs-on: ubuntu-latest
+    # Applies every migration to a throwaway Postgres, runs the RLS workflow
+    # check (supabase/tests), then the AI worker's tests against that database.
+    # The worker uses a fake model client: no API key, no cost.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: worker
+      - name: Migrations + RLS workflow check
+        run: supabase/tests/run-workflow-check.sh | tee workflow-check.log && grep -q "ALL CHECKS PASSED" workflow-check.log
+      - run: npx tsc --noEmit -p .
+        working-directory: worker
+      - run: npx vitest run
+        working-directory: worker
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ssb_workflow_check

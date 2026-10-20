@@ -850,6 +850,189 @@ approval. Reset email delivery not verified (needs custom SMTP + URL allowlist).
 tests, build pass. **Follow-ups:** T092 super-admin demo-request list + form rate limiting; replace
 cropped reference photos with licensed high-resolution images.
 
+
+## T093 — File materials (PDFs and documents) in Supabase Storage — P1 — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** Super Admin, Mentors and Academy Admins upload;
+students don't.
+**Requirements:**
+- Migration:
+  - a private `materials` bucket
+  - storage RLS mirroring `can_read_content()` / ownership
+  - `contents` gains a file reference: path, name, type, size
+  - an academy-owned content type for Academy Admin documents
+- Server-side upload: type sniffed from the bytes, 50 MB limit, path built by the server. Download
+  through short-lived signed URLs only.
+- Content forms (Super Admin, mentor, academy) get a file field. Library rows show file type and
+  size, and open through the signed link.
+**Acceptance:** `specs.md` §8a.4h. Database checks cover cross-academy and non-assigned access.
+**Needs:** a Supabase project (Storage can't be tested on plain Postgres).
+
+## T094 — Live meeting rooms with LiveKit (WebRTC) — P1 — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** LiveKit (open source; LiveKit Cloud, India
+region).
+**Requirements:**
+- Server route that issues a join token only to the session's mentor and participants, in the join
+  window, never for cancelled sessions.
+- Env: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (server only).
+- Room page `/{role}/sessions/[id]/room` built with LiveKit's React components: camera, mic, screen
+  share, chat. The mentor can mute or remove participants; students join muted.
+- A LiveKit webhook (signature-verified) marks attendance on join.
+- Online sessions default to a room; a pasted link remains as a fallback.
+**Acceptance:** `specs.md` §8a.4h. Tests cover token scope (outsider, cancelled, outside window).
+**Needs:** a LiveKit Cloud project (free tier). Local testing works with `livekit-server --dev`.
+
+## T095 — Session recordings — P2 (PRD: after the MVP) — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Depends on:** T093, T094. **Decided 2026-10-19:** record sessions.
+**Requirements:**
+- Mentor-only start and stop through LiveKit Egress, with a visible "Recording" indicator and a
+  notice on joining.
+- Output to a private Supabase Storage bucket. Signed-link playback for the session's people and
+  their academy admin.
+- Retention: 90 days by default, removed by a scheduled job (in the worker service).
+**Acceptance:** `specs.md` §8a.4h.
+**Needs:** a paid LiveKit plan for recording minutes; consent wording reviewed for students under 18.
+
+---
+
+# Phase 9 — PRD v2.0 MVP (adopted 2026-10-19, `specs.md` §0)
+
+Built one at a time, in this order. Each task ships with tests, `status.md` and screenshots, as
+before.
+
+## T100 — Staging environment live — P0 — `[ ]`
+Supabase staging (Mumbai) and Vercel preview deployments. Apply migrations 0001–0016. Create the
+first Super Admins (`supabase/snippets/grant_super_admin.sql`). Run the 10 logged-in e2e tests and
+click through every role.
+**Needs (owner):** Supabase staging keys in `.env.local` / Vercel. **Acceptance:** every e2e test
+passes against staging.
+
+## T101 — AI foundation: worker service + evaluation engine — P0 — `[-]`
+- A separate worker (Node + TypeScript, Railway or Render, Mumbai) with a Postgres job queue,
+  retries, timeouts and dead-letter handling.
+- Provider keys live only in the worker.
+- One evaluation engine for every practice type:
+  - versioned rubrics per dimension
+  - output = evidence → rating → confidence → feedback (§0.1)
+- Guardrails: output-schema validation, banned-claim checks (no selection prediction, no
+  diagnosis), and "AI-generated practice evaluation" labels.
+- Telemetry per call: cost and latency.
+- Every AGENTS.md §11 failure is handled, and the student's answer is never lost.
+**Needs (owner):** an Anthropic API key in the worker host's settings (provider decided 2026-10-19:
+Claude).
+**Status:** built and tested offline with a fake model client:
+- migration `0017_ai_jobs.sql`
+- `worker/`: queue, evaluation engine, guardrails, telemetry, `general-response` v1 rubric
+- 20 worker tests (16 engine, 4 queue against Postgres)
+- 12 new RLS checks (97 total)
+- a CI job running both against a throwaway Postgres
+
+**Waiting on:** a real Claude smoke test once the key exists, and deploying the worker (staging,
+T100).
+
+## T102 — AI feedback on psychology practice — P0 — `[-]`
+FR-PSY-01/02. Feedback on TAT/WAT/SRT/SD submissions: observed patterns only, history over time,
+shown to the student and their mentor. Timers configurable per assessment version.
+**Status:** built and tested offline:
+- migration `0018_psychology_feedback.sql`: a submitted TAT/WAT/SRT/SD test is queued for
+  evaluation; the student is notified when it's ready; per-bank timers
+- worker rubrics `psychology-{tat,wat,srt,sdt}` v1 (observed patterns only)
+- results page `/student/practice/psychology/results/[id]` and "Your recent tests"
+- mentor view `/mentor/mentees/[id]/practice/[attemptId]`
+- Super Admin timer form on the bank page
+
+**Tests:** 106 database checks; 28 worker tests, including the end-to-end submit → evaluate →
+notify flow; 483 app tests.
+**Waiting on:** the real Claude call (API key), deferred to the end by the owner.
+
+## T103 — AI interview with dynamic follow-ups — P0 — `[-]`
+FR-INT-01/02. Guided, Topic and Mock modes. Follow-up questions based on the previous answer:
+clarification, evidence, depth, consistency, reflection. Structured feedback in the same session.
+Can use the student's PIQ. Text answers only.
+**Status:** built and tested offline:
+- migration `0019_ai_interview.sql`: sessions, turns and topics; student functions start, answer
+  and skip; bank fallback when an AI question fails or the student skips (stale AI follow-ups are
+  dropped); feedback job on the last answer; LISTEN wake-up; notifications
+- worker: AI interviewer (`question.ts`, low effort, guardrails: one question, no banned claims,
+  no repeats) and the `interview` v1 feedback rubric
+- app: `/student/practice/interview/ai` (start: guided, topic or mock, optional PIQ sharing; past
+  interviews) and `[sessionId]` (live room with a mock timer, waiting state and skip; feedback at
+  the end); mentor view and list on the mentee page
+
+**Tests:** 119 database checks; 39 worker tests, including the full interview flow on Postgres;
+495 app tests.
+
+## T104 — Readiness profile — P0 — `[-]`
+FR-DASH-02. Seven dimensions, each with a state (Developing / Improving / Strong / Needs Attention),
+its evidence trail and a confidence level, computed from mentor reviews, AI evaluations, practice
+and attendance. Shown to the student, their mentor and the academy (states only). Never a single
+number.
+**Status:** built and tested offline:
+- migration `0020_readiness_signals.sql`: one access-checked function returning numbers only
+- fixed, explainable rules in `lib/server/readiness/compute.ts`: mentor reviews lead once there are
+  two; "improving" from recent trends; "not enough evidence" instead of guessing; confidence
+- shown on the student's Progress page and dashboard, the mentor's mentee page, and the academy
+  student page (states only)
+
+**Tests:** 129 database checks; 516 app tests.
+
+
+## T105 — Diagnostic assessment + personalised roadmap — P0 — `[-]`
+FR-ONB-01/02, FR-PLAN-01.
+- Onboarding adds: entry scheme, target date, preparation stage, language, daily study time.
+- A low-anxiety diagnostic sets an immutable baseline.
+- The generated roadmap is recalculated when new evidence arrives.
+- Daily Mission reads from the roadmap (FR-DASH-01). Every recommendation answers "why".
+**Status:** built and tested offline:
+- migration `0021_diagnostic_roadmap.sql`: preferences on `student_profiles` (onboarding moves from
+  the browser to the account); 12 diagnostic questions (8 multiple choice, scored in the database;
+  4 written, AI feedback with rubric `diagnostic` v1); an immutable baseline plus weekly
+  re-assessments
+- roadmap computed by fixed rules on every view (`lib/server/roadmap`): suggested stage shown next to
+  the self-reported one; up to three focus areas with reasons; daily-time split; Daily Mission of at
+  most three actions, each with its reason
+- pages: `/onboarding`, `/student/profile`, `/student/diagnostic` (+ `[id]`), `/student/roadmap`
+  (nav item); dashboard Today's Mission now comes from the roadmap
+- removed: browser-only onboarding and profile storage
+
+**Tests:** 147 database checks; 40 worker tests; 534 app tests.
+
+
+## T106 — Courses + content versioning + review workflow — P0 — `[ ]`
+FR-CONT-01.
+- Program → course → module → lesson structure, with text and video lessons.
+- Lifecycle: Draft → Review → Approved → Published → Deprecated → Archived.
+- Published versions can't change; progress is tied to the version the learner used.
+- SME review step with audit log. AI drafts are allowed but always reviewed.
+- Uses file materials (T093).
+**Needs (owner):** content authors and SME reviewers (§0.6.2).
+
+## T107 — Structured mentor feedback + AI-prepared briefing — P0 — `[ ]`
+FR-MENT-01/02.
+- Mentor evaluation per rubric dimension (dimension → evidence → rating → recommendation), tagged
+  as mentor-sourced and merged into the readiness profile.
+- AI briefing per student before a session: history, weak areas, recent activity.
+
+## T108 — AI Mentor (grounded chat) — P0 — `[ ]`
+FR-AI-01/02.
+- Conversational guidance grounded in the approved knowledge base (T106), using retrieval.
+- Explains concepts, adjusts the plan, shows "why" on request.
+- Escalates to a mentor for disputed or high-stakes questions.
+- Memory layers with retention and deletion (§0.5). Rate-limited.
+
+## T109 — MVP hardening + pilot launch — P0 — `[ ]`
+- Run the audits: T060–T065 (authorization, state, responsive, accessibility, performance,
+  security).
+- Hindi-ready UI strings.
+- Production environment with backups, monitoring and SMTP.
+- Privacy policy, terms and consent (students may be under 18).
+- Pilot with one academy.
+
+# Phase 10 — PRD Phase 2 (P1), after the pilot
+
+T093 file materials · T094 video rooms · mentor override of AI evaluations · messaging and
+announcements · GTO digital practice · Lecturette · Mock SSB · voice capture · spaced repetition ·
+community with validation pipeline. Each gets a full task when it starts.
+
 ---
 
 # Post-MVP Backlog

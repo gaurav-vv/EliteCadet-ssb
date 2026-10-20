@@ -307,6 +307,10 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-08 | **Dashboards are read-only summaries over real data** (T088, no migration). One server function per role (`lib/server/dashboards`) reuses the progress, sessions, assessments and people services, so every figure matches the page it links to. **No readiness score**: "average reviewed score" replaces it until a readiness formula is defined. **Today's Mission and the practice streak are hidden** until practice is stored (T083b). The sample-data dashboards, the `getAnalytics` "Demo data" panels and the "Load/Clear demo data" controls are removed; this supersedes the 2026-09-19 demo-data and 2026-10-03 analytics decisions above | User-approved 2026-10-08 (both recommendations) + `AGENTS.md` §8 (no fabricated data) |
 | 2026-10-08 | **Notifications come from database triggers; analytics from one guarded SQL function** (T089, `0013_notifications_analytics.sql`). Events write `notifications` rows inside the same transaction as the change: sessions scheduled or cancelled, assessments opened, submissions, reviews, batch membership, content requests. No code path can forget one, and there is no insert policy, so clients can't forge one. Recipients can only set `read_at` (column grant). Each event notifies a person once (`ref_id` de-duplication), except content-request status changes. Hrefs are same-site paths, checked in the DB and the service. Platform analytics is a SECURITY DEFINER function that refuses everyone but a super admin, so aggregates don't widen any table's RLS. The bell's badge is rendered by the layout and its list is fetched when it opens. There is no realtime push yet | Brief Phase 10 + `AGENTS.md` §10 (server-side authorization) + §15 (no infrastructure without measured need: realtime deferred) |
 | 2026-10-08 | **Practice banks and saved practice move to Postgres** (T083b, `0014_practice.sql`). The 11 question banks (209 items) are seeded with the exact shipped content and edited only by the Super Admin; the journey's days/modules/copy stay in code and point at banks by slug. Students' self-paced answers, ticks and "done" are saved per question; timed tests and mock runs are saved once per run (idempotent on a browser-generated key) and MCQ is scored by the database, so a test never ships the correct options. The student and their batch's mentors can read answers; academy and super admins get counts only via `practice_stats()`. Items are hidden, never deleted, so answers keep their question. PIQ-based questions, the PIQ form and the self-assessment stay on the device | User decisions 2026-10-08 (scope: banks + saved practice; editors: Super Admin only; visibility: student + mentors) + `AGENTS.md` §8, §11 (never lose input) |
+| 2026-10-19 | **The PRD v2.0 is the product source** (`specs.md` §0). Its hard rules — no official-score or selection language, non-diagnostic psychology, readiness as a multi-dimension profile never a single number, AI and mentor evaluations both preserved, versioned expert-reviewed content — override older sections. The AI Mentor and mentor briefing move from out-of-scope to MVP. Recordings (T095) move to P2 per the PRD. The PRD PDF stays with the product owner (not committed to this public repo) | User decision 2026-10-19 + `AGENTS.md` §0 (specs.md is authoritative for what to build) |
+| 2026-10-19 | **AI runs only in a separate worker over a Postgres queue** (T101, `0017_ai_jobs.sql`, `worker/`). The app enqueues; the worker claims (`FOR UPDATE SKIP LOCKED`), calls Claude (`claude-opus-5-5`, effort medium, structured JSON output, `fallbacks: "default"` for refusals, cached rubric system prompt), validates with Zod and guardrails, then stores. An evaluation is discarded, never shown, if it predicts selection, claims an official score or a single readiness number, makes a clinical claim, mentions accent, or quotes words the student didn't write. Retries: SDK x2, then queue backoff x3, then `dead`. Cost and latency per call in `ai_usage` (super admin). The provider key lives only in the worker | PRD §11.7, §12.9–12.11; `specs.md` §0.1; `AGENTS.md` §3 (no provider SDK in the browser) and §11 |
+| 2026-10-19 | **Readiness is a seven-dimension profile computed by fixed rules, never by AI** (T104, `0020_readiness_signals.sql`, `lib/server/readiness/compute.ts`). `readiness_signals()` returns counts and averages only (no answer or feedback text), access-checked for the student, their mentors, their academy admins and super admins. Rules: mentor review averages (≥70 strong, ≥45 developing) lead once there are two reviews, else AI practice ratings weighted by confidence; "improving" when the latest mentor average beats the previous three by 8+ points (or the recent AI average by 0.5); fewer than two pieces of evidence = "not enough evidence"; consistency from active days, revision from retaking tests after feedback and Library reads. Academy admins see states only | PRD §5.3 (deterministic progress math), §11.8, §12.12; `specs.md` §0.1 |
+| 2026-10-19 | **The roadmap is computed by fixed rules from current evidence on every view, not stored and not AI-written** (T105). Inputs: preferences (onboarding, now in `student_profiles`), the diagnostic (first attempt = immutable baseline, enforced by a partial unique index and no update/delete grants; weekly re-assessments kept separately), the readiness profile, the mentor's open work and journey progress. So it "recalculates when new evidence is recorded" (FR-PLAN-01) without a background job. The suggested stage is shown next to the student's self-reported stage, never merged (PRD §5.4); the Daily Mission is at most three actions, each with its reason (FR-DASH-01) | PRD §5.3, §9.3, §13; FR-ONB-01/02, FR-PLAN-01, FR-DASH-01 |
 
 ---
 
@@ -1734,6 +1738,88 @@ What remains:
 - Production: run supabase/migrations/0016_demo_requests.sql after the 0005–0015 catch-up.
 - Super-admin view of demo requests; rate limiting on the public form.
 ```
+
+Date: 2026-10-19
+Task: T101 — AI foundation (worker service + evaluation engine)
+Status: Complete in code; VERIFIED offline (fake model client, local Postgres 17). Not yet run against the real Claude API (no key on this machine)
+
+What changed:
+- `supabase/migrations/0017_ai_jobs.sql`: `ai_jobs` queue, `ai_evaluations` (label fixed to "AI-generated practice evaluation"), `ai_usage`; RLS read-only for the student and their batch mentors (usage: super admin); queue functions not callable through the API
+- `worker/` (separate deployable, Railway/Render): config, pricing, versioned rubrics (`general-response` v1), prompt, schema, guardrails, evaluate, queue, main loop with graceful shutdown; README with deploy steps
+- Tests: worker 20/20 (engine 16, queue-on-Postgres 4 incl. two workers racing); `supabase/tests/workflow-check.sql` 97/97 (12 new AI checks); app lint, types and 470 Vitest tests unchanged and passing
+- CI: new "Database checks & AI worker tests" job (Postgres service): all migrations + RLS workflow check + worker tests on every PR
+
+What remains:
+- Add an Anthropic API key to the worker host and run one real evaluation (smoke test); deploy the worker with staging (T100)
+- T102 (psychology feedback) adds the psychology rubrics and the enqueue trigger on submissions, and shows feedback in the app
+
+Next task:
+- T102
+
+Date: 2026-10-19
+Task: T102 — AI feedback on psychology practice
+Status: Complete in code; VERIFIED offline (fake model, local Postgres 17). Real Claude call deferred to the end (owner decision)
+
+What changed:
+- `0018_psychology_feedback.sql`: trigger on `practice_attempts` queues `psychology-<test>` v1 evaluations for timed TAT/WAT/SRT/SD tests (question + answer snapshot; blank tests not queued); `ai_feedback_ready` notification with a link to the results page; `practice_banks.timing` + super-admin-only `set_practice_bank_timing`
+- Worker: four psychology rubrics whose dimensions describe the responses, never the person; dimension names stored with each evaluation
+- App: `lib/server/ai/feedback.ts`; `components/practice/{ai-feedback,attempt-answers,pending-refresh}.tsx`; student results page + "Your recent tests"; submit screen links to feedback; mentor attempt view linked from the mentee's Practice section; Super Admin timer form; configured timers used in the tests and shown on the Psychology page
+- Tests: app 483 (13 new), worker 28 (rubric safety + end-to-end), database 106 checks (9 new); screenshots in `docs/screenshots/t102/`
+
+What remains:
+- Real Claude evaluation once the API key is added (deferred)
+
+Next task:
+- T103 — AI interview with dynamic follow-ups
+
+Date: 2026-10-19
+Task: T103 — AI interview with dynamic follow-ups
+Status: Complete in code; VERIFIED offline (fake model, local Postgres 17). Real Claude call deferred to the end (owner decision)
+
+What changed:
+- `0019_ai_interview.sql`: `interview_topics` (7 seeded), `interview_sessions`, `interview_turns`; `start_interview_session` / `answer_interview_turn` / `skip_interview_wait` (ownership and turn order checked in the database); `ai_jobs.kind` (`evaluation` | `interview_question`); the next question is written by the worker, or taken from the interview bank when the AI job gives up or the student skips — a late AI follow-up after a skip is dropped; after the last answer an `interview` v1 evaluation is queued; feedback-ready notification; `pg_notify('ai_jobs')` wake-up
+- Worker: `engine/question.ts` (interviewer: one short question, follow-up type clarification/evidence/depth/consistency/reflection or new topic; guardrails reject multiple questions, banned claims and repeats), `rubrics/interview.ts`, job-kind dispatch, separate model settings for questions (effort low), LISTEN-based wake-up
+- App: `lib/server/ai/interview.ts`, `lib/actions/interview.ts`, `components/interview/{interview-start,interview-room}.tsx`, `/student/practice/interview/ai` + `[sessionId]`, mentor `/mentor/mentees/[id]/interviews/[sessionId]` + "AI interviews" on the mentee page, "AI interview" entry on the Interview page
+- Tests: app 495 (12 new), worker 39 (11 new incl. the end-to-end interview), database 119 (13 new); screenshots in `docs/screenshots/t103/`
+
+What remains:
+- Real Claude calls once the API key is added (deferred)
+
+Next task:
+- T104 — Readiness profile
+
+Date: 2026-10-19
+Task: T104 — Readiness profile
+Status: Complete in code; VERIFIED offline (local Postgres 17)
+
+What changed:
+- `0020_readiness_signals.sql`; `types/readiness.ts`; `lib/server/readiness/{compute,service}.ts`; `components/progress/readiness-profile.tsx` (full profile + dashboard strip)
+- Shown on `/student/progress`, the student dashboard, `/mentor/mentees/[id]` (with evidence) and `/academy/students/[id]` (states only — replaces the "arrives in a later phase" placeholder)
+- Tests: app 516 (16 new), database 129 (10 new); screenshots in `docs/screenshots/t104/`
+
+What remains:
+- The GTO dimension stays "not enough evidence" until GTO practice exists (PRD Phase 2) or mentors review GTO assessments
+
+Next task:
+- T105 — Diagnostic assessment + personalised roadmap
+
+Date: 2026-10-19
+Task: T105 — Diagnostic assessment + personalised roadmap
+Status: Complete in code; VERIFIED offline (local Postgres 17). Real Claude call for the diagnostic's written part deferred to the end
+
+What changed:
+- `0021_diagnostic_roadmap.sql`: preferences columns + `save_student_preferences`; mentor/academy-admin read of preferences; diagnostic banks (editable in Practice Banks); `diagnostic_attempts` with immutable baseline; `submit_diagnostic` (scores MCQ by section, once a week, queues AI feedback on the written part); diagnostic notifications
+- Worker: `diagnostic` v1 rubric; readiness maps its dimensions (communication, situational reasoning → psychology, self-awareness)
+- App: `lib/server/{student/preferences,diagnostic/service,roadmap/compute,roadmap/service}.ts`; `components/{student/preferences-form,diagnostic/*,roadmap/*}`; onboarding (step 1 of 2 → diagnostic), profile, diagnostic + result, roadmap pages; Roadmap nav item; dashboard Today's Mission from the roadmap
+- Removed: `components/student/{onboarding-form,profile-form}.tsx`, `lib/api/student.ts`, `lib/student/profile-storage.ts`
+- Tests: app 534 (23 new), worker 40, database 147 (18 new); screenshots in `docs/screenshots/t105/`
+
+What remains:
+- Hindi UI (the preference is stored; English is shown for now)
+- Real Claude feedback on the written diagnostic (deferred)
+
+Next task:
+- T106 — Courses + content versioning + review workflow
 
 ## 14. North Star
 

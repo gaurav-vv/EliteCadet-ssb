@@ -62,7 +62,8 @@ all green as of this update):
 - `tests/unit/lib/dashboards-compute.test.ts`, `dashboards-service.test.ts`, `academy-dashboard-view.test.ts` — dashboard derivations, role and academy/batch scope, no invented values (T088)
 - `tests/unit/lib/notifications-service.test.ts`, `analytics-service.test.ts` — own-notifications scope, safe links, mark read, super-admin-only analytics, boundary validation (T089)
 - `tests/unit/lib/practice-validation.test.ts`, `practice-service.test.ts`, `practice-journey.test.ts`; `tests/integration/bank-practice-runner.test.tsx`, `mock-session.test.tsx` — answer/attempt validation, streak, role scope, server-side scoring, idempotent submit, journey wiring vs the 0014 seed, autosave with retry (T083b)
-- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies migrations 0001–0014 to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics, practice (85 checks)
+- `supabase/tests/workflow-check.sql` (run with `supabase/tests/run-workflow-check.sh`) — applies every migration to a throwaway local Postgres and runs the whole workflow as each role under real RLS: isolation, lifecycles, attendance, progress views, notifications, analytics, practice, AI evaluations, psychology feedback, AI interview, readiness signals, preferences and diagnostic (147 checks)
+- `worker/tests/engine.test.ts`, `worker/tests/queue.db.test.ts` — AI request shape (cache, structured output, fallback, answer as data), outcome classification, guardrails (selection prediction, official score, readiness %, clinical claims, accent, ungrounded evidence), pricing; queue idempotency, backoff, dead-lettering, concurrent claims (T101)
 - `tests/unit/components/login-form.test.tsx` — submit/redirect, custom `redirectTo`, error display, input survives a failed/network-error submit (AGENTS.md §11)
 - `tests/unit/lib/ssb-journey-progress.test.ts` — the on-device Day 5 self-assessment, corrupted/blocked localStorage
 - `tests/unit/lib/resource-completion.test.ts` — resource read/unread state
@@ -230,6 +231,44 @@ implicit.
 | PRC-05 | A retried submit doesn't create a duplicate | P1 | `VERIFIED` (`practice-service.test.ts`, `workflow-check.sql`, `mock-session.test.tsx`) | Submit twice with the same run | One attempt |
 | PRC-06 | Only a super admin edits banks; hiding keeps saved answers | P0 | `VERIFIED` (`practice-service.test.ts`, `workflow-check.sql`) | Edit as a mentor; hide an answered question | Refused; answer kept, question gone for students |
 | PRC-07 | Every journey bank module points at a seeded bank; counts are real | P1 | `VERIFIED` (`practice-journey.test.ts`) | — | 11 banks, 209 questions |
+
+### 2k. AI evaluations (T101)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| AI-01 | No evaluation that predicts selection, claims an official score/readiness %, diagnoses or mentions accent is ever stored | P0 | `VERIFIED` (`worker/tests`) | Model returns such text | Job retried, then dead; no evaluation row |
+| AI-02 | Every evidence quote is the student's own words | P0 | `VERIFIED` (`worker/tests`) | Model invents a quote | Rejected by guardrail |
+| AI-03 | A model failure never loses the answer and never blocks the student | P0 | `VERIFIED` (`worker/tests`, design: answer stored before the job) | 429/5xx/timeout/refusal | Retry with backoff; final failures marked dead |
+| AI-04 | Only the student and their batch mentors read AI feedback; admins can't read the text | P0 | `VERIFIED` (`workflow-check.sql`) | Read as other student / other academy / admin | Nothing |
+| AI-05 | Real Claude call returns a valid evaluation | P0 | MANUAL (needs API key) | Enqueue one job with the worker running | Evaluation stored, cost logged |
+| AI-06 | Submitting a TAT/WAT/SRT/SD test queues exactly one AI evaluation with the right rubric; blank tests and other practice don't | P0 | `VERIFIED` (`workflow-check.sql`, `worker/tests/queue.db.test.ts`) | Submit tests | One job per psychology test |
+| AI-07 | Psychology feedback describes patterns, never the person, and is labelled as an AI practice evaluation | P0 | `VERIFIED` (`worker/tests/rubrics.test.ts`, `ai-feedback-view.test.tsx`) | — | Guardrail + label |
+| AI-08 | Student is notified and can open the feedback; mentor sees a mentee's from the mentee page | P1 | `VERIFIED` (DB + `ai-feedback.test.ts`); MANUAL live | Submit, wait | Notification → results page |
+| AI-09 | Super admin changes a test's timer; students get it next attempt; others can't | P1 | `VERIFIED` (`workflow-check.sql`, `practice-timing.test.ts`) | Set SRT to 20 min | SRT runs 20 min |
+| AI-10 | The AI interviewer follows up on the student's own answer, one question at a time, never repeating or predicting selection | P0 | `VERIFIED` (`worker/tests/question.test.ts`) | — | Guardrails reject bad questions |
+| AI-11 | An AI failure or slow answer never stops the interview (bank fallback, skip) and a late AI question after a skip is dropped | P0 | `VERIFIED` (`worker/tests/queue.db.test.ts`, `workflow-check.sql`) | Refuse / skip | Next question from the bank |
+| AI-12 | Only the student answers their interview; their mentor reads it; others and academy admins can't | P0 | `VERIFIED` (`workflow-check.sql`) | — | — |
+| AI-13 | A failed save keeps the typed answer; mock mode auto-submits when time runs out | P1 | `VERIFIED` (`interview-room.test.tsx`) | — | — |
+
+### 2l. Readiness profile (T104)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| RDY-01 | Readiness is seven states with evidence, never a number | P0 | `VERIFIED` (`readiness-compute.test.ts`, `readiness-profile.test.tsx`) | — | — |
+| RDY-02 | Too little evidence shows "Not enough evidence yet", never a guess | P0 | `VERIFIED` (`readiness-compute.test.ts`) | New student | All dimensions "Not enough evidence yet" |
+| RDY-03 | A mentor's reviews outweigh AI feedback | P1 | `VERIFIED` (`readiness-compute.test.ts`) | 2+ reviews disagree with AI | Mentor-based state |
+| RDY-04 | Only the student, their mentors and their academy admin (states only) can see it | P0 | `VERIFIED` (`workflow-check.sql`, `readiness-service.test.ts`) | Other academy | Refused |
+
+### 2m. Onboarding, diagnostic and roadmap (T105)
+
+| ID | Case | Priority | Status | Steps | Expected result |
+|---|---|---|---|---|---|
+| RMP-01 | Onboarding is saved to the account and editable from Profile | P0 | `VERIFIED` (`student-preferences.test.ts`, `workflow-check.sql`) | Save, reload on another device | Same details |
+| RMP-02 | The first diagnostic is an immutable baseline; later ones are re-assessments, at most weekly | P0 | `VERIFIED` (`workflow-check.sql`, `diagnostic-service.test.ts`) | Retake | Baseline unchanged; comparison shown |
+| RMP-03 | Multiple-choice is scored by the database and correct answers never reach the browser | P0 | `VERIFIED` (`workflow-check.sql`, `diagnostic-service.test.ts`) | — | — |
+| RMP-04 | The diagnostic is low-pressure: no timer, skippable, not marked while taking it | P1 | `VERIFIED` (`diagnostic-runner.test.tsx`) | — | — |
+| RMP-05 | The roadmap updates from new evidence and every Daily Mission item says why (max three) | P0 | `VERIFIED` (`roadmap-compute.test.ts`, `roadmap-view.test.tsx`) | New review arrives | Focus/mission change with reasons |
+| RMP-06 | The suggested stage is shown next to the self-reported one and never claims selection | P1 | `VERIFIED` (`roadmap-view.test.tsx`) | — | — |
 ---
 
 ## 3. Academy isolation / IDOR

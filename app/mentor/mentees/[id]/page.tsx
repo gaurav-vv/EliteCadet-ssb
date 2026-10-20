@@ -15,6 +15,9 @@ import { ProgressBody, ProgressStats } from "@/components/progress/progress-view
 import { getMenteeProgress } from "@/lib/server/progress/service";
 import { MenteePractice } from "@/components/progress/mentee-practice";
 import { getMenteePractice } from "@/lib/server/practice/service";
+import { getMenteeInterviews } from "@/lib/server/ai/interview";
+import { ReadinessProfileView } from "@/components/progress/readiness-profile";
+import { getStudentReadiness } from "@/lib/server/readiness/service";
 
 export const metadata: Metadata = { title: "Mentee" };
 
@@ -31,7 +34,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 // batch, another academy, or nonexistent — is the same "not found" (specs §7.4).
 export default async function MenteeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [result, history, progress, practice] = await Promise.all([getMyMentee(id), getMenteeHistory(id), getMenteeProgress(id), getMenteePractice(id)]);
+  const [result, history, progress, practice, interviews, readiness] = await Promise.all([getMyMentee(id), getMenteeHistory(id), getMenteeProgress(id), getMenteePractice(id), getMenteeInterviews(id, 5), getStudentReadiness(id, new Date().toISOString())]);
   if (!result.ok && result.error?.code === "not_found") notFound();
 
   if (!result.ok || !result.data) {
@@ -73,14 +76,37 @@ export default async function MenteeDetailPage({ params }: { params: Promise<{ i
         )}
       </section>
 
+      {readiness.ok && readiness.data && <ReadinessProfileView profile={readiness.data} />}
+
       <section aria-labelledby="practice-heading" className="flex flex-col gap-3">
         <h2 id="practice-heading" className="text-[18px] font-semibold text-ink">Practice</h2>
         {practice.ok && practice.data ? (
-          <MenteePractice answers={practice.data.answers} attempts={practice.data.attempts} />
+          <MenteePractice studentId={id} answers={practice.data.answers} attempts={practice.data.attempts} />
         ) : (
           <RetryErrorState message={practice.error?.message ?? "We couldn't load this student's practice. Please try again."} />
         )}
       </section>
+
+      {interviews.ok && interviews.data && interviews.data.length > 0 && (
+        <section aria-labelledby="interviews-heading" className="flex flex-col gap-3">
+          <h2 id="interviews-heading" className="text-[18px] font-semibold text-ink">AI interviews</h2>
+          <ListPanel>
+            {interviews.data.map((iv) => (
+              <ListRow key={iv.id} href={`/mentor/mentees/${id}/interviews/${iv.id}`}>
+                <div className="min-w-0">
+                  <p className="text-sm text-ink">
+                    {iv.mode === "mock" ? "Mock interview" : iv.mode === "topic" ? "Topic interview" : "Guided interview"}
+                    {iv.topic ? ` · ${iv.topic}` : ""}
+                  </p>
+                  <p className="text-[13px] text-ink-secondary">
+                    {formatDay(iv.createdAt)} · {iv.answered} of {iv.maxQuestions} answered{iv.status === "active" ? " · in progress" : ""}
+                  </p>
+                </div>
+              </ListRow>
+            ))}
+          </ListPanel>
+        </section>
+      )}
 
       <section aria-labelledby="activity-heading" className="flex flex-col gap-3">
         <h2 id="activity-heading" className="text-[18px] font-semibold text-ink">Assessments and evaluations</h2>

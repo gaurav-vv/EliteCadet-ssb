@@ -2,6 +2,7 @@
 // (practice_banks / practice_items, 0014); the browser only ever sees an
 // item's stable `key` as its id.
 
+import type { TimingConfig } from "@/lib/practice/config";
 import type { GuidedPracticeItem, McqItem } from "@/types/ssb-journey";
 
 export type PsychologyTestType = "tat" | "wat" | "srt" | "sdt";
@@ -20,6 +21,8 @@ export interface PracticeBank {
   kind: PracticeItemKind;
   /** `mcq` banks: McqItem; `response` banks: GuidedPracticeItem. Ids are item keys. */
   items: (McqItem | GuidedPracticeItem)[];
+  /** Timer override set by a super admin; null = the standard timing. */
+  timing: TimingConfig | null;
 }
 
 export interface SavedPracticeAnswer {
@@ -87,6 +90,7 @@ export interface MenteePracticeAnswer {
 
 export interface MenteePracticeAttempt {
   id: string;
+  bankSlug: string;
   bankTitle: string;
   mode: "test" | "mock";
   correct: number | null;
@@ -99,6 +103,7 @@ export interface AdminBankSummary {
   slug: string;
   title: string;
   kind: PracticeItemKind;
+  timing?: TimingConfig | null;
   active: number;
   inactive: number;
 }

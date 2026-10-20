@@ -44,3 +44,35 @@ export const MOCK_SESSIONS: Record<"interview" | "conference", MockSessionConfig
   interview: { questionCount: 8, secondsPerQuestion: 120, maxPiqQuestions: 3, openingQuestionId: "int-1" },
   conference: { questionCount: 4, secondsPerQuestion: 60, maxPiqQuestions: 0 },
 };
+
+// Per-bank timer overrides (T102, FR-PSY-01): stored on practice_banks.timing
+// and validated here at the boundary; anything malformed falls back to the
+// standard timing above.
+export function parseTiming(raw: unknown): TimingConfig | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const int = (v: unknown, min: number, max: number) => (Number.isInteger(v) && (v as number) >= min && (v as number) <= max ? (v as number) : null);
+  if (r.mode === "carousel") {
+    const responseSeconds = int(r.responseSeconds, 5, 900);
+    const stimulusSeconds = r.stimulusSeconds === undefined ? undefined : int(r.stimulusSeconds, 0, 120);
+    if (responseSeconds === null || stimulusSeconds === null) return null;
+    return stimulusSeconds ? { mode: "carousel", stimulusSeconds, responseSeconds } : { mode: "carousel", responseSeconds };
+  }
+  if (r.mode === "budget") {
+    const totalSeconds = int(r.totalSeconds, 60, 7200);
+    return totalSeconds === null ? null : { mode: "budget", totalSeconds };
+  }
+  return null;
+}
+
+export function timingFor(testType: PsychologyTestType, override: TimingConfig | null | undefined): TimingConfig {
+  return override ?? PRACTICE_TIMING[testType];
+}
+
+const minutes = (s: number) => (s % 60 === 0 ? `${s / 60} min` : `${Math.round((s / 60) * 10) / 10} min`);
+
+export function timingLabel(t: TimingConfig): string {
+  if (t.mode === "budget") return `${minutes(t.totalSeconds)} total`;
+  const write = t.responseSeconds >= 60 ? `${minutes(t.responseSeconds)} write` : `${t.responseSeconds}s`;
+  return t.stimulusSeconds ? `${t.stimulusSeconds}s view + ${write}, per picture` : `${write} per item`;
+}
