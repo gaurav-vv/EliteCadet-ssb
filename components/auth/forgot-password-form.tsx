@@ -8,7 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset } from "@/lib/api/auth";
 
-export function ForgotPasswordForm() {
+const REASON_MESSAGES: Record<string, string> = {
+  link_invalid: "That reset link is invalid, expired or already used. Request a new one below.",
+};
+
+export function ForgotPasswordForm({ reason }: { reason?: string }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -49,6 +53,12 @@ export function ForgotPasswordForm() {
         <h1 className="text-xl font-semibold text-ink">Reset your password</h1>
         <p className="text-sm text-ink-secondary">Enter your email and we&apos;ll send you a reset link.</p>
       </div>
+
+      {reason && REASON_MESSAGES[reason] && status !== "error" && (
+        <Alert>
+          <AlertDescription>{REASON_MESSAGES[reason]}</AlertDescription>
+        </Alert>
+      )}
 
       {status === "error" && errorMessage && (
         <Alert variant="destructive">

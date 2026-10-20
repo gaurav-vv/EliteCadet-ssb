@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { EditBatchDialog } from "@/components/academy/batches/batch-form-dialog";
@@ -12,28 +13,22 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { setBatchMentorAction, setBatchStatusAction, type BatchActionResult } from "@/lib/actions/batches";
-import type { BatchMentorOption, BatchRecord } from "@/types/academy";
+import { setBatchStatusAction, type BatchActionResult } from "@/lib/actions/batches";
+import type { BatchRecord } from "@/types/academy";
 
 const TOAST_MS = 4000;
 
 interface BatchRowActionsProps {
   batch: BatchRecord;
-  mentors: BatchMentorOption[];
 }
 
-// Every item is wired to a real mutation: edit, change mentor, archive/restore.
-// (No "View" or "Delete": there is no batch detail page yet, and batches are
-// archived rather than deleted so students can never be orphaned.)
-export function BatchRowActions({ batch, mentors }: BatchRowActionsProps) {
+// Every item is wired to real data: edit, the batch page (mentors and
+// students), archive/restore. No "Delete": batches are archived so their
+// membership history is never orphaned.
+export function BatchRowActions({ batch }: BatchRowActionsProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -90,26 +85,9 @@ export function BatchRowActions({ batch, mentors }: BatchRowActionsProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>Edit batch</DropdownMenuItem>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>{batch.mentorId ? "Change mentor" : "Assign mentor"}</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuRadioGroup
-                value={batch.mentorId ?? "none"}
-                onValueChange={(value) => {
-                  const next = value === "none" ? null : value;
-                  const label = next ? (mentors.find((m) => m.id === next)?.name ?? "the mentor") : "no mentor";
-                  void run(() => setBatchMentorAction(batch.id, next), `${batch.name} now has ${label}.`);
-                }}
-              >
-                <DropdownMenuRadioItem value="none">No mentor</DropdownMenuRadioItem>
-                {mentors.map((m) => (
-                  <DropdownMenuRadioItem key={m.id} value={m.id}>
-                    {m.name}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+          <DropdownMenuItem asChild>
+            <Link href={`/academy/batches/${batch.id}`}>Manage mentors & students</Link>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           {archived ? (
             <DropdownMenuItem onSelect={() => void run(() => setBatchStatusAction(batch.id, "active"), `${batch.name} was restored.`)}>
@@ -128,7 +106,7 @@ export function BatchRowActions({ batch, mentors }: BatchRowActionsProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <EditBatchDialog batch={batch} mentors={mentors} open={editOpen} onOpenChange={setEditOpen} onSaved={(m) => notify(m)} />
+      <EditBatchDialog batch={batch} open={editOpen} onOpenChange={setEditOpen} onSaved={(m) => notify(m)} />
 
       <Dialog open={archiveOpen} onOpenChange={(open) => !pending && setArchiveOpen(open)}>
         <DialogContent className="sm:max-w-md">

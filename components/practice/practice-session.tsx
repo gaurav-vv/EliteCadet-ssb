@@ -6,14 +6,17 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { CarouselRunner } from "@/components/practice/carousel-runner";
 import { BudgetRunner } from "@/components/practice/budget-runner";
-import { PRACTICE_TIMING } from "@/lib/practice/config";
-import { submitPractice } from "@/lib/api/practice";
-import type { PracticeActivitySummary, PracticeItem, PsychologyTestType } from "@/types/practice";
+import { timingLabel, type TimingConfig } from "@/lib/practice/config";
+import { submitAttemptAction } from "@/lib/actions/practice";
+import type { PsychologyActivity } from "@/lib/practice/activities";
+import type { PracticeItem, PsychologyTestType } from "@/types/practice";
 
 interface PracticeSessionProps {
   testType: PsychologyTestType;
-  summary: PracticeActivitySummary;
+  summary: PsychologyActivity;
   items: PracticeItem[];
+  /** The bank's timer (a super admin may have changed it from the standard one). */
+  timing: TimingConfig;
 }
 
 type SessionPhase = "instructions" | "in_progress" | "submitting" | "submitted" | "error";
@@ -29,10 +32,11 @@ function useLeavePageGuard(active: boolean) {
   }, [active]);
 }
 
-export function PracticeSession({ testType, summary, items }: PracticeSessionProps) {
+export function PracticeSession({ testType, summary, items, timing }: PracticeSessionProps) {
   const [phase, setPhase] = useState<SessionPhase>("instructions");
   const [responses, setResponses] = useState<Record<string, string> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
   const [idempotencyKey] = useState(() =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
   );
@@ -44,12 +48,12 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
     setPhase("submitting");
     setErrorMessage(null);
 
-    const result = await submitPractice(
-      {
-        testType,
-        responses: Object.entries(finalResponses).map(([itemId, response]) => ({ itemId, response })),
-      },
+    // Every item is sent (blank if unanswered), so the record shows the whole test.
+    const result = await submitAttemptAction(
+      testType,
+      "test",
       idempotencyKey,
+      items.map((item) => ({ key: item.id, response: finalResponses[item.id] ?? "" })),
     );
 
     if (!result.ok) {
@@ -58,6 +62,7 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
       return;
     }
 
+    setAttemptId(result.data?.id ?? null);
     setPhase("submitted");
   }
 
@@ -67,7 +72,6 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
     }
   }
 
-  const timing = PRACTICE_TIMING[testType];
 
   if (phase === "instructions") {
     return (
@@ -81,8 +85,8 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
         <div className="glass-regular flex flex-col gap-3 px-6 py-6">
           <p className="text-sm text-ink">{summary.description}</p>
           <ul className="flex flex-col gap-1 text-sm text-ink-secondary">
-            <li>{summary.itemCount} items</li>
-            <li>{summary.durationLabel}</li>
+            <li>{items.length} items</li>
+            <li>{timingLabel(timing)}</li>
             <li>Once started, the timer runs automatically — read the instructions fully before you begin.</li>
             <li>Leaving mid-activity will prompt a warning; your progress up to that point is not saved.</li>
           </ul>
@@ -128,10 +132,15 @@ export function PracticeSession({ testType, summary, items }: PracticeSessionPro
       <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10">
         <h1 className="text-xl font-semibold text-ink">Submitted</h1>
         <p className="text-sm text-ink-secondary">
-          Your {summary.title.split(" —")[0]} responses were recorded. AI feedback isn&apos;t available yet
-          (tracked as T034) — your mentor will be able to review this once mentor tools are built.
+          Your {summary.title.split(" —")[0]} answers are saved. AI feedback on the patterns in them is being prepared and
+          usually takes a minute; your mentor can see it too.
         </p>
-        <Button asChild size="sm">
+        {attemptId && (
+          <Button asChild size="sm">
+            <Link href={`/student/practice/psychology/results/${attemptId}`}>See feedback</Link>
+          </Button>
+        )}
+        <Button asChild size="sm" variant="outline">
           <Link href="/student/practice/psychology">Back to Psychology</Link>
         </Button>
       </div>

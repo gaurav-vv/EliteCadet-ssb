@@ -257,6 +257,22 @@
   background: rgba(74, 85, 232, 0.06);
 }
 
+/* Destructive row-action icon button (§7.5): ink-secondary at rest, danger
+   red only on hover; shared accent focus ring (§7.10) */
+.row-action {
+  transition: color var(--motion-duration) var(--motion-easing), background var(--motion-duration) var(--motion-easing);
+}
+@media (hover: hover) {
+  .row-action:hover {
+    color: var(--status-danger);
+    background: var(--status-danger-bg);
+  }
+}
+.row-action:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+
 /* Filter chip active state (§7.5) — accent-outlined, never filled */
 .filter-chip[data-active="true"] {
   border-color: var(--brand-accent);
@@ -390,36 +406,18 @@
   background: var(--status-danger-bg);
 }
 
-/* Sidebar / nav item states (§7.3) */
-.nav-item {
-  transition:
-    transform var(--motion-duration) var(--motion-easing),
-    background var(--motion-duration) var(--motion-easing),
-    color var(--motion-duration) var(--motion-easing);
-}
-.nav-item[data-active="true"] {
-  background: linear-gradient(135deg, var(--brand-accent), var(--brand-accent-2));
-  color: var(--brand-accent-fg);
-  box-shadow: var(--shadow-glow-accent);
-}
-@media (hover: hover) {
-  .nav-item[data-active="false"]:hover {
-    transform: translateY(-1px);
-    background: rgba(0, 0, 0, 0.04);
-  }
-}
-
 /*
- * Academy design language — "SSB Path Academy" (decision: status.md,
- * 2026-09-24, approved scoped deviation from the Glass UI v3 material).
- * Scoped to the .academy-app wrapper so Student/Mentor are untouched; it only
- * re-points existing tokens (surface, radius, materials) and adds the navy
- * sidebar + restrained gold tokens. Glass materials become solid white cards
- * with a hairline border, so every shared component used inside Academy
- * pages (cards, lists, inputs) matches without per-component changes.
- * Promote to :root when Student/Mentor adopt it.
+ * Workspace design language: navy sidebar, white cards, indigo primary,
+ * restrained gold. Introduced for Academy on 2026-09-24 and extended to every
+ * signed-in workspace (Student, Mentor, Academy, Super Admin) on 2026-10-07 at
+ * the user's request, matching their reference image (status.md, Decisions).
+ * Scoped to the .workspace-app wrapper that WorkspaceLayout renders, so the
+ * public site and auth pages keep the Glass UI v3 material. It re-points
+ * existing tokens (surface, radius, materials): glass materials become solid
+ * white hairline-bordered cards, so shared components match without
+ * per-component changes. The --academy-* token names are historical.
  */
-.academy-app {
+.workspace-app {
   --surface-base: #f5f6fb;
   --hairline: #e4e7f1;
   --radius-card: 16px;
@@ -442,19 +440,19 @@
   --academy-chart-ppdt: #3b82f6;
   background: var(--surface-base);
 }
-.academy-app .glass-thin,
-.academy-app .glass-regular,
-.academy-app .glass-thick {
+.workspace-app .glass-thin,
+.workspace-app .glass-regular,
+.workspace-app .glass-thick {
   background: #ffffff;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow-soft);
 }
-.academy-app .glass-hover-lift:hover {
+.workspace-app .glass-hover-lift:hover {
   border-color: color-mix(in srgb, var(--brand-accent) 35%, var(--hairline));
 }
-.academy-app .row-hover-tint:hover {
+.workspace-app .row-hover-tint:hover {
   background: rgba(74, 85, 232, 0.04);
 }
 
@@ -495,29 +493,29 @@
   background: var(--status-danger);
 }
 
-.academy-sidebar {
+.workspace-sidebar {
   background: var(--academy-navy);
   color: var(--academy-nav-fg);
 }
-.academy-nav-item {
+.workspace-nav-item {
   transition:
     background var(--motion-duration) var(--motion-easing),
     color var(--motion-duration) var(--motion-easing);
 }
-.academy-nav-item[data-active="true"] {
+.workspace-nav-item[data-active="true"] {
   background: var(--brand-accent);
   color: var(--academy-nav-fg-strong);
   box-shadow: var(--shadow-glow-accent);
 }
-.academy-nav-item[data-active="false"][data-disabled="false"]:hover {
+.workspace-nav-item[data-active="false"][data-disabled="false"]:hover {
   background: rgba(255, 255, 255, 0.07);
   color: var(--academy-nav-fg-strong);
 }
-.academy-nav-item[data-disabled="true"] {
+.workspace-nav-item[data-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.academy-sidebar :focus-visible {
+.workspace-sidebar :focus-visible {
   outline: 2px solid var(--academy-gold);
   outline-offset: 2px;
 }
@@ -584,4 +582,123 @@
   html {
     @apply font-sans;
   }
+}
+
+/*
+ * Public site (landing page, site header/footer, request-demo) — built to the
+ * user's reference image elitecadet-landing-reference.png on 2026-10-18 at
+ * their explicit request (status.md, Decisions). Same precedent as
+ * .workspace-app: scoped to the .site-public wrapper the public layout
+ * renders, so workspaces keep their own material. Colours are sampled from
+ * the reference: dark navy text/buttons, restrained blue, green and gold
+ * heading accents, pale blue / warm neutral panels, small radii.
+ */
+.site-public {
+  --site-navy: #0b1a38;
+  --site-navy-hover: #172a52;
+  --site-text: #1f2b40;
+  --site-muted: #5f6f87;
+  --site-line: #e3e7ee;
+  --site-bg: #ffffff;
+  --site-bg-soft: #f9fafc;
+  --site-card: #f2f6fa;
+  --site-panel-blue: #e8f1fc;
+  --site-panel-warm: #f6ede3;
+  --site-accent-blue: #0b62e6;
+  --site-accent-green: #05704b;
+  --site-accent-gold: #a8762a;
+  --site-danger: #c0271b;
+  --site-radius-sm: 6px;
+  --site-radius-md: 10px;
+  --site-shadow: 0 1px 2px rgba(11, 26, 56, 0.06);
+  background: var(--site-bg);
+  color: var(--site-text);
+}
+
+.site-btn {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--site-radius-sm);
+  border: 1px solid transparent;
+  padding: 0 1.4rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color var(--motion-duration) var(--motion-easing),
+    border-color var(--motion-duration) var(--motion-easing);
+}
+.site-btn:focus-visible,
+.site-link:focus-visible {
+  outline: 2px solid var(--site-accent-blue);
+  outline-offset: 2px;
+}
+.site-btn-primary {
+  background: var(--site-navy);
+  color: #ffffff;
+}
+.site-btn-primary:hover {
+  background: var(--site-navy-hover);
+}
+.site-btn-secondary {
+  background: #ffffff;
+  border-color: #c9d0db;
+  color: var(--site-navy);
+}
+.site-btn-secondary:hover {
+  border-color: var(--site-navy);
+}
+.site-btn-sm {
+  min-height: 40px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+}
+
+.site-link {
+  border-radius: var(--site-radius-sm);
+  color: var(--site-text);
+  transition: color var(--motion-duration) var(--motion-easing);
+}
+.site-link:hover {
+  color: var(--site-accent-blue);
+}
+
+.site-eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--site-muted);
+}
+
+/* Hero photo fades into the page on wide screens, as in the reference. */
+.site-hero-fade {
+  background: linear-gradient(90deg, var(--site-bg-soft) 0%, rgba(249, 250, 252, 0.7) 12%, rgba(249, 250, 252, 0) 30%);
+}
+.site-panel-fade-blue {
+  background: linear-gradient(90deg, var(--site-panel-blue) 0%, rgba(232, 241, 252, 0) 35%);
+}
+.site-panel-fade-warm {
+  background: linear-gradient(90deg, var(--site-panel-warm) 0%, rgba(246, 237, 227, 0) 40%);
+}
+
+.site-input {
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--site-radius-sm);
+  border: 1px solid #c9d0db;
+  background: #ffffff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--site-text);
+}
+.site-input:focus-visible {
+  outline: 2px solid var(--site-accent-blue);
+  outline-offset: 1px;
+}
+.site-input[aria-invalid="true"] {
+  border-color: var(--site-danger);
 }

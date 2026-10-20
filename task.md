@@ -44,6 +44,8 @@ Academy experience) are complete on mock data — see `status.md` for the verifi
 complete as of 2026-09-19 — see `status.md` §11. T039 (5-Day SSB Practice Journey, previously deferred)
 complete as of 2026-09-20. Remaining: T034/T035 (AI feedback, blocked on B3), and Phase 6 quality/security
 audits, which still need to account for the mock-data gap documented in status.md → Technical Debt.
+Phase 8 (role-based platform, T080–T089, `specs.md` §8a) was added 2026-10-07 from the user's
+platform brief. T080 (auth, users, roles, RBAC) comes first.
 
 ---
 
@@ -548,14 +550,18 @@ regression" also needs a branch-protection rule requiring the CI checks on `main
 
 ---
 
-## T076 — Academy Students on real Supabase (Phase 0) — P0 — `[-]`
-**Why:** User request 2026-10-06: Academy Students must be real database records, not in-memory.
-**Acceptance:** `academy_students` exists with same-academy batch protection and RLS; Students list/search/filter/create/edit/batch-move work against Postgres and persist; loading/empty/error states; validation; responsive; dashboard counts real; lint/typecheck/tests pass; live verification passes.
-**Status:** code + tests done; migration `0004_academy_students.sql` prepared and awaiting the user to apply it; live verification pending.
-**Out of scope:** mentors, assessments, reports, student login/email.
-**Tests:** unit — `academy-student-list.test.ts`, `students-supabase.test.ts`, `academy-dashboard-view.test.ts`.
-
----
+## T076 — One workspace shell for every role — P1 — `[x]`
+**Why:** User request 2026-10-07: every role should get the reference image's dark navy sidebar,
+not only Academy.
+**Requirements:** generalise the Academy shell into `components/layout/workspace/` (brand,
+navigation, mobile drawer, header, sidebar footer, `WorkspaceLayout`). Student, Mentor and Academy
+use it now; Super Admin adopts it when T080 (PR #8) is updated. Rename the scoped CSS classes
+`.academy-app/-sidebar/-nav-item` to `.workspace-*`.
+**Acceptance:** each workspace shows the navy sidebar with its role in the wordmark and the role
+label in the header. The mobile drawer works, there is no horizontal overflow at 375px, and Academy
+is visually unchanged. Lint, typecheck, tests and build pass.
+**Done with PR #8 merged in:** `/admin` uses `WorkspaceLayout`, and the old glass
+`components/layout/{app-shell,sidebar,top-header,mobile-tab-bar}.tsx` are deleted.
 
 ## T070 — Design system consistency pass — P1 — `[ ]`
 **Updated 2026-09-19:** the design system itself changed (Glass Capsule → Apple-Inspired Glass UI v3,
@@ -576,6 +582,456 @@ Academy: readiness, batch performance, students needing attention.
 ## T072 — Production readiness — P0 — `[ ]`
 Production environment variables, build succeeds, lint succeeds, tests pass, security reviewed,
 responsive reviewed, no debug logs, no mock data in production paths, public metadata reviewed.
+
+---
+
+# Phase 8 — Role-based platform (brief 2026-10-07)
+
+Spec: `specs.md` §8a. One branch and one PR per phase into `gaurav-vv/EliteCadet-ssb` `main`,
+merged in order. Every phase connects frontend and backend against the real database.
+
+## T080 — Phase 1: Authentication + Users + Roles + RBAC — P0 — `[-]`
+**Why:** the brief's foundation; every later phase depends on it. Also closes two security holes on
+`main`: users could rewrite their own `profiles.role`, and signup trusted a browser-sent role.
+**Branch:** `feat/admin-access-foundation` (PR #8, reworked from the earlier grant model).
+**Requirements:** migrations `0004_super_admin_role.sql` (enum value, run alone) and
+`0005_users_rbac.sql` (profiles as central users table, role-profile tables, hardened signup trigger,
+privileged-column guard, super-admin RLS, audit log). Middleware maps `/admin` → `super_admin` and
+signs out suspended accounts. `lib/server/{permissions,auth,users}` (RBAC rules, guards,
+validation, repository, service). `/admin` dashboard, User Management list, and user detail with
+role/status changes and history.
+**Acceptance:** `specs.md` §8a.3 (Phase 1 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0004 then
+0005, bootstrapping the first super admin, and a live check with real accounts.
+**Tests:** unit — `rbac.test.ts`, `users-validation.test.ts`, `users-service.test.ts`,
+`users-repository.test.ts`, `login-suspended.test.ts`, `middleware-role.test.ts`, `redirect.test.ts`;
+integration — `middleware-session.test.ts`; e2e — `/admin` logged-out redirects.
+
+## T081 — Phase 2: Academies + Academy Admin — P0 — `[-]`
+**Spec:** `specs.md` §8a.3b. **Depends on:** T080. **Branch:** `feat/phase-2-academies` (stacked on
+T076/T080).
+**Requirements:** migration `0006_academies.sql` (academy profile + status, super-admin
+insert/update, academy-admin update of their own academy, status/owner guard trigger,
+`academy_member_counts` security-invoker view). `lib/server/academies` (validation, repository,
+service). Super Admin `/admin/academies` list and detail: create, edit, suspend/reactivate, members
+(add by email with role, remove students), history. "Change academy" on user detail. Academy Admin
+settings read and write the real academy. Members of a suspended academy are signed out and can't
+log in.
+**Acceptance:** `specs.md` §8a.3b (Phase 2 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0006 and a
+live check with real accounts.
+**Tests:** unit — `academies-validation.test.ts`, `academies-service.test.ts`, `blocked.test.ts`,
+`users-validation.test.ts` (`checkAcademyChange`), `rbac.test.ts`, `login-suspended.test.ts`;
+integration — `middleware-session.test.ts` (academy suspension).
+
+## T082 — Phase 3: Batches + Students + Mentor assignment — P0 — `[-]`
+**Spec:** `specs.md` §8a.3c. **Depends on:** T081. **Branch:** `feat/phase-3-batches` (stacked on
+T081).
+**Requirements:**
+- Migration `0007_batch_membership.sql`: `batch_students` (one batch per student) and
+  `batch_mentors` (many per batch) replace `batches.mentor_id`, with existing assignments copied.
+  A role/academy integrity trigger, mentor-scoped RLS, the `batch_overview` and `academy_students`
+  views, `academy_add_student` / `academy_remove_student`, and invited students joining their
+  academy.
+- Academy Admin: Students (real list, filters, add by email or invite, change batch, remove),
+  student detail, batch detail (assign/remove mentors, add/remove students), and Mentors (real
+  list and invite).
+- Mentor: Mentees and mentee detail scoped to their own batches.
+**Acceptance:** `specs.md` §8a.3c (Phase 3 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0007 and a
+live check.
+**Tests:** unit — `academy-people-validation.test.ts`, `academy-people-service.test.ts`,
+`batches-supabase.test.ts` (membership actions), `academy-batch-logic.test.ts`.
+
+## T083 — Phase 4: Global content management — P1 — `[-]`
+**Spec:** `specs.md` §8a.4. **Depends on:** T082. **Branch:** `feat/phase-4-content` (stacked on T082).
+**Requirements:**
+- Migration `0008_contents.sql`: `contents` (all brief fields, draft/published/archived, never
+  deleted, https-only links) and `content_assignments` (one academy or one batch each).
+  `can_read_content()` is the single reader rule, enforced by RLS.
+- `lib/server/content`, plus the Super Admin Content Library: category tabs with counts, filters,
+  create/edit, publish/unpublish/archive/restore, academy/batch assignments.
+- A Library for students, mentors and academy admins showing only what RLS allows.
+**Acceptance:** `specs.md` §8a.4 (Phase 4 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0008 and a
+live check.
+**Tests:** unit — `content-validation.test.ts`, `content-service.test.ts`, `rbac.test.ts`.
+
+## T083b — Practice banks and saved practice — P1 — `[-]`
+**Spec:** `specs.md` §8a.4g. **Depends on:** T083, T089. **Branch:** `feat/t083b-practice-content`
+(stacked on T089). **Decided 2026-10-08:** banks and saved practice; Super Admin edits banks;
+answers readable by the student and their mentors, counts only for admins.
+**Requirements:**
+- Migration `0014_practice.sql`:
+  - `practice_banks` and `practice_items`, seeded with the shipped content (209 questions)
+  - `practice_answers` and `practice_attempts`, with MCQ scored in the database, idempotent on the
+    client key
+  - `is_my_mentee()`, `practice_stats()` (counts only) and `practice_move_item()`
+  - `student_progress` gains practice counts
+- Server: `lib/server/practice/{validation,service,journey-progress}.ts`, `lib/actions/practice.ts`.
+  The journey structure moves to `lib/practice/journey.ts`, the psychology list to
+  `lib/practice/activities.ts`.
+- Runners save to the account:
+  - self-paced answers autosave, with a retry on failure
+  - tests and mock runs submit through server actions
+  - progress ring, badges, continue card and final summary are server-rendered from saved answers
+- Super Admin **Practice Banks** pages: list, add, edit, reorder, hide or show.
+- Student dashboard: Today's Mission and practice streak. Mentor mentee page: Practice section.
+  Academy Performance: Practice Done column.
+- Removed:
+  - `lib/mock/{practice,ssb-journey}.ts` (moved) and `lib/api/{practice,ssb-journey}.ts`
+  - `lib/student/{practice-answers,mock-attempts}.ts` and the journey part of
+    `ssb-journey-progress.ts`
+  - their tests
+- Stays on the device by design: the PIQ form and its answers, the self-assessment and onboarding.
+  Resources and the curated Day-2 library stay in code.
+**Acceptance:** `specs.md` §8a.4g. Lint, typecheck, tests, build and `supabase/tests` pass.
+**Status:** code and tests done; database layer verified on a local Postgres; UI reviewed locally with
+sample data. Waiting on applying 0014 to the real project.
+**Tests:** unit — `practice-validation.test.ts`, `practice-service.test.ts`, `practice-journey.test.ts`;
+integration — `bank-practice-runner.test.tsx`, `mock-session.test.tsx` (rewritten);
+`supabase/tests/workflow-check.sql` (25 practice checks).
+
+## T084 — Phase 5: Mentor content, starter templates and content requests — P1 — `[-]`
+**Spec:** `specs.md` §8a.4 (Mentor content, decided 2026-10-08). **Depends on:** T083.
+**Branch:** `feat/phase-5-mentor-content` (stacked on T083).
+**Requirements:**
+- Migration `0009_mentor_content.sql`: mentor-owned rows in `contents`, pinned to
+  assigned/student by trigger. Mentor RLS covers own read/insert/update and sharing only with
+  batches the mentor teaches. `is_template` and `template_source_id` for platform starter
+  templates. `content_requests`, with `respond_to_content_quote`, `cancel_content_request` and
+  `deliver_content_request` enforcing the lifecycle.
+- Mentor: My Content (create/edit/publish/archive, share with own batches), Starter templates
+  ("Use this template" copies into My Content), and Content requests (request, accept/decline a
+  quote, cancel, open delivered content).
+- Super Admin: "Offer as a starter template" on platform content, and Content Requests (quote in
+  INR, mark in progress, deliver, mark fee settled).
+- Fees are recorded and settled outside the app; there's no automated billing.
+**Acceptance:** `specs.md` §8a.4 (Phase 5 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0009 and a
+live check.
+**Tests:** unit — `mentor-content-service.test.ts`, `content-requests-service.test.ts`,
+`content-requests-validation.test.ts`, `content-service.test.ts`.
+
+## T085 — Phase 6: Session scheduling — P1 — `[-]`
+**Spec:** `specs.md` §8a.4b. **Depends on:** T084. **Branch:** `feat/phase-6-sessions` (stacked on T084).
+**Requirements:**
+- Migration `0010_sessions.sql`: `mentor_availability` (weekly IST slots), `sessions` (one batch
+  and one mentor who teaches it, online with an https link or offline with a location, whole
+  batch or selected students, scheduled/completed/cancelled with a reason, at most 8h) and
+  `session_participants` (students of that batch only). A btree_gist exclusion constraint
+  prevents a mentor double-booking. `can_see_session()` is the single visibility rule (RLS).
+- `lib/server/sessions` (IST ⇄ UTC validation, service), `lib/actions/sessions.ts`.
+- Mentor: agenda (upcoming/past/cancelled), schedule, edit, cancel with a reason, mark
+  completed, availability.
+- Student: Sessions page. Academy: Sessions page. The batch page lists upcoming sessions.
+- The sample-data mentor sessions UI and actions were removed. Notifications come in Phase 10.
+**Acceptance:** `specs.md` §8a.4b (Phase 6 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0010 and a
+live check.
+**Tests:** unit — `sessions-validation.test.ts`, `sessions-service.test.ts`.
+
+## T086 — Phase 7: Assessments + Feedback — P1 — `[-]`
+**Spec:** `specs.md` §8a.4c (+ §7.5). **Depends on:** T085. **Branch:** `feat/phase-7-assessments`
+(stacked on T085).
+**Requirements:**
+- Migration `0011_assessments.sql`: `assessments` (per batch, mentor-created, JSON questions,
+  draft/published/closed, questions locked once opened), `assessment_attempts` (one per student,
+  draft → submitted then locked; only while open and only students of the batch) and `feedback`
+  (one per attempt, in_review → reviewed then locked; reviewed requires score, strengths and
+  improvement areas; score within the maximum). All enforced by triggers and RLS.
+- `lib/server/assessments` (validation, service), `lib/actions/assessments.ts`.
+- Mentor: Assessments (create/edit draft, open/close/reopen, submissions), Evaluations queue
+  (pending / in review / reviewed), evaluate page (save draft, submit review), and assessment
+  history on the mentee page.
+- Student: Assessments (answer with drafts, submit once, see reviewed feedback with the evaluator
+  and date). Academy: Assessments overview (nav now live).
+- Removed the sample-data evaluations pages, form and actions.
+**Acceptance:** `specs.md` §8a.4c (Phase 7 block). Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0011 and a
+live check.
+**Tests:** unit — `assessments-validation.test.ts`, `assessments-service.test.ts`.
+
+## T087 — Phase 8: Progress tracking — P1 — `[-]`
+**Spec:** `specs.md` §8a.4d. **Depends on:** T086. **Branch:** `feat/phase-8-progress` (stacked on
+T086).
+**Requirements:**
+- Migration `0012_progress.sql`: `session_attendance` (marked by the session's mentor, only once
+  the session has started, only for its participants) and `content_progress` (a student marks
+  Library items done, only content they can read). Security-invoker views `student_scores` (one
+  row per reviewed attempt) and `student_progress` (per-student summary).
+- `lib/server/progress` (pure `compute.ts`, `service.ts`), `lib/actions/progress.ts`.
+- Student: My Progress (average score, reviewed count, attendance, Library read, score trend chart
+  with a table view, averages by area, strength/weak area, recent feedback, rule-based next steps
+  with reasons). "Mark as done" on Library items.
+- Mentor: average score and attendance columns on Mentees, a progress section on the mentee page,
+  attendance marking on started sessions.
+- Academy: Performance (academy totals, needs-attention with the reason, per-batch averages; nav
+  now live).
+- Removed the sample-data progress API and mock.
+**Acceptance:** `specs.md` §8a.4d. Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0012 and a
+live check.
+**Tests:** unit — `progress-compute.test.ts`, `progress-service.test.ts`.
+
+## T088 — Phase 9: Role-specific dashboards — P1 — `[-]`
+**Spec:** `specs.md` §8a.4e. **Depends on:** T087. **Branch:** `feat/phase-9-dashboards` (stacked on
+T087).
+**Requirements:**
+- `lib/server/dashboards` (pure `compute.ts`, `service.ts`): one function per role. Each checks the
+  role first, scopes to the caller, and reuses the progress, sessions, assessments and people
+  services.
+- Student, Mentor and Academy dashboards and Academy Reports on real data. Every widget has an
+  empty state, and every list links to where the user acts on it.
+- No readiness score (use average reviewed score); hide Today's Mission and the streak until T083b.
+- Removed:
+  - the sample data: `lib/mock/{student,mentor,academy,academy-analytics}.ts` and
+    `lib/api/{mentor,academy}.ts`
+  - the student dashboard's `getDashboardData`
+  - the demo-data actions and controls
+  - the "Demo data" badge and the assessment radar
+  - the dead sample-data types
+  - the obsolete "known gap" isolation test (isolation is covered by the service tests)
+**Acceptance:** `specs.md` §8a.4e. Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying
+0004–0012 and a live check.
+**Tests:** unit — `dashboards-compute.test.ts`, `dashboards-service.test.ts`,
+`academy-dashboard-view.test.ts` (rewritten).
+
+## T089 — Phase 10: Analytics + Notifications — P2 — `[-]`
+**Spec:** `specs.md` §8a.4f. **Depends on:** T088. **Branch:** `feat/phase-10-analytics-notifications`
+(stacked on T088).
+**Requirements:**
+- Migration `0013_notifications_analytics.sql`:
+  - a `notifications` table: own rows only, recipients change only `read_at`, no client inserts
+  - trigger-written events: sessions scheduled or cancelled, assessments opened, submissions,
+    reviews, batch membership, content requests
+  - `platform_analytics(p_since)`: SECURITY DEFINER, refuses everyone but a super admin
+- `lib/server/notifications`, `lib/server/analytics`, `lib/actions/notifications.ts`.
+- A header bell in every workspace: unread badge, a fresh list when opened, mark one or all read.
+  A Notifications page for each role (the Academy nav item is now live).
+- Super Admin Platform Analytics with a 30/90/365-day range (the nav item is now live).
+**Acceptance:** `specs.md` §8a.4f. Lint, typecheck, tests and build pass.
+**Status:** code and tests done; UI reviewed locally with sample data. Waiting on applying 0013 and a
+live check.
+**Tests:** unit — `notifications-service.test.ts`, `analytics-service.test.ts`.
+
+---
+
+## T090 — Auth flow repair + production migration catch-up — P0 — `[-]`
+**Spec:** `specs.md` §8a (auth/RBAC), `AGENTS.md` §10–§12. **Depends on:** T080–T089 migrations.
+**Why:** production Supabase is at 0001–0004 only (0005+ never applied), so every profile read that
+selects `status`/`email`/`academies.status` fails; the code treated that failure as "no role" and sent
+users to `/forbidden`. Password reset links did not return through `/auth/callback`; dev-preview
+crashed without a service-role key and used a password committed to the repo.
+**Requirements:**
+- Profile lookups distinguish query failure (`account_unavailable`, retryable, never `/forbidden`)
+  from a missing profile (`profile_missing`, signed out) — proxy, login and page guard.
+- Login honours `next` only when safe and openable by the role; auth callback rejects off-site `next`.
+- Signup handles "Confirm email" (no session) with a confirmation screen and an `emailRedirectTo`.
+- Reset flow: link → `/auth/callback?next=/reset-password` (PKCE) or `token_hash`; reset page
+  verifies the recovery session (also hash tokens from invites) and offers a new link when invalid.
+- `createAdminClient()` fails with a named config error, never a fallback key; dev-preview is
+  opt-in (`DEV_PREVIEW_ENABLED`), password from env, 503/409 explanations instead of HTTP 500.
+- `middleware.ts` → `proxy.ts` (Next 16 convention).
+- Production: apply 0005–0014 after the legacy `academy_students` table is resolved (user approval).
+**Acceptance:** tests in `auth-api`, `auth-redirect`, `auth-callback`, `dev-preview-route`,
+`admin-client`, `auth-flow-forms`, `middleware-session`, `login-form`; lint, typecheck, build pass;
+live login, signup, reset email and migrations verified against production.
+**Status:** local code + tests done (2026-10-18); catch-up verified on a simulated production DB. Production migration plan written, awaiting
+approval. Reset email delivery not verified (needs custom SMTP + URL allowlist).
+
+---
+
+## T091 — Landing page to reference image + demo requests — P1 — `[x]`
+**Why:** user-supplied design (`elitecadet-landing-reference.png`); Request Demo had no flow.
+**Acceptance:** page matches the reference's layout/order; every link resolves; demo form stores a row
+(insert-only RLS); no invented statistics; responsive with no horizontal overflow; lint, typecheck,
+tests, build pass. **Follow-ups:** T092 super-admin demo-request list + form rate limiting; replace
+cropped reference photos with licensed high-resolution images.
+
+
+## T093 — File materials (PDFs and documents) in Supabase Storage — P1 — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** Super Admin, Mentors and Academy Admins upload;
+students don't.
+**Requirements:**
+- Migration:
+  - a private `materials` bucket
+  - storage RLS mirroring `can_read_content()` / ownership
+  - `contents` gains a file reference: path, name, type, size
+  - an academy-owned content type for Academy Admin documents
+- Server-side upload: type sniffed from the bytes, 50 MB limit, path built by the server. Download
+  through short-lived signed URLs only.
+- Content forms (Super Admin, mentor, academy) get a file field. Library rows show file type and
+  size, and open through the signed link.
+**Acceptance:** `specs.md` §8a.4h. Database checks cover cross-academy and non-assigned access.
+**Needs:** a Supabase project (Storage can't be tested on plain Postgres).
+
+## T094 — Live meeting rooms with LiveKit (WebRTC) — P1 — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Decided 2026-10-19:** LiveKit (open source; LiveKit Cloud, India
+region).
+**Requirements:**
+- Server route that issues a join token only to the session's mentor and participants, in the join
+  window, never for cancelled sessions.
+- Env: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (server only).
+- Room page `/{role}/sessions/[id]/room` built with LiveKit's React components: camera, mic, screen
+  share, chat. The mentor can mute or remove participants; students join muted.
+- A LiveKit webhook (signature-verified) marks attendance on join.
+- Online sessions default to a room; a pasted link remains as a fallback.
+**Acceptance:** `specs.md` §8a.4h. Tests cover token scope (outsider, cancelled, outside window).
+**Needs:** a LiveKit Cloud project (free tier). Local testing works with `livekit-server --dev`.
+
+## T095 — Session recordings — P2 (PRD: after the MVP) — `[ ]`
+**Spec:** `specs.md` §8a.4h. **Depends on:** T093, T094. **Decided 2026-10-19:** record sessions.
+**Requirements:**
+- Mentor-only start and stop through LiveKit Egress, with a visible "Recording" indicator and a
+  notice on joining.
+- Output to a private Supabase Storage bucket. Signed-link playback for the session's people and
+  their academy admin.
+- Retention: 90 days by default, removed by a scheduled job (in the worker service).
+**Acceptance:** `specs.md` §8a.4h.
+**Needs:** a paid LiveKit plan for recording minutes; consent wording reviewed for students under 18.
+
+---
+
+# Phase 9 — PRD v2.0 MVP (adopted 2026-10-19, `specs.md` §0)
+
+Built one at a time, in this order. Each task ships with tests, `status.md` and screenshots, as
+before.
+
+## T100 — Staging environment live — P0 — `[ ]`
+Supabase staging (Mumbai) and Vercel preview deployments. Apply migrations 0001–0016. Create the
+first Super Admins (`supabase/snippets/grant_super_admin.sql`). Run the 10 logged-in e2e tests and
+click through every role.
+**Needs (owner):** Supabase staging keys in `.env.local` / Vercel. **Acceptance:** every e2e test
+passes against staging.
+
+## T101 — AI foundation: worker service + evaluation engine — P0 — `[-]`
+- A separate worker (Node + TypeScript, Railway or Render, Mumbai) with a Postgres job queue,
+  retries, timeouts and dead-letter handling.
+- Provider keys live only in the worker.
+- One evaluation engine for every practice type:
+  - versioned rubrics per dimension
+  - output = evidence → rating → confidence → feedback (§0.1)
+- Guardrails: output-schema validation, banned-claim checks (no selection prediction, no
+  diagnosis), and "AI-generated practice evaluation" labels.
+- Telemetry per call: cost and latency.
+- Every AGENTS.md §11 failure is handled, and the student's answer is never lost.
+**Needs (owner):** an Anthropic API key in the worker host's settings (provider decided 2026-10-19:
+Claude).
+**Status:** built and tested offline with a fake model client:
+- migration `0017_ai_jobs.sql`
+- `worker/`: queue, evaluation engine, guardrails, telemetry, `general-response` v1 rubric
+- 20 worker tests (16 engine, 4 queue against Postgres)
+- 12 new RLS checks (97 total)
+- a CI job running both against a throwaway Postgres
+
+**Waiting on:** a real Claude smoke test once the key exists, and deploying the worker (staging,
+T100).
+
+## T102 — AI feedback on psychology practice — P0 — `[-]`
+FR-PSY-01/02. Feedback on TAT/WAT/SRT/SD submissions: observed patterns only, history over time,
+shown to the student and their mentor. Timers configurable per assessment version.
+**Status:** built and tested offline:
+- migration `0018_psychology_feedback.sql`: a submitted TAT/WAT/SRT/SD test is queued for
+  evaluation; the student is notified when it's ready; per-bank timers
+- worker rubrics `psychology-{tat,wat,srt,sdt}` v1 (observed patterns only)
+- results page `/student/practice/psychology/results/[id]` and "Your recent tests"
+- mentor view `/mentor/mentees/[id]/practice/[attemptId]`
+- Super Admin timer form on the bank page
+
+**Tests:** 106 database checks; 28 worker tests, including the end-to-end submit → evaluate →
+notify flow; 483 app tests.
+**Waiting on:** the real Claude call (API key), deferred to the end by the owner.
+
+## T103 — AI interview with dynamic follow-ups — P0 — `[-]`
+FR-INT-01/02. Guided, Topic and Mock modes. Follow-up questions based on the previous answer:
+clarification, evidence, depth, consistency, reflection. Structured feedback in the same session.
+Can use the student's PIQ. Text answers only.
+**Status:** built and tested offline:
+- migration `0019_ai_interview.sql`: sessions, turns and topics; student functions start, answer
+  and skip; bank fallback when an AI question fails or the student skips (stale AI follow-ups are
+  dropped); feedback job on the last answer; LISTEN wake-up; notifications
+- worker: AI interviewer (`question.ts`, low effort, guardrails: one question, no banned claims,
+  no repeats) and the `interview` v1 feedback rubric
+- app: `/student/practice/interview/ai` (start: guided, topic or mock, optional PIQ sharing; past
+  interviews) and `[sessionId]` (live room with a mock timer, waiting state and skip; feedback at
+  the end); mentor view and list on the mentee page
+
+**Tests:** 119 database checks; 39 worker tests, including the full interview flow on Postgres;
+495 app tests.
+
+## T104 — Readiness profile — P0 — `[-]`
+FR-DASH-02. Seven dimensions, each with a state (Developing / Improving / Strong / Needs Attention),
+its evidence trail and a confidence level, computed from mentor reviews, AI evaluations, practice
+and attendance. Shown to the student, their mentor and the academy (states only). Never a single
+number.
+**Status:** built and tested offline:
+- migration `0020_readiness_signals.sql`: one access-checked function returning numbers only
+- fixed, explainable rules in `lib/server/readiness/compute.ts`: mentor reviews lead once there are
+  two; "improving" from recent trends; "not enough evidence" instead of guessing; confidence
+- shown on the student's Progress page and dashboard, the mentor's mentee page, and the academy
+  student page (states only)
+
+**Tests:** 129 database checks; 516 app tests.
+
+
+## T105 — Diagnostic assessment + personalised roadmap — P0 — `[-]`
+FR-ONB-01/02, FR-PLAN-01.
+- Onboarding adds: entry scheme, target date, preparation stage, language, daily study time.
+- A low-anxiety diagnostic sets an immutable baseline.
+- The generated roadmap is recalculated when new evidence arrives.
+- Daily Mission reads from the roadmap (FR-DASH-01). Every recommendation answers "why".
+**Status:** built and tested offline:
+- migration `0021_diagnostic_roadmap.sql`: preferences on `student_profiles` (onboarding moves from
+  the browser to the account); 12 diagnostic questions (8 multiple choice, scored in the database;
+  4 written, AI feedback with rubric `diagnostic` v1); an immutable baseline plus weekly
+  re-assessments
+- roadmap computed by fixed rules on every view (`lib/server/roadmap`): suggested stage shown next to
+  the self-reported one; up to three focus areas with reasons; daily-time split; Daily Mission of at
+  most three actions, each with its reason
+- pages: `/onboarding`, `/student/profile`, `/student/diagnostic` (+ `[id]`), `/student/roadmap`
+  (nav item); dashboard Today's Mission now comes from the roadmap
+- removed: browser-only onboarding and profile storage
+
+**Tests:** 147 database checks; 40 worker tests; 534 app tests.
+
+
+## T106 — Courses + content versioning + review workflow — P0 — `[ ]`
+FR-CONT-01.
+- Program → course → module → lesson structure, with text and video lessons.
+- Lifecycle: Draft → Review → Approved → Published → Deprecated → Archived.
+- Published versions can't change; progress is tied to the version the learner used.
+- SME review step with audit log. AI drafts are allowed but always reviewed.
+- Uses file materials (T093).
+**Needs (owner):** content authors and SME reviewers (§0.6.2).
+
+## T107 — Structured mentor feedback + AI-prepared briefing — P0 — `[ ]`
+FR-MENT-01/02.
+- Mentor evaluation per rubric dimension (dimension → evidence → rating → recommendation), tagged
+  as mentor-sourced and merged into the readiness profile.
+- AI briefing per student before a session: history, weak areas, recent activity.
+
+## T108 — AI Mentor (grounded chat) — P0 — `[ ]`
+FR-AI-01/02.
+- Conversational guidance grounded in the approved knowledge base (T106), using retrieval.
+- Explains concepts, adjusts the plan, shows "why" on request.
+- Escalates to a mentor for disputed or high-stakes questions.
+- Memory layers with retention and deletion (§0.5). Rate-limited.
+
+## T109 — MVP hardening + pilot launch — P0 — `[ ]`
+- Run the audits: T060–T065 (authorization, state, responsive, accessibility, performance,
+  security).
+- Hindi-ready UI strings.
+- Production environment with backups, monitoring and SMTP.
+- Privacy policy, terms and consent (students may be under 18).
+- Pilot with one academy.
+
+# Phase 10 — PRD Phase 2 (P1), after the pilot
+
+T093 file materials · T094 video rooms · mentor override of AI evaluations · messaging and
+announcements · GTO digital practice · Lecturette · Mock SSB · voice capture · spaced repetition ·
+community with validation pipeline. Each gets a full task when it starts.
 
 ---
 

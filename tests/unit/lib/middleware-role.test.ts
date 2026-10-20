@@ -25,6 +25,13 @@ describe("roleForPath", () => {
     expect(roleForPath("/academy/students/456")).toBe("academy_admin");
   });
 
+  it("maps /admin and nested paths to super_admin, anchored", () => {
+    expect(roleForPath("/admin")).toBe("super_admin");
+    expect(roleForPath("/admin/users/123")).toBe("super_admin");
+    expect(roleForPath("/administration")).toBeNull();
+    expect(roleForPath("/adminer")).toBeNull();
+  });
+
   it("does not require a role for public routes", () => {
     expect(roleForPath("/")).toBeNull();
     expect(roleForPath("/login")).toBeNull();

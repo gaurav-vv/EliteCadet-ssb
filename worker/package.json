@@ -1,0 +1,21 @@
+{
+  "name": "ssb-ai-worker",
+  "private": true,
+  "type": "module",
+  "description": "AI worker for SSB Academy: claims evaluation jobs from Postgres and calls Claude (T101).",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "pg": "^8.23.1",
+    "tsx": "^4.20.6",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.6"
+  },
+  "engines": { "node": ">=22" }
+}

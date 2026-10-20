@@ -4,7 +4,7 @@
 // Every action: (1) confirms the caller is an academy admin, (2) re-validates
 // input on the server, (3) writes as the admin's own session so RLS is the
 // final gate, (4) reports success only after Postgres confirms the write.
-// There is intentionally no delete action: batches are archived (see migration).
+// There is intentionally no delete action: batches are archived (see 0003).
 
 import { revalidatePath } from "next/cache";
 import { BATCHES_NOT_SET_UP_MESSAGE } from "@/lib/api/batches";
@@ -29,12 +29,12 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 const fail = (error: BatchActionError): BatchActionResult<never> => ({ ok: false, error });
 
-async function requireAdmin(): Promise<{ supabase: Supabase; academyId: string } | BatchActionResult<never>> {
+async function requireAdmin(): Promise<{ supabase: Supabase; academyId: string; userId: string } | BatchActionResult<never>> {
   const { profile } = await getCurrentUserAndProfile();
-  if (!profile || profile.role !== "academy_admin" || !profile.academyId) {
+  if (!profile || profile.role !== "academy_admin" || !profile.academyId || profile.status !== "active") {
     return fail({ code: "unauthorized", message: "Only an academy admin can manage batches." });
   }
-  return { supabase: await createClient(), academyId: profile.academyId };
+  return { supabase: await createClient(), academyId: profile.academyId, userId: profile.id };
 }
 
 function isFailure(value: unknown): value is BatchActionResult<never> {
@@ -50,8 +50,8 @@ function dbError(error: { code?: string; message?: string }): BatchActionResult<
   return fail({ code: "server_error", message: "We couldn't save your changes. Please try again." });
 }
 
-// The mentor must be a mentor profile in the admin's own academy. (RLS also
-// enforces this; checking first gives a clear message instead of a 403.)
+// The mentor must be a mentor profile in the admin's own academy. (The 0007
+// trigger also enforces this; checking first gives a clear message.)
 async function mentorIsValid(supabase: Supabase, academyId: string, mentorId: string): Promise<boolean> {
   const { data } = await supabase
     .from("profiles")
@@ -73,15 +73,11 @@ export async function createBatchAction(input: BatchFormInput): Promise<BatchAct
 
   const parsed = validateBatchInput(input);
   if (!parsed.ok) return fail({ code: "validation_error", message: "Please fix the highlighted fields.", fieldErrors: parsed.errors });
-  const { name, mentorId, startDate } = parsed.value;
-
-  if (mentorId && !(await mentorIsValid(admin.supabase, admin.academyId, mentorId))) {
-    return fail({ code: "validation_error", message: "Select a mentor from your academy.", fieldErrors: { mentorId: "Select a mentor from your academy." } });
-  }
+  const { name, startDate } = parsed.value;
 
   const { data, error } = await admin.supabase
     .from("batches")
-    .insert({ academy_id: admin.academyId, name, mentor_id: mentorId, start_date: startDate })
+    .insert({ academy_id: admin.academyId, name, start_date: startDate })
     .select("id, name")
     .single();
   if (error || !data) return dbError(error ?? {});
@@ -97,15 +93,11 @@ export async function updateBatchAction(id: string, input: BatchFormInput): Prom
 
   const parsed = validateBatchInput(input);
   if (!parsed.ok) return fail({ code: "validation_error", message: "Please fix the highlighted fields.", fieldErrors: parsed.errors });
-  const { name, mentorId, startDate } = parsed.value;
-
-  if (mentorId && !(await mentorIsValid(admin.supabase, admin.academyId, mentorId))) {
-    return fail({ code: "validation_error", message: "Select a mentor from your academy.", fieldErrors: { mentorId: "Select a mentor from your academy." } });
-  }
+  const { name, startDate } = parsed.value;
 
   const { data, error } = await admin.supabase
     .from("batches")
-    .update({ name, mentor_id: mentorId, start_date: startDate })
+    .update({ name, start_date: startDate })
     .eq("id", id)
     .eq("academy_id", admin.academyId)
     .select("id");
@@ -116,28 +108,85 @@ export async function updateBatchAction(id: string, input: BatchFormInput): Prom
   return { ok: true, data: null };
 }
 
-// Mentor-only change (the row menu). A single column update: the batch ->
-// mentor link is `batches.mentor_id`; nothing else stores it.
-export async function setBatchMentorAction(id: string, mentorId: string | null): Promise<BatchActionResult> {
+// Batch membership — batch_mentors / batch_students (0007). The database also
+// enforces role + same-academy (trigger) and academy scope (RLS); the checks
+// here give a clear message first.
+
+async function batchInAcademy(supabase: Supabase, academyId: string, batchId: string): Promise<boolean> {
+  const { data } = await supabase.from("batches").select("id").eq("id", batchId).eq("academy_id", academyId).maybeSingle();
+  return Boolean(data);
+}
+
+async function studentIsValid(supabase: Supabase, academyId: string, studentId: string): Promise<boolean> {
+  const { data } = await supabase.from("profiles").select("id").eq("id", studentId).eq("role", "student").eq("academy_id", academyId).maybeSingle();
+  return Boolean(data);
+}
+
+function membershipError(error: { code?: string; message?: string }): BatchActionResult<never> {
+  if (error.code === "23514") return fail({ code: "validation_error", message: "That person isn't eligible for this batch." });
+  if (error.code === "23505") return fail({ code: "validation_error", message: "They're already on this batch." });
+  return dbError(error);
+}
+
+function refreshBatch(batchId: string) {
+  revalidatePath("/academy/batches");
+  revalidatePath(`/academy/batches/${batchId}`);
+  revalidatePath("/academy/students");
+  revalidatePath("/academy/mentors");
+}
+
+export async function addBatchMentorAction(batchId: string, mentorId: string): Promise<BatchActionResult> {
   const admin = await requireAdmin();
   if (isFailure(admin)) return admin;
-  if (!isUuid(id)) return fail({ code: "not_found", message: "Batch not found." });
-  if (mentorId !== null && !isUuid(mentorId)) return fail({ code: "validation_error", message: "Select a valid mentor." });
-  if (mentorId && !(await mentorIsValid(admin.supabase, admin.academyId, mentorId))) {
-    return fail({ code: "validation_error", message: "Select a mentor from your academy." });
-  }
+  if (!isUuid(batchId) || !isUuid(mentorId)) return fail({ code: "validation_error", message: "Select a valid mentor." });
+  if (!(await batchInAcademy(admin.supabase, admin.academyId, batchId))) return fail({ code: "not_found", message: "Batch not found." });
+  if (!(await mentorIsValid(admin.supabase, admin.academyId, mentorId))) return fail({ code: "validation_error", message: "Select a mentor from your academy." });
 
-  const { data, error } = await admin.supabase
-    .from("batches")
-    .update({ mentor_id: mentorId })
-    .eq("id", id)
-    .eq("academy_id", admin.academyId)
-    .select("id");
-  if (error) return dbError(error);
-  if (!data || data.length === 0) return fail({ code: "not_found", message: "Batch not found." });
-
-  refresh();
+  const { error } = await admin.supabase.from("batch_mentors").insert({ batch_id: batchId, mentor_id: mentorId, assigned_by: admin.userId });
+  if (error) return membershipError(error);
+  refreshBatch(batchId);
   return { ok: true, data: null };
+}
+
+export async function removeBatchMentorAction(batchId: string, mentorId: string): Promise<BatchActionResult> {
+  const admin = await requireAdmin();
+  if (isFailure(admin)) return admin;
+  if (!isUuid(batchId) || !isUuid(mentorId)) return fail({ code: "not_found", message: "Mentor not found on this batch." });
+
+  const { data, error } = await admin.supabase.from("batch_mentors").delete().eq("batch_id", batchId).eq("mentor_id", mentorId).select("mentor_id");
+  if (error) return dbError(error);
+  if (!data || data.length === 0) return fail({ code: "not_found", message: "Mentor not found on this batch." });
+  refreshBatch(batchId);
+  return { ok: true, data: null };
+}
+
+// A student is in at most one batch: adding moves them from any other batch.
+export async function setStudentBatchAction(studentId: string, batchId: string | null): Promise<BatchActionResult> {
+  const admin = await requireAdmin();
+  if (isFailure(admin)) return admin;
+  if (!isUuid(studentId) || (batchId !== null && !isUuid(batchId))) return fail({ code: "validation_error", message: "Select a valid batch." });
+  if (!(await studentIsValid(admin.supabase, admin.academyId, studentId))) return fail({ code: "not_found", message: "Student not found in your academy." });
+
+  if (batchId === null) {
+    const { error } = await admin.supabase.from("batch_students").delete().eq("student_id", studentId);
+    if (error) return dbError(error);
+  } else {
+    if (!(await batchInAcademy(admin.supabase, admin.academyId, batchId))) return fail({ code: "not_found", message: "Batch not found." });
+    const { error } = await admin.supabase
+      .from("batch_students")
+      .upsert({ batch_id: batchId, student_id: studentId, added_by: admin.userId }, { onConflict: "student_id" });
+    if (error) return membershipError(error);
+    refreshBatch(batchId);
+  }
+  revalidatePath("/academy/students");
+  revalidatePath(`/academy/students/${studentId}`);
+  revalidatePath("/academy/batches", "layout");
+  return { ok: true, data: null };
+}
+
+// The batch page's "Add student": batch first so it can be .bind()-ed.
+export async function addStudentToBatchAction(batchId: string, studentId: string): Promise<BatchActionResult> {
+  return setStudentBatchAction(studentId, batchId);
 }
 
 export async function setBatchStatusAction(id: string, status: BatchStatus): Promise<BatchActionResult> {

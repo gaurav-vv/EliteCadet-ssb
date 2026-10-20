@@ -38,11 +38,13 @@ and record the resolution in `status.md` → *Decisions*.
 
 ## 1. Project Overview
 
-SSB Academy is a web platform for **Services Selection Board (SSB) preparation**, serving three roles:
+SSB Academy is a web platform for **Services Selection Board (SSB) preparation**, serving three academy roles plus a platform Super Admin:
 
 - **Student** — practises, receives AI-assisted feedback, learns, tracks readiness.
 - **Mentor** — reviews mentees, evaluates performance, runs sessions, gives feedback.
 - **Academy Admin** — manages students, batches and mentors; monitors academy-level performance.
+- **Super Admin** — manages the whole platform: users, academies, global content, permissions,
+  analytics (added 2026-10-07, `specs.md` §8a).
 
 ### Core loops
 
@@ -219,6 +221,15 @@ Motion:
 One-off values in components are a review failure. If a value is needed twice, it is a token.
 
 ### 7.3 App shell (persists across every authenticated section)
+
+> **Decision 2026-10-07 (user-approved, from their reference image):** every signed-in workspace
+> (Student, Mentor, Academy, Super Admin) uses the one shared `WorkspaceLayout`
+> (`components/layout/workspace/`): a navy sidebar whose wordmark names the workspace, a white sticky
+> header with the role label, and solid white hairline cards. That material is scoped to
+> `.workspace-app` in `app/globals.css`, so the public site and auth pages keep the glass material
+> described here. Where this section's glass-tier rules conflict with that, `.workspace-app` wins
+> inside workspaces. Tokens, radius, typography, motion, accessibility and the content patterns in
+> §7.4–§7.13 still apply everywhere. Never build a per-role shell.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -420,7 +431,7 @@ not found · server error · timeout · network failure.
 
 ## 10. Authentication, Authorization, Isolation
 
-Roles: `STUDENT`, `MENTOR`, `ACADEMY_ADMIN`.
+Roles: `STUDENT`, `MENTOR`, `ACADEMY_ADMIN`, `SUPER_ADMIN` (platform-level, `/admin`; `specs.md` §8a).
 
 - Authentication and authorization are separate concerns.
 - **Authorization is enforced server-side.** Hiding a route in the client is UX, not security.

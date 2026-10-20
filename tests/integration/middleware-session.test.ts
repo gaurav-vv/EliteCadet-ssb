@@ -12,16 +12,26 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: vi.fn() }));
 
 const mockedCreateClient = vi.mocked(createServerClient);
 
-function fakeSupabase(user: { id: string } | null, profileRole: string | null) {
-  const single = vi.fn().mockResolvedValue({ data: profileRole ? { role: profileRole } : null });
-  const eq = vi.fn(() => ({ single }));
+function fakeSupabase(
+  user: { id: string } | null,
+  profileRole: string | null,
+  status = "active",
+  academyStatus: string | null = null,
+  queryError: { code: string; message: string } | null = null,
+) {
+  const maybeSingle = vi.fn().mockResolvedValue({
+    data: queryError || !profileRole ? null : { role: profileRole, status, academy: academyStatus ? { status: academyStatus } : null },
+    error: queryError,
+  });
+  const eq = vi.fn(() => ({ maybeSingle }));
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
+  const signOut = vi.fn().mockResolvedValue({ error: null });
   mockedCreateClient.mockReturnValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }), signOut },
     from,
   } as unknown as ReturnType<typeof createServerClient>);
-  return { from, eq };
+  return { from, eq, signOut };
 }
 
 function request(path: string) {
@@ -34,6 +44,8 @@ function redirectTarget(res: Response): URL | null {
 }
 
 beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
   mockedCreateClient.mockReset();
 });
 
@@ -77,15 +89,98 @@ describe("updateSession", () => {
     expect(target?.search).toBe("");
   });
 
-  it("sends a logged-in user with no profile row to /forbidden", async () => {
-    fakeSupabase({ id: "u1" }, null);
-    const res = await updateSession(request("/student"));
-    expect(redirectTarget(res)?.pathname).toBe("/forbidden");
+  it("signs out a logged-in user with no profile row and explains why (not /forbidden)", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, null);
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("reason")).toBe("profile_missing");
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it("treats a failed profile query (e.g. a migration not applied) as an outage, not a permission denial", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, "student", "active", null, { code: "42703", message: "column profiles.status does not exist" });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const target = redirectTarget(await updateSession(request("/student/practice")));
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("reason")).toBe("account_unavailable");
+    expect(target?.searchParams.get("next")).toBe("/student/practice");
+    // Kept signed in so a retry works once the database recovers.
+    expect(signOut).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it("sends a profile with an unrecognised role to /forbidden", async () => {
+    fakeSupabase({ id: "u1" }, "janitor");
+    expect(redirectTarget(await updateSession(request("/student")))?.pathname).toBe("/forbidden");
+  });
+
+  it("never redirects /login, /reset-password or /auth/callback (no loops)", async () => {
+    for (const path of ["/login?reason=account_unavailable", "/reset-password", "/auth/callback", "/forgot-password", "/forbidden"]) {
+      const { from } = fakeSupabase({ id: "u1" }, null, "active", null, { code: "42703", message: "x" });
+      expect(redirectTarget(await updateSession(request(path)))).toBeNull();
+      expect(from).not.toHaveBeenCalled();
+    }
   });
 
   it("ignores a role supplied by the browser in the query string", async () => {
     fakeSupabase({ id: "u1" }, "student");
     const res = await updateSession(request("/academy?role=academy_admin"));
     expect(redirectTarget(res)?.pathname).toBe("/forbidden");
+  });
+});
+
+describe("updateSession — /admin (super_admin workspace) and account status", () => {
+  it("redirects a logged-out visitor to /login", async () => {
+    fakeSupabase(null, null);
+    const res = await updateSession(request("/admin/users"));
+    const target = redirectTarget(res);
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("next")).toBe("/admin/users");
+  });
+
+  it.each(["student", "mentor", "academy_admin"])("sends a %s who opens /admin to /forbidden", async (role) => {
+    fakeSupabase({ id: "u1" }, role);
+    const res = await updateSession(request("/admin"));
+    expect(redirectTarget(res)?.pathname).toBe("/forbidden");
+  });
+
+  it("lets a super admin into /admin and nested pages", async () => {
+    for (const path of ["/admin", "/admin/users", "/admin/users/123"]) {
+      fakeSupabase({ id: "u1" }, "super_admin");
+      expect(redirectTarget(await updateSession(request(path)))).toBeNull();
+    }
+  });
+
+  it.each(["/student", "/mentor", "/academy"])("keeps a super admin out of another role's workspace (%s)", async (path) => {
+    fakeSupabase({ id: "u1" }, "super_admin");
+    expect(redirectTarget(await updateSession(request(path)))?.pathname).toBe("/forbidden");
+  });
+
+  it("signs out a suspended account and sends it to login with a reason", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, "student", "suspended");
+    const res = await updateSession(request("/student"));
+    const target = redirectTarget(res);
+    expect(signOut).toHaveBeenCalled();
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("reason")).toBe("account_suspended");
+  });
+
+  it("suspends a super admin too", async () => {
+    fakeSupabase({ id: "u1" }, "super_admin", "suspended");
+    expect(redirectTarget(await updateSession(request("/admin")))?.searchParams.get("reason")).toBe("account_suspended");
+  });
+
+  it.each(["student", "mentor", "academy_admin"])("signs out a %s whose academy is suspended", async (role) => {
+    const { signOut } = fakeSupabase({ id: "u1" }, role, "active", "suspended");
+    const path = role === "student" ? "/student" : role === "mentor" ? "/mentor" : "/academy";
+    const target = redirectTarget(await updateSession(request(path)));
+    expect(signOut).toHaveBeenCalled();
+    expect(target?.searchParams.get("reason")).toBe("academy_suspended");
+  });
+
+  it("does not block a super admin because of an academy's status", async () => {
+    fakeSupabase({ id: "u1" }, "super_admin", "active", "suspended");
+    expect(redirectTarget(await updateSession(request("/admin")))).toBeNull();
   });
 });

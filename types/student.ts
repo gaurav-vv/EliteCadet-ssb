@@ -1,81 +1,39 @@
-// Types for the student domain. These are the working API contract per
-// AGENTS.md §9 until a real backend exists — lib/api/student.ts is written
-// against these shapes so a real fetch implementation can replace
-// lib/mock/student.ts without any component changing.
+// Student preparation preferences (T105, PRD §9.1–9.2, FR-ONB-01): saved to
+// the account, editable any time. The stage here is self-reported and is
+// kept separate from the roadmap's observed stage (PRD §5.4).
 
 export type PreparationStage = "just_starting" | "in_progress" | "final_stretch";
+export type EntryScheme = "nda" | "cds" | "afcat" | "tes" | "tgc" | "ssc" | "ncc" | "other";
+export type PreferredLanguage = "en" | "hi";
 
-export type TargetExam = "cds" | "afcat" | "nda" | "ssc" | "other";
+export const ENTRY_SCHEMES: Record<EntryScheme, string> = {
+  nda: "NDA",
+  cds: "CDS",
+  afcat: "AFCAT",
+  tes: "TES (10+2 Technical Entry)",
+  tgc: "TGC (Technical Graduate Course)",
+  ssc: "SSC (Short Service Commission)",
+  ncc: "NCC Special Entry",
+  other: "Other",
+};
 
-export interface OnboardingInput {
+export const PREPARATION_STAGES: Record<PreparationStage, string> = {
+  just_starting: "Just starting",
+  in_progress: "Preparing for a while",
+  final_stretch: "Final stretch",
+};
+
+export const STUDY_MINUTES = [15, 30, 45, 60, 90, 120] as const;
+
+export interface StudentPreferences {
   fullName: string;
-  targetExam: TargetExam;
-  preparationStage: PreparationStage;
-  academyName: string | null;
+  entryScheme: EntryScheme | null;
+  targetSsbDate: string | null;
+  preparationStage: PreparationStage | null;
+  preferredLanguage: PreferredLanguage;
+  dailyStudyMinutes: number | null;
   goals: string;
+  onboarded: boolean;
 }
 
-export interface StudentProfile {
-  fullName: string;
-  targetExam: TargetExam;
-  preparationStage: PreparationStage;
-  academyName: string | null;
-  goals: string;
-  onboardedAt: string;
-}
-
-export interface ReadinessSummary {
-  score: number;
-  basis: string;
-}
-
-export interface ActivityMetrics {
-  practicesCompleted: number;
-  sessionsAttended: number;
-}
-
-export interface MissionItem {
-  title: string;
-  description: string;
-  href: string;
-}
-
-export interface UpcomingSession {
-  title: string;
-  withName: string;
-  scheduledFor: string;
-}
-
-export interface SkillTrendPoint {
-  label: string;
-  value: number;
-}
-
-export interface ProgressSummary {
-  skillArea: string;
-  trend: SkillTrendPoint[];
-}
-
-export interface RecentActivityItem {
-  id: string;
-  title: string;
-  category: string;
-  completedAt: string;
-}
-
-export interface Recommendation {
-  title: string;
-  reason: string;
-  href: string;
-}
-
-export interface StudentDashboardData {
-  profile: StudentProfile;
-  readiness: ReadinessSummary | null;
-  activity: ActivityMetrics;
-  todaysMission: MissionItem | null;
-  upcomingSession: UpcomingSession | null;
-  progress: ProgressSummary | null;
-  recentActivity: RecentActivityItem[];
-  recommendations: Recommendation[];
-}
+export type PreferencesInput = Omit<StudentPreferences, "onboarded">;

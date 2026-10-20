@@ -1,10 +1,9 @@
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border/60">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-6 py-8 text-center text-sm text-ink-secondary sm:flex-row sm:justify-between sm:text-left">
-        <p>© {new Date().getFullYear()} SSB Academy. All rights reserved.</p>
-        <p>AI-assisted preparation guidance, not an official SSB assessment.</p>
-      </div>
+    <footer id="about" className="scroll-mt-20 border-t border-[var(--site-line)] bg-[var(--site-bg-soft)]">
+      <p className="mx-auto max-w-[1440px] px-4 py-5 text-sm text-[var(--site-muted)] sm:px-6 lg:px-12">
+        © {new Date().getFullYear()} EliteCadet. All rights reserved.
+      </p>
     </footer>
   );
 }

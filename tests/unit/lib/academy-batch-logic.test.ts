@@ -14,26 +14,25 @@ const MENTOR = "3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b";
 
 describe("validateBatchInput", () => {
   it("accepts a name only and normalises whitespace", () => {
-    expect(validateBatchInput({ name: "  Batch   Alpha ", mentorId: null, startDate: null })).toEqual({
+    expect(validateBatchInput({ name: "  Batch   Alpha ", startDate: null })).toEqual({
       ok: true,
-      value: { name: "Batch Alpha", mentorId: null, startDate: null },
+      value: { name: "Batch Alpha", startDate: null },
     });
   });
 
-  it("treats the 'none' select value and an empty date as no mentor / no date", () => {
-    const result = validateBatchInput({ name: "Alpha", mentorId: "none", startDate: "" });
-    expect(result).toEqual({ ok: true, value: { name: "Alpha", mentorId: null, startDate: null } });
+  it("treats an empty date as no date", () => {
+    const result = validateBatchInput({ name: "Alpha", startDate: "" });
+    expect(result).toEqual({ ok: true, value: { name: "Alpha", startDate: null } });
   });
 
   it("rejects too-short, too-long and blank names", () => {
-    expect(validateBatchInput({ name: "A", mentorId: null, startDate: null })).toMatchObject({ ok: false, errors: { name: expect.any(String) } });
-    expect(validateBatchInput({ name: "   ", mentorId: null, startDate: null })).toMatchObject({ ok: false });
-    expect(validateBatchInput({ name: "x".repeat(61), mentorId: null, startDate: null })).toMatchObject({ ok: false });
+    expect(validateBatchInput({ name: "A", startDate: null })).toMatchObject({ ok: false, errors: { name: expect.any(String) } });
+    expect(validateBatchInput({ name: "   ", startDate: null })).toMatchObject({ ok: false });
+    expect(validateBatchInput({ name: "x".repeat(61), startDate: null })).toMatchObject({ ok: false });
   });
 
-  it("rejects a malformed mentor id and impossible dates", () => {
-    expect(validateBatchInput({ name: "Alpha", mentorId: "not-a-uuid", startDate: null })).toMatchObject({ ok: false, errors: { mentorId: expect.any(String) } });
-    expect(validateBatchInput({ name: "Alpha", mentorId: MENTOR, startDate: "2026-02-30" })).toMatchObject({ ok: false, errors: { startDate: expect.any(String) } });
+  it("rejects impossible dates", () => {
+    expect(validateBatchInput({ name: "Alpha", startDate: "2026-02-30" })).toMatchObject({ ok: false, errors: { startDate: expect.any(String) } });
     expect(isIsoDate("2026-09-14")).toBe(true);
     expect(isIsoDate("14/09/2026")).toBe(false);
   });

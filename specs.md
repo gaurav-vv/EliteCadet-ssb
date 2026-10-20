@@ -4,9 +4,105 @@
 **Authority:** Defines *what* the product must do. `AGENTS.md` defines *how* to build it.
 **Last structural revision:** 2026-09-16
 
-> Scope note: this platform has no media player, video playback, watch rooms, chat rooms, playback
-> queues or real-time playback synchronisation. Any requirement of that kind found in older prompts
-> or notes belongs to a different project and must be ignored.
+> Scope note: this platform has no media player for entertainment, watch-party rooms, playback queues
+> or playback synchronisation; requirements of that kind belong to a different project. Live mentor
+> sessions in video rooms (§8a.4h) and session recordings are in scope, per the PRD (§0).
+
+---
+
+## 0. Product Source — PRD v2.0 (adopted 2026-10-19)
+
+The product requirements come from **"AI-Powered Online SSB Preparation & Academy Management
+Platform — PRD v2.0"** (August 2026, 36 pages; kept by the product owner, not committed to this
+public repository). This file carries those requirements in implementable form. Where an older
+section below conflicts with this one, **this section wins**. Record any further conflict in
+`status.md` → Decisions.
+
+### 0.1 Hard rules (PRD §5.3–5.5, §11, §12.11) — never break
+
+- Every internal result is labelled a **"Platform Assessment Result"** or an **"AI-generated practice
+  evaluation"**, never an official SSB score. Nothing predicts or guarantees selection.
+- Psychology and GTO observations are **"observed practice patterns"**, never clinical,
+  psychological or personality claims.
+- Accent is never a signal of communication quality.
+- No single composite readiness number. Readiness is a **profile across dimensions**
+  (Communication, Self-Awareness, Interview, Psychology, GTO, Revision, Consistency). Each dimension
+  gets a state (**Developing / Improving / Strong / Needs Attention**), its evidence and a
+  confidence level.
+- **Feedback structure:** Observation → Evidence → Impact → Improvement Action → Recommended
+  Practice. Low confidence means more cautious advice, never more assertive.
+- **AI and mentor evaluations are both kept** when they disagree. The mentor's is marked final; the
+  AI's is never silently overwritten.
+- **AI grounding:**
+  - Factual guidance must trace back to the approved knowledge base, and uncertainty is stated.
+  - The learner sees evidence and conclusions, never the model's internal reasoning.
+- **Content:**
+  - AI may draft content, but a human author, an SME and a reviewer approve it before publishing.
+  - Published content can't change; edits create a new version.
+- **Digital vs physical practice:** digital GTO practice always says what still needs physical,
+  offline practice.
+- **Self-reported vs observed:** self-reported confidence is kept separate from observed
+  performance.
+
+### 0.2 MVP (P0) — required to validate the core loop with one pilot academy
+
+| ID | Requirement | State on 2026-10-19 |
+|---|---|---|
+| FR-ONB-01 | Onboarding captures entry scheme, target SSB date, preparation stage, preferred language and daily study time | Partial (T030) |
+| FR-ONB-02 | A low-anxiety **diagnostic assessment** sets the starting point. The baseline is never changed; later re-assessments are stored separately | Missing |
+| FR-ONB-02 / FR-PLAN-01 | A **personalised roadmap** is generated after the diagnostic and recalculated when new evidence arrives | Missing |
+| FR-DASH-01 | **Daily Mission:** a bounded, ranked set of next actions, each explainable | Partial (Today's Mission, Do next) |
+| FR-DASH-02 | **Readiness profile** across at least 5 dimensions, with state, evidence and confidence (§0.1) | Partial (averages by area) |
+| FR-INT-01/02 | **AI interview** (Guided, Topic, Mock modes): dynamic follow-up questions based on the previous answer, then structured feedback in the same session. Text answers at MVP | Missing (fixed question lists) |
+| FR-PSY-01/02 | Timed TAT/WAT/SRT/SD with configurable timers, plus **pattern-level, non-diagnostic feedback**. Response history is kept for comparison over time | Partial (timed practice, no feedback) |
+| FR-AI-01/02 | **AI Mentor:** grounded, explainable conversational guidance. Every non-trivial recommendation shows its evidence on request | Missing |
+| FR-MENT-01 | Mentor sees an **AI-prepared briefing** of an assigned student before a session | Missing |
+| FR-MENT-02 | Mentor submits **structured feedback** per rubric dimension (dimension → evidence → rating → recommendation), tagged as mentor-sourced, merged into the student's profile | Partial (score + strengths + improvements) |
+| FR-CONT-01 | **Content versioning + lifecycle:** Draft → Review → Approved → Published → Deprecated → Archived. Published versions can't change, and a learner's history stays valid after updates | Missing (draft/published/archived only) |
+| — | Core learning content: SSB Fundamentals, OLQs, Interview, Psychology, as **courses → modules → lessons**, text and video | Partial (flat Library) |
+| FR-ACAD-01 | Academy, batch, student and mentor management | **Done** |
+| FR-SEC-01 | Role-based access and academy data isolation | **Done** (database-verified) |
+| FR-SAFE-01 | Platform/practice labelling on every result (§0.1) | Partial |
+| FR-ANLY-01 | Student sees improvement between two attempts of the same type | Partial (score trend) |
+
+### 0.3 Phase 2 (P1)
+
+- GTO digital preparation (with simulated group participants, clearly labelled) and Lecturette
+  practice (preparation + speaking timers, topic bank).
+- Mock SSB integrated session with resumable state and a 7-day improvement plan.
+- Mentor override and annotation of AI evaluations, with the original preserved.
+- Mentor-led live sessions in video rooms (§8a.4h, T094). Mentor ↔ student messaging, protected
+  from unsolicited contact.
+- Academy scheduling with conflict detection, attendance and batch analytics (**done**). Academy
+  announcements.
+- Community: discussions, study groups, a validation pipeline into the knowledge base, reputation
+  and moderation.
+- Voice capture for interview answers and audio capture for lecturettes.
+- Spaced-repetition revision engine.
+
+### 0.4 Later (P2/P3)
+
+Session recordings (T095), live events/AMAs/workshops with waitlists, real-time multiplayer GTO,
+video capture, mentor analytics, multi-campus academies, institutional licensing, and expansion to
+the written defence exams.
+
+### 0.5 Non-functional (PRD §20)
+
+- RBAC is enforced at the API layer.
+- AI memory has an explicit retention and deletion policy per layer.
+- Recordings need consent and a retention period.
+- AI chat feels real-time; long evaluations show progress, never a blocking wait.
+- Mock SSB survives a dropped connection.
+- The platform handles seasonal spikes around call-letter releases.
+- **Hindi and English:** UI text must not assume English only.
+- Mentor overrides, moderation and content publication are audited with actor, time and reason.
+
+### 0.6 Open decisions (owner: product)
+
+1. ~~AI provider~~ **Decided 2026-10-19: Anthropic Claude.** The key lives only in the worker (T101); model routing per task is a T101 design choice.
+2. **Who writes and SME-reviews** the knowledge base and courses.
+3. **Pricing** and the institutional licensing model.
+4. **Languages** beyond Hindi and English.
 
 ---
 
@@ -31,6 +127,7 @@ Supported by: **Mentor Guidance** and **Academy Visibility**.
 STUDENT
 MENTOR
 ACADEMY_ADMIN
+SUPER_ADMIN   (added 2026-10-07 — see §8a)
 ```
 
 | Role | Uses the platform to |
@@ -483,8 +580,9 @@ Profile · editable fields · settings.
 Dashboard · Students · Batches · Mentors · Reports · Settings
 ```
 
-Deferred: courses, attendance, assessments, admin-side practice authoring, announcements, messages,
-advanced insights.
+Deferred: courses, attendance, assessments, announcements, messages, advanced insights.
+Admin-side practice authoring, previously listed here, was un-deferred 2026-10-07 as Super Admin
+global content plus mentor-owned content. See §8a.4.
 
 ### 8.2 Academy dashboard
 
@@ -532,6 +630,503 @@ misleading chart.
 ### 8.7 Academy profile / settings
 
 Academy information · admin profile · basic settings.
+
+---
+
+## 8a. Platform Architecture — Four Roles (brief 2026-10-07)
+
+**Decision:** the user supplied a full platform brief on 2026-10-07. It supersedes the earlier
+"three admin panels with per-area grants" idea and un-defers "admin-side practice authoring" from
+§8.1, as platform content owned by the Super Admin (§8a.4). Delivered in ten phases (§8a.6),
+tracked as T080–T089.
+
+### 8a.1 Roles and workspaces
+
+One application, one authentication system, one design system, one database. Four role-based
+workspaces:
+
+| Role | Workspace | Manages |
+|---|---|---|
+| `SUPER_ADMIN` | `/admin` | The entire platform: all users, academies, global learning content, permissions, platform analytics, system configuration |
+| `ACADEMY_ADMIN` | `/academy` | Their own academy only: batches, students, mentor-to-batch assignment, academy content, academy/batch performance |
+| `MENTOR` | `/mentor` | Their own teaching content and schedule; evaluates and monitors only the batches/students assigned to them |
+| `STUDENT` | `/student` | Their own academy, batch, mentors, available content, sessions, assessments, submissions, feedback, progress, notifications |
+
+The UI must make it immediately clear which role is signed in (sidebar and header role label) and
+what that role may manage.
+
+### 8a.2 Authorization chain
+
+```text
+Authentication → Role → Academy → Batch → Assignment → Resource → Permission
+```
+
+Enforced server-side on every page, action and query, with Postgres RLS as a second line of defence.
+Possessing an ID never grants access. An academy can never reach another academy's students, mentors,
+batches, content or analytics.
+
+### 8a.3 User Management (separate from Content Management)
+
+- **One identity system.** Supabase Auth stays the only authentication provider. `profiles` is the
+  central users table: id, name, email, phone, auth provider, role, academy membership, status
+  (`active · suspended`), last login, created/updated timestamps.
+- **Role-specific profiles** (1:1): `student_profiles`, `mentor_profiles`, `academy_admin_profiles`,
+  `super_admin_profiles`.
+- **Who can set what.** Self-signup creates only a Student or an Academy Admin. A Mentor joins only
+  through an invite. Only a Super Admin can change role, academy, status or email, and never their own
+  role or status. The first Super Admin is created by hand in the database.
+- **Suspension.** A suspended account is signed out on its next request and can't log in.
+- **Audit.** Every role or status change records who changed it, when, and from/to what.
+
+**Acceptance (Phase 1):**
+- A signed-out visitor to any workspace is sent to login. A signed-in user of another role gets the
+  forbidden state. A Super Admin can't open other roles' workspaces either.
+- A user can't change their own role, academy or status by any means, including calling the API
+  directly.
+- The Super Admin dashboard shows real platform totals. User Management lists every account with
+  search, role/status filters, sorting and pagination. A user's detail page shows their account
+  information, role and status changes with confirmation, and the account history.
+- Changing a user to Mentor or Academy Admin requires them to belong to an academy.
+
+### 8a.3b Academies (Phase 2)
+
+- **Academy record:** name (2–80 chars), description, logo URL, contact email, contact phone,
+  status (`active · suspended`), created/updated timestamps.
+- **Super Admin** (`/admin/academies`):
+  - List with search, status filter, pagination, and per-academy counts of admins, mentors and
+    students.
+  - Create and edit academies.
+  - Suspend or reactivate an academy, with confirmation.
+  - Manage members: add an existing account by email as Student, Mentor or Academy Admin; move
+    someone between academies; remove a student.
+  - A Mentor or Academy Admin can't be left without an academy: change their role first.
+  - A user's academy can also be changed from their User Management page.
+  - Every change is audited.
+- **Academy Admin** (`/academy/settings`): edits their own academy's name, description and contact
+  details. They can never change its status or reach another academy.
+- **Suspension:** while an academy is suspended, its admins, mentors and students are signed out on
+  their next request and can't log in. Super Admins are unaffected.
+
+**Acceptance (Phase 2):**
+- Academy counts and lists come from the database. A newly created academy appears immediately with
+  zero members.
+- Adding a member by email fails clearly for an unknown email, for a super admin, and when the
+  role/academy rules above would be broken.
+- An academy admin can edit only their own academy, and can't change its status, even by calling
+  the API directly.
+- Members of a suspended academy can't use the platform until it's reactivated.
+
+### 8a.3c Batches, Students and Mentor assignment (Phase 3)
+
+- **Batch membership** is first-class: `batch_students` (a student is in at most one batch at a
+  time) and `batch_mentors` (any number of mentors per batch). Both sides must belong to the
+  batch's academy and have the right role, which the database enforces.
+- **Academy Admin**, for their own academy only:
+  - **Students:** list with search, batch and status filters, sorting and pagination.
+  - **Add a student by email:** an existing account with no academy joins this one; a new person
+    is emailed an invite. A student already in another academy can't be taken.
+  - Change a student's batch, or remove a student from the academy.
+  - **Batch detail:** add/remove students and assign/remove mentors.
+  - **Mentors:** the academy's mentors with their batches, plus invite a mentor.
+- **Mentor:** "Mentees" lists exactly the students in batches they're assigned to. Opening any other
+  student, from this academy or another, is "not found", enforced on the server and by RLS.
+- No readiness, performance or activity figure is shown until it comes from real data (Phase 8).
+
+**Acceptance (Phase 3):**
+- Student and mentor membership in batches comes from the database. Counts match.
+- An academy admin can't add, move or view students of another academy, even by calling the API
+  directly.
+- A mentor sees only their assigned batches' students; changing an id in the URL yields not-found.
+- Removing a student from an academy also removes them from its batches; their account is kept.
+
+### 8a.4 Content Management (Phase 4–5)
+
+"Student content" means **platform learning content that students consume**, not managing students.
+
+**Global content (Super Admin, Phase 4):** `/admin/content`.
+- **Fields:** title, description, category (Psychology · GTO · Interview · Communication · Current
+  Affairs · General), type (study material · video · document · article · practice exercise ·
+  assessment · session template · mock SSB activity), difficulty (easy · medium · hard), target role
+  (students · mentors · both), visibility (everyone · assigned only), status
+  (`draft · published · archived`), body text and/or an https link, created_by, updated_by,
+  created_at, updated_at, published_at.
+- Content is never deleted; it's archived. Only published content is ever visible to readers.
+- **Assignment:** content with "assigned only" visibility reaches only the academies or batches it's
+  assigned to.
+- **Readers:** a student sees published content targeted at students that is visible to everyone,
+  or assigned to their academy or their batch. A mentor sees the same for mentors, through their
+  academy or their assigned batches. Academy admins see what reaches their academy. This is
+  enforced by RLS, not only in the UI.
+
+**Acceptance (Phase 4):**
+- A Super Admin creates content as a draft, publishes it, and it appears in the right readers'
+  Library. Archiving removes it from readers.
+- Assigned-only content never appears for an academy or batch it isn't assigned to, even by id.
+- Every field is validated on the server; links must be https.
+- No content figure or list is hard-coded.
+
+**Follow-up (T083b):** move the existing practice banks, 5-day journey modules and resources (still
+`lib/mock/*`) onto this content model. Their runners need structured item formats (TAT images, WAT
+words, MCQs), so that's a separate, specified task.
+
+**Mentor content (Phase 5, decided 2026-10-08):** an add-on to global content.
+- **My Content:** mentors create teaching material, session templates, practice exercises,
+  documents and videos (as links; uploads wait for storage, B5).
+  - It's owned by them; only they edit, publish or archive it. A mentor can never modify global
+    content, and Super Admins see mentor content but don't edit it.
+  - Mentor content is always "assigned only", for students, and only to batches the mentor is
+    assigned to. It then appears in those students' Library.
+- **Starter templates:** a Super Admin marks published global content as a *template*. Any mentor
+  can "Use this template", which copies it into their own content as a draft to edit and publish.
+  The original stays unchanged, and the copy remembers its source.
+- **Content requests (paid service):** a mentor can ask the platform team to create content for
+  them.
+  - Lifecycle: `requested → quoted → accepted → in_progress → delivered`, plus `declined` and
+    `cancelled`.
+  - A Super Admin quotes a fee in INR. The mentor accepts or declines it, and can cancel before
+    accepting.
+  - Delivery copies a platform content item into the mentor's My Content as a draft.
+  - The accepted fee is recorded as **owed**. The platform team deducts it from the mentor's
+    payout or invoice **outside the app**, then marks it settled. There's no automated billing or
+    payments (`AGENTS.md`, B6).
+  - Only mentors can request.
+
+**Acceptance (Phase 5):**
+- A mentor's content is invisible to students outside their assigned batches, and to other
+  mentors, even by id.
+- A mentor can't assign content to a batch they don't teach, or edit someone else's content.
+- "Use this template" creates an editable draft copy; the template itself is unchanged.
+- A request's status only moves along the lifecycle above. Only the requesting mentor can
+  accept, decline or cancel; only a Super Admin can quote, progress, deliver or settle.
+- A fee is shown in INR (Indian formatting) and is never charged automatically.
+
+
+### 8a.4b Session scheduling (Phase 6)
+
+- **Availability:** a mentor keeps weekly availability slots (weekday + start/end time). They're
+  shown to the mentor and their academy admin as a guide; scheduling outside them is allowed with
+  a visible note.
+- **Sessions:**
+  - A mentor schedules a session for **one batch they teach**: title, description, start and end
+    time, **online** (https meeting link required) or **offline** (location required).
+  - It goes either to the **whole batch** or to **selected students** of that batch.
+  - Status is `scheduled · completed · cancelled`. Cancelling needs a reason, which participants
+    see.
+- **No double-booking:** a mentor can't have two scheduled sessions that overlap. The database
+  enforces this.
+- **Calendars (agenda views):**
+  - **Mentor:** their sessions.
+  - **Batch:** a batch page shows that batch's upcoming sessions.
+  - **Student:** sessions for their batch, or ones they were selected for.
+  - **Academy admin:** all their academy's sessions.
+  - A session is visible to no one else; this is enforced by RLS.
+- **Times:** stored as UTC and shown in **IST (Asia/Kolkata)**, labelled "IST". This product serves
+  Indian SSB candidates; per-user time zones can come later.
+- **Notifications** ("you've been scheduled") arrive with the notification system in Phase 10.
+  Until then, the session appears in the student's Sessions page immediately.
+
+**Acceptance (Phase 6):**
+- A mentor can only schedule for, edit, cancel or complete sessions of batches they teach, and
+  only their own sessions.
+- Overlapping sessions for the same mentor are refused with a clear message.
+- A student sees only sessions for their batch, or ones they were selected for. Another batch's
+  session id is "not found".
+- Online sessions need an https link; offline sessions need a location; the end is after the
+  start; sessions are at most 8 hours.
+
+### 8a.4c Assessments and mentor feedback (Phase 7)
+
+- **Assessments** (mentor-created, per batch): title, instructions, category, 1–20 free-text
+  questions, maximum score (1–100), optional due date.
+  - Status `draft → published → closed`. Only published, not-yet-due assessments accept answers.
+  - Only mentors who teach the batch create and manage them; co-mentors of the batch can see and
+    evaluate them.
+- **Attempts:** one per student per assessment. A student saves a draft as often as they like,
+  then **submits once**. A submitted attempt is locked.
+- **Mentor feedback** (`specs.md` §7.5) on a submitted attempt:
+  - Fields: score (0–max), **strengths**, **improvement areas**, comments.
+  - Saving keeps it **in review** (a recoverable draft, visible only to staff); **submitting**
+    marks it **reviewed**. One feedback per attempt, so a double submit can't create a second.
+  - Reviewed feedback is locked and shows the evaluator and timestamp.
+  - A student sees feedback only once it's reviewed.
+  - Evaluation status: `pending` (submitted, no feedback) · `in_review` · `reviewed`.
+- **Who sees what:**
+  - Students see published assessments for their batch, and their own attempts and reviewed
+    feedback.
+  - Mentors see their batches' assessments and attempts.
+  - Academy admins see their academy's.
+  - Enforced by RLS.
+- Feedback is the mentor's own, never presented as an SSB selection outcome (`AGENTS.md` §11).
+  AI-assisted feedback remains blocked on B3.
+
+**Acceptance (Phase 7):**
+- A student can't submit twice, edit after submitting, answer a closed/overdue/draft assessment,
+  or see another student's attempt.
+- A mentor can't create assessments for, or evaluate attempts in, batches they don't teach.
+- A draft evaluation is recoverable after leaving the page. Submitting twice yields one reviewed
+  feedback.
+- The student's assessment page shows the score, strengths, improvement areas and comments with
+  the evaluator's name and date.
+
+### 8a.4d Progress tracking (Phase 8)
+
+One set of real progress data, shown per role. Nothing is invented: every figure states what it's
+based on, and a figure with no data says so instead of showing 0 or a guess.
+
+- **Sources:**
+  - Reviewed assessment scores (Phase 7), as a percentage of each assessment's maximum.
+  - Session attendance: a mentor marks each participant Present, Absent or Excused once the
+    session has started.
+  - Library items a student marks as done.
+  - Mentor feedback text (strengths and areas to improve).
+  - Practice-runner activity (TAT, WAT, journey) is **not** counted: it's browser-only until T083b.
+- **Derived per student:**
+  - **Average score**: the mean of reviewed assessment percentages, labelled "based on N reviewed
+    assessments".
+  - **Score trend**: one point per reviewed assessment, over time.
+  - **Category strengths/weak areas**: average percentage per content category with at least one
+    review. The highest is a strength and the lowest a weak area, shown only when there are two or
+    more categories.
+  - **Attendance rate**: present ÷ marked sessions, labelled with counts. Excused sessions don't
+    count against it.
+  - **Library completed** count.
+  - **Recommended next actions** (rule-based and explainable, never AI): open assessments not yet
+    submitted, the next upcoming session, and unread Library items in the weakest category. Each
+    recommendation states its reason.
+- **Views:**
+  - **Student, "My Progress":** all of the above for themselves.
+  - **Mentor, "My Assigned Students":** Mentees shows each student's average score, attendance
+    and reviewed count; the mentee page shows that student's full progress.
+  - **Academy, "Performance":** per batch: students, average score, attendance rate, and
+    **students needing attention** with the reason ("average below 50%", or "no submission in 14
+    days while assessments were open").
+  - **Super Admin:** platform analytics come in Phase 10.
+- Visibility follows the existing scopes (own student data, the mentor's batches, the admin's
+  academy), enforced by RLS on the underlying tables.
+
+**Acceptance (Phase 8):**
+- Every progress number is derived from database rows and states its basis. "Not enough data
+  yet" appears when there are none.
+- A mentor can mark attendance only for their own sessions, and only for that session's
+  participants.
+- A student can mark only their own Library completion, and only for content they can see.
+- "Needs attention" always shows its reason.
+
+### 8a.4e Role dashboards (Phase 9)
+
+Each dashboard is a read-only summary of data the earlier phases store, scoped to the signed-in
+user. It reuses the same services as the pages it links to, so its figures always match them. Every
+list links to where the user acts on it.
+
+- **Student:**
+  - stats: average score, reviewed count, attendance, Library read
+  - "Do next", with reasons: open assessments, the next session, reading in the weakest area
+  - the next session
+  - recent activity: their submissions and the feedback on them
+- **Mentor** (their batches only):
+  - stats: mentees, sessions in the next 7 days, reviews waiting, average score
+  - submissions waiting for review
+  - today's sessions (IST)
+  - "Needs attention", with reasons (the same rules as Academy Performance)
+  - mentees, lowest average first, with the latest score and its direction
+- **Academy** (own academy only):
+  - stats: students, active batches, mentors, average score, attendance
+  - average score by month
+  - scores by area
+  - "Today's tasks": flagged students, reviews waiting, batches without a mentor, students not in a
+    batch, pending invites, sessions this week
+  - recent submissions
+  - per-batch average score
+  - upcoming sessions
+- **Reports:** the same data, laid out for review:
+  - students by average-score band
+  - scores by area
+  - mentor workload: batches, sessions in the next 7 days, reviews waiting
+
+**Decisions (2026-10-08):**
+- There is **no readiness score**. "Average reviewed score" replaces it until a readiness formula is
+  defined.
+- **Today's Mission and the practice streak were hidden** until practice was stored. T083b now shows
+  them from saved practice (§8a.4g).
+- The sample-data dashboards and the "Load/Clear demo data" controls are removed.
+
+**Acceptance:**
+- No dashboard shows a sample or invented figure. With no data, each widget shows the shared empty
+  state.
+- Each dashboard refuses other roles server-side.
+- The mentor dashboard reads only the mentor's own batches.
+- The academy dashboard reads only the admin's own academy.
+- Figures match the linked pages: Performance, Evaluations, Sessions, Mentees.
+
+### 8a.4f Analytics and notifications (Phase 10)
+
+**Notifications** are written by database triggers on the events themselves, so no code path can
+skip one, and they are never created from the browser.
+
+| Event | Who is notified | Opens |
+|---|---|---|
+| Session scheduled | Its students: the whole batch, or the selected students | Sessions |
+| Session cancelled | Its students and the academy's admins | Sessions |
+| Assessment opened | The batch's students | The assessment |
+| Assessment submitted | The assessment's mentor | The evaluate page |
+| Review completed | The student | The assessment's feedback |
+| Added to a batch | The student, or the mentor | Dashboard or Mentees |
+| New content request | Super admins | Content Requests |
+| Content request status changes | The mentor | My requests |
+
+- Each event notifies a person at most once. The exception is content-request status changes, which
+  notify on every change.
+- A recipient can read only their own notifications and change only `read_at`.
+- Links are same-site paths only.
+- The header bell shows the unread count. Its list loads fresh each time it opens.
+- Each role has a Notifications page, with "Mark all read".
+
+**Platform Analytics** (Super Admin, `/admin/analytics`) is built by one SQL function that refuses
+anyone else. It shows:
+- platform totals
+- activity for the last 30 days, 90 days or 12 months: new accounts, sessions held, submissions,
+  reviews, average score, attendance and Library reads
+- a per-academy table
+- the last six months by month
+- published content by category
+
+**Acceptance:**
+- Each event above creates exactly one notification for the right people, and no one else.
+- Another user's notifications can't be read or marked read.
+- Only a super admin can call the analytics function.
+- With no data, every figure is 0, "—" or the shared empty state.
+
+### 8a.4g Practice banks and saved practice (T083b)
+
+The Practice journey's question banks and every student's practice work are stored in Postgres
+(`0014_practice.sql`). The journey's days, modules and reading copy stay in code as product copy.
+
+- **Banks:**
+  - Eleven banks, seeded with the exact content the app shipped with: TAT, WAT, SRT, SDT, OIR
+    verbal and non-verbal (practice and test sets for each), PPDT, interview and conference.
+  - Each question keeps a stable key, e.g. `tat-13`.
+  - Only the **Super Admin** edits banks, under **Practice Banks**: add, edit, reorder, hide.
+  - Hiding a question removes it for students but keeps their saved answers.
+  - Multiple-choice questions need 2–6 options and one correct option, checked in the database.
+- **Saved practice:**
+  - **Self-paced:** each answer, chosen option, self-review tick and "done" is saved per question.
+    Typing saves after a short pause. A failed save keeps the text on screen with a retry.
+  - **Timed tests and mock interview/conference runs:** saved once per run. A retried submit returns
+    the original. MCQ tests are scored by the database, and correct answers are never sent to the
+    browser for a test.
+- **Who reads it (decided 2026-10-08):**
+  - The student, and the mentors of their batch, can read the written answers.
+  - Academy admins and super admins see counts only, through `practice_stats()`.
+- **What shows it:**
+  - journey progress rings and badges
+  - "Continue where you left off"
+  - the student dashboard's **Today's Mission** and **practice streak**: consecutive IST days with
+    practice, ending today or yesterday
+  - a **Practice** section on the mentor's mentee page
+  - a **Practice Done** column on Academy Performance
+- **Stays on the device, by design:** the PIQ form and answers to questions built from it, the Day 5
+  self-assessment, the onboarding draft and the recently-viewed list. Resources and the curated Day-2
+  library also stay in code.
+
+**Acceptance:**
+- The banks match the shipped content (209 questions).
+- A student's practice survives a reload and a different device.
+- A mentor of another batch, another academy's admin, or another student can't read it.
+- Only a super admin can change a bank.
+- No count shown is invented.
+
+### 8a.4h File materials and live meeting rooms (decided 2026-10-19)
+
+**File materials (T093).** PDFs and other materials are stored in **Supabase Storage**, a private
+bucket in the same project as the database, so the same sign-in and the same rules decide who
+may open a file.
+
+- **Who uploads:**
+  - **Super Admin:** platform Library content.
+  - **Mentors:** their own My Content.
+  - **Academy Admins:** academy-wide documents for their own students and mentors.
+  - Students don't upload.
+- **Files:** each file belongs to one content item. A content item can be text, a link, **or a
+  file**.
+- **Allowed types:** PDF, DOCX, PPTX, XLSX, PNG, JPG, MP3 and MP4.
+  - Size limit: 50 MB per file to start.
+  - The type is checked from the file itself, not just its name.
+- **Access:**
+  - Files are never public.
+  - The server hands out a short-lived signed link (minutes) only to someone who may read that
+    content item, using the same rules as the Library.
+  - Storage row-level security repeats the same rules.
+- **Other rules:**
+  - Replacing a file keeps the content item and its assignments.
+  - Archiving content hides the file.
+  - Deleting is Super Admin only.
+
+**Live meeting rooms (T094).** Online sessions use built-in video rooms on **LiveKit** (open-source
+WebRTC, LiveKit Cloud, India region), instead of a pasted meeting link.
+
+- **Rooms:**
+  - Each online session gets one room, named after the session.
+  - The room opens 15 minutes before the start and closes 30 minutes after the end.
+- **Join tokens:**
+  - The app's server issues a short-lived LiveKit join token only to the session's mentor and its
+    participants: the whole batch, or the selected students.
+  - Nobody else can join, even with the link. Cancelled sessions issue no tokens.
+  - The LiveKit API secret stays on the server.
+- **In the room:**
+  - Camera, microphone, screen share and chat.
+  - The mentor is the host and can mute or remove a participant.
+  - Students join muted.
+- **Attendance:** joining a room counts as being present for attendance. The mentor can still
+  correct it.
+- **Existing links:** a pasted external link stays possible as a fallback for sessions created
+  before rooms existed.
+
+**Recordings (T095).** Sessions can be recorded, through LiveKit's recording service.
+
+- **Consent:** only the mentor starts or stops a recording. Everyone in the room sees a clear
+  "Recording" indicator, and is told when they join.
+- **Storage:** recordings go to Supabase Storage in a private bucket.
+- **Access:** only the session's mentor and participants, plus their academy admin, can watch a
+  recording, through short-lived signed links.
+- **Retention:** recordings are deleted after 90 days by default (a setting).
+- Recordings use paid plan minutes and storage, so cost is tracked in Platform Analytics.
+
+**Acceptance:**
+- An uploaded PDF opens for exactly the people who can read its content item, and for nobody else,
+  even with the link.
+- A mentor and their batch can meet in a room with video, audio and screen share.
+- Outsiders can't join a room.
+- Joining marks attendance.
+- A recording is visible only to the session's people, and only within the retention period.
+
+### 8a.5 Domain model
+
+```text
+users(profiles) · student_profiles · mentor_profiles · academy_admin_profiles · super_admin_profiles
+academies · batches · batch_students · batch_mentors · contents · content_assignments · sessions ·
+session_participants · assessments · assessment_attempts · feedback · student_progress ·
+notifications · audit_log
+```
+
+Proper foreign keys, indexes, timestamps and audit fields. Seed data is for development only. No
+dashboard figure, user, academy, batch, session, content item or progress value is hard-coded.
+
+### 8a.6 Phases and end-to-end workflow
+
+```text
+1 Auth + Users + Roles + RBAC        6 Session scheduling
+2 Academies + Academy Admin          7 Assessments + Feedback
+3 Batches + Students + Mentor assign 8 Progress tracking
+4 Global content management          9 Role-specific dashboards
+5 Mentor content management          10 Analytics + Notifications
+```
+
+Every phase ships with a working frontend and backend against the real database, never as static
+mockups. The finished workflow is: Super Admin publishes content → Academy Admin creates a batch,
+adds students and assigns mentors → Mentor schedules a session → students attend and practise → the
+mentor evaluates and the feedback is stored → progress updates → each role sees the same progress
+data at its own scope (Student: "My Progress"; Mentor: "My Assigned Students"; Academy: "Academy /
+Batch Performance"; Super Admin: "Platform Analytics").
 
 ---
 
@@ -610,9 +1205,11 @@ build. Do not invent guarantees.
 ## 13. Out of Scope for the Initial MVP
 
 Groups · Leaderboard · Achievements · Career Guide · advanced live classes · advanced events ·
-advanced attendance · advanced messaging · advanced analytics and reports · AI Mentor · Mentor AI
-Assistant · Earnings · complex scheduling · full ERP functionality · complex finance management ·
-automated billing.
+advanced attendance · advanced messaging · advanced analytics and reports · Earnings · complex
+scheduling · full ERP functionality · complex finance management · automated billing.
+
+**Superseded 2026-10-19 by the PRD (§0):** the AI Mentor and the AI-prepared mentor briefing are now
+MVP (P0). Community, GTO, Lecturette and Mock SSB are Phase 2.
 
 The 5-Day SSB Practice Journey, previously listed here, was un-deferred and built 2026-09-20 — see
 §6.4a. Mentor/Academy visibility into a student's journey progress and AI feedback on journey

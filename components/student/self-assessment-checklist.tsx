@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "cn";
-import { SELF_ASSESSMENT_TRAITS } from "@/lib/mock/ssb-journey";
+import { SELF_ASSESSMENT_TRAITS } from "@/lib/practice/journey";
 import { readSelfAssessment, setSelfAssessmentRating } from "@/lib/student/ssb-journey-progress";
 
 const RATINGS = [1, 2, 3, 4, 5];

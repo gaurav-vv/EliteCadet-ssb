@@ -1,67 +1,77 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { StatusBadge } from "@/components/academy/shared/status-badge";
-import { StudentDetailActions } from "@/components/academy/students/student-detail-actions";
-import { PageHeader } from "@/components/ui/page-header";
-import { getStudentBatchOptions, getStudentById } from "@/lib/api/students";
-import { formatStudentDate } from "@/lib/academy/student-list";
+import { StudentRowActions } from "@/components/academy/students/student-row-actions";
+import { ReadinessProfileView } from "@/components/progress/readiness-profile";
+import { getAcademyBatchOptions } from "@/lib/api/batches";
+import { getAcademyStudent } from "@/lib/server/academy-people/service";
+import { getStudentReadiness } from "@/lib/server/readiness/service";
+import { formatDay } from "@/lib/utils/format-date";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
-  const result = await getStudentById(id);
-  return { title: result.data?.fullName ?? "Student" };
-}
+export const metadata: Metadata = { title: "Student" };
 
 function InfoCard({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="glass-regular flex flex-col gap-1.5 rounded-card px-5 py-4">
       <span className="text-[11px] font-semibold tracking-[0.04em] text-ink-secondary uppercase">{label}</span>
-      <span className="text-[15px] font-medium text-ink">{children}</span>
+      <div className="text-sm text-ink">{children}</div>
     </div>
   );
 }
 
-// Phase 0 detail view: the student's real stored information plus edit.
-// (Assessment history, analytics and a profile page belong to later phases.)
+// One student of the admin's own academy. Another academy's student id is
+// "not found" (server-side scope + RLS), never partial data.
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [studentResult, batchesResult] = await Promise.all([getStudentById(id), getStudentBatchOptions()]);
+  const [result, batches, readiness] = await Promise.all([getAcademyStudent(id), getAcademyBatchOptions(), getStudentReadiness(id, new Date().toISOString())]);
+  if (!result.ok && result.error?.code === "not_found") notFound();
 
-  if (studentResult.error?.code === "not_found") notFound();
-  if (!studentResult.ok || !studentResult.data || !batchesResult.ok || !batchesResult.data) {
-    const message = studentResult.error?.message ?? batchesResult.error?.message ?? "We couldn't load this student. Please try again.";
+  if (!result.ok || !result.data) {
     return (
       <div className="flex flex-col gap-6">
-        <Link href="/academy/students" className="text-[13px] text-brand-accent hover:underline">
-          ← Students
-        </Link>
-        <RetryErrorState message={message} />
+        <Link href="/academy/students" className="text-[13px] text-ink-secondary no-underline">‹ Students</Link>
+        <RetryErrorState message={result.error?.message ?? "We couldn't load this student. Please try again."} />
       </div>
     );
   }
 
-  const student = studentResult.data;
+  const { student, mentors } = result.data;
+  const name = student.fullName || student.email || "Unnamed student";
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8">
-      <Link href="/academy/students" className="text-[13px] text-brand-accent hover:underline">
-        ← Students
+    <div className="flex flex-col gap-6 pb-10">
+      <Link href="/academy/students" className="inline-flex w-fit items-center gap-1 text-[13px] text-ink-secondary no-underline hover:text-ink">
+        <ChevronLeft aria-hidden="true" size={16} />
+        Students
       </Link>
-      <PageHeader
-        title={student.fullName}
-        subtitle="Student information"
-        primaryAction={<StudentDetailActions student={student} batches={batchesResult.data} />}
-      />
 
-      <section aria-label="Student details" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <InfoCard label="Batch">{student.batchName ?? <span className="text-ink-secondary">No batch</span>}</InfoCard>
-        <InfoCard label="Status">
-          <StatusBadge label={student.status === "active" ? "Active" : "Inactive"} tone={student.status === "active" ? "success" : "neutral"} />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-bold text-ink">{name}</h1>
+          <p className="text-sm text-ink-secondary">{student.email ?? "No email on file"}</p>
+        </div>
+        <StudentRowActions student={student} batches={batches.data ?? []} />
+      </div>
+
+      <section aria-label="Student details" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <InfoCard label="Batch">
+          {student.batchId ? <Link href={`/academy/batches/${student.batchId}`} className="text-ink">{student.batchName}</Link> : <span className="text-ink-secondary">No batch</span>}
         </InfoCard>
-        <InfoCard label="Added">{formatStudentDate(student.createdAt)}</InfoCard>
+        <InfoCard label="Mentors">{mentors.length > 0 ? mentors.map((m) => m.name).join(", ") : <span className="text-ink-secondary">{student.batchId ? "No mentor on this batch" : "Assign a batch first"}</span>}</InfoCard>
+        <InfoCard label="Account">
+          <StatusBadge label={student.status === "active" ? "Active" : "Suspended"} tone={student.status === "active" ? "success" : "danger"} />
+        </InfoCard>
+        <InfoCard label="Last login">{formatDay(student.lastLoginAt) ?? <span className="text-ink-secondary">Never</span>}</InfoCard>
       </section>
+
+      {readiness.ok && readiness.data ? (
+        <ReadinessProfileView profile={readiness.data} />
+      ) : (
+        <RetryErrorState message={readiness.error?.message ?? "We couldn't load this student's readiness profile. Please try again."} />
+      )}
     </div>
   );
 }

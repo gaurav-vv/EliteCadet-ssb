@@ -1,42 +1,44 @@
 import { MetricCard } from "@/components/academy/shared/metric-card";
-import { buildStudentListHref } from "@/lib/academy/student-list";
-import type { DashboardMetric, StudentSummary } from "@/types/academy";
+import { buildStudentHref } from "@/lib/server/academy-people/validation";
+import type { DashboardMetric } from "@/types/academy";
+import type { AcademyStudentSummary } from "@/types/academy-people";
 
-// Counts come straight from Postgres (see getStudentSummary) and cover the whole
-// academy, never just the filtered page. Each card also links to the matching list.
-export function StudentStats({ summary }: { summary: StudentSummary }) {
+// Real counts over the whole academy (never just the filtered page). Each card
+// also opens the list already filtered to the students it counts.
+export function StudentStats({ summary }: { summary: AcademyStudentSummary }) {
   const metrics: DashboardMetric[] = [
+    { id: "total", label: "Total Students", value: String(summary.total), detail: "In your academy", icon: "students", tone: "indigo", href: buildStudentHref({}) },
     {
-      id: "total",
-      label: "Total Students",
-      value: String(summary.total),
-      detail: `${summary.total - summary.active} inactive`,
-      icon: "students",
-      tone: "indigo",
-      href: buildStudentListHref({}),
-    },
-    {
-      id: "active",
-      label: "Active Students",
-      value: String(summary.active),
-      detail: summary.total === 0 ? "No students yet" : "Currently enrolled",
-      icon: "activeStudents",
+      id: "in-batch",
+      label: "In a Batch",
+      value: String(summary.inBatch),
+      detail: summary.total === 0 ? "No students yet" : `${summary.withoutBatch} without a batch`,
+      icon: "batches",
       tone: "success",
-      href: buildStudentListHref({ status: "active" }),
+      href: buildStudentHref({}),
     },
     {
       id: "no-batch",
       label: "Without Batch",
       value: String(summary.withoutBatch),
       detail: summary.withoutBatch === 0 ? "Everyone is in a batch" : "Not yet assigned",
-      icon: "batches",
+      icon: "attention",
+      tone: "warning",
+      href: buildStudentHref({ batch: "none" }),
+    },
+    {
+      id: "suspended",
+      label: "Suspended Accounts",
+      value: String(summary.suspended),
+      detail: summary.suspended === 0 ? "None suspended" : "Can't log in",
+      icon: "activeStudents",
       tone: "info",
-      href: buildStudentListHref({ batch: "none" }),
+      href: buildStudentHref({ status: "suspended" }),
     },
   ];
 
   return (
-    <section aria-label="Student summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <section aria-label="Student summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map((metric) => (
         <MetricCard key={metric.id} metric={metric} />
       ))}
