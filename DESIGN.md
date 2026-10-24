@@ -36,6 +36,16 @@ the same hex as `--site-navy` (that token only exists inside `.site-public`, whi
 background). Inside `SiteFooter` do **not** use `.site-link` or `.site-eyebrow`; they set dark text
 colours that disappear on navy.
 
+### Brand logo
+
+The EliteCadet mark lives at `public/brand/elitecadet-logo.png` (512px, circular, transparent
+corners; the favicon is `app/icon.png`). Always render it through `<BrandLogo size={…} />`
+(`components/layout/brand-logo.tsx`), never a raw `<img>` or a stock icon. It is used in
+`SiteHeader` (36px), `SiteFooter` (40px) and `WorkspaceBrand` (40px). Its white disc keeps it
+legible on both white and navy, so do not recolour or add a background box behind it. It is
+decorative (`alt=""`): keep the brand name or an `aria-label` next to it. Do not stretch it; it is
+square.
+
 ### Rules that never change
 
 - **Never build a per-role shell.** All four workspaces use the one `WorkspaceLayout`
