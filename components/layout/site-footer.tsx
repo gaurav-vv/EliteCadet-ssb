@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Layers } from "lucide-react";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { SITE_NAV_LINKS } from "@/components/layout/site-nav-links";
 
 const ACCOUNT_LINKS = [
@@ -22,7 +22,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-[1440px] gap-8 px-4 py-10 sm:px-6 md:grid-cols-[2fr_1fr_1fr] lg:px-12">
         <div className="flex max-w-sm flex-col gap-3">
           <Link href="/" className={`${linkClass} flex items-center gap-2 text-white`} aria-label="EliteCadet home">
-            <Layers aria-hidden="true" className="size-6" strokeWidth={2.2} />
+            <BrandLogo size={40} />
             <span className="text-lg font-semibold tracking-tight">EliteCadet</span>
           </Link>
           <p className="text-sm text-white/75">
