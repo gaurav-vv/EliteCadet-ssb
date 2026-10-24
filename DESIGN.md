@@ -28,6 +28,14 @@ Quick test: **does the route's `layout.tsx` render `WorkspaceLayout`? → Worksp
 Layouts live in: `app/(public)/layout.tsx`, `app/{student,mentor,academy,admin}/layout.tsx`,
 and `app/layout.tsx` (root: fonts + ambient wash only).
 
+### Footers are dark navy in every theme
+
+All three footers use the navy brand colour with light text (`text-white/70`–`/75`, contrast ≥ 4.5:1):
+`SiteFooter` uses `--site-navy`, `WorkspaceFooter` uses `--academy-navy`, and `MinimalFooter` uses
+the same hex as `--site-navy` (that token only exists inside `.site-public`, which also forces a white
+background). Inside `SiteFooter` do **not** use `.site-link` or `.site-eyebrow`; they set dark text
+colours that disappear on navy.
+
 ### Rules that never change
 
 - **Never build a per-role shell.** All four workspaces use the one `WorkspaceLayout`
