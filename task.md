@@ -1145,6 +1145,40 @@ are refused safely; invite failures are reported, never shown as sent.
   (`docs/email.md`); confirm "Email OTP Expiration" is 3600 s or update `INVITE_LINK_TTL_SECONDS`.
 - [ ] Super admin's independent-mentor invite still has no manual path or revoke (not requested).
 
+## T111 — Student Resources redesign + dashboard news images, dates and sources — P1 — `[-]`
+**Spec:** user request 2026-10-25 (reference: `resources_ref.png`). **Depends on:** news feed work (2026-10-25).
+**Requirements:**
+- `/student/resources` to the reference: banner, category chips, Featured, All Resources (search via
+  header, category filter, sort, Load more), Quick Links, Popular Resources, Resource Categories.
+- Working Quick Link pages: Downloadable PDFs (real files), SSB Preparation Videos (embedded
+  playback), Recommended Reading, Daily Current Affairs (dated official releases).
+- Category pages for all six categories; article pages with breadcrumb, TOC, objectives, examples,
+  exercises, takeaways, related + previous/next. Existing six resource URLs preserved.
+- Dashboard news: per-article images with category fallbacks, publication dates, newest first,
+  more official sources, dedupe, independent source failures, caching.
+**Acceptance:** every link on the Resources pages opens a populated page; PDFs download; videos play;
+news shows real dated items with real images where the source provides one; nothing fabricated.
+**Progress 2026-10-25:**
+- [x] 24 articles + 6 printables + 17 verified videos + reading list (`lib/content/resources/`).
+- [x] Pages: main, `[slug]`, `category/[category]`, `downloads` (+ `downloads/[slug]` PDF route),
+  `videos`, `reading`, `current-affairs`. Header search submits to Resources (students only).
+- [x] News: PIB Ministry of Defence listing source, release photos (PIB image host only),
+  hourly in-memory cache with stale fallback, entity decoding, `#pibReleaseBody` parsing fix.
+- [x] Tests: `tests/unit/lib/resources.test.ts`, `tests/unit/components/resources-pages.test.tsx`,
+  news tests extended; opt-in live check `tests/integration/news-live.test.ts` (`NEWS_LIVE=1`).
+- [ ] Newspaper sources still excluded (licence terms, see Decisions); Army/IAF/NDA sites fail TLS
+  verification (incomplete certificate chain on their servers) — revisit if they fix it.
+- [ ] Reading progress ("Read" badge) is still per-browser localStorage (existing debt).
+- [x] Follow-up 2026-10-25: header simplified (no banner), real Commons photographs with
+  attribution, duplicates/repetition removed (see status.md update log).
+- [x] Follow-up 2026-10-25: full-width category tabs above both columns; thumbnails replaced
+  with people-free object/environment photos (attribution updated).
+- [x] Follow-up 2026-10-25: "Resources" title in the workspace header on /student/resources (no
+  duplicate header search there); in-page search above the tabs; sidebar aligned with the cards;
+  Tejas photo (pilots visible) replaced with binoculars.
+- [ ] Browser check of the 2026-10-25 header/search change against a local stack (not run: only
+  the hosted-DB dev server was available).
+
 # Phase 10 — PRD Phase 2 (P1), after the pilot
 
 T093 file materials · T094 video rooms · mentor override of AI evaluations · messaging and

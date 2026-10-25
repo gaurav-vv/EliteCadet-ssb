@@ -85,6 +85,8 @@ Every number on every screen comes from real rows in the database — no sample 
 
 | Platform analytics | Practice bank editor |
 |---|---|
+
+
 | ![Platform analytics](docs/screenshots/phase-10/admin-analytics.png) | ![Practice bank editor](docs/screenshots/t083b/admin-practice-bank.png) |
 
 ## Architecture

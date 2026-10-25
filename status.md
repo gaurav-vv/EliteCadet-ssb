@@ -317,6 +317,11 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-20 | **Meeting attendance = 75% of the scheduled duration in connected time** (0025). The union of LiveKit-webhook intervals, clipped to the scheduled window, finalized only after the end, stored in `session_attendance` (with seconds). A mentor's mark is kept. Replaces "present on join". Ended-early meetings are judged against the scheduled length (literal rule) | User requirement 2026-10-20 |
 | 2026-10-20 | **Chat is stored and server-broadcast**; clients never publish LiveKit data. Reactions and raise hand go through server actions as well | Authorization + history after reconnects |
 | 2026-10-20 | **Email: local = Mailpit only, hosted = custom SMTP required** (`docs/email.md`). An "invite sent" or "check your email" message means Auth handed the email to SMTP, not that it reached an inbox | Diagnosis 2026-10-20 |
+| 2026-10-25 | Student news adds PIB's Ministry of Defence release listing, read through the same ASP.NET postback its ministry picker performs (two requests per hourly refresh) | PIB's RSS carries 0-1 Defence releases a day; the listing is public and official. If PIB changes the form, that source fails alone and is reported |
+| 2026-10-25 | News images come only from photos embedded in the PIB release, loaded via next/image with one host+path remotePattern; no general image proxy | Real, relevant images without letting the server fetch arbitrary URLs |
+| 2026-10-25 | Resources category tags use soft per-category tints (the text label is always present), as in resources_ref.png | User asked to reproduce the reference closely; status/category is never colour-only. Deviation from AGENTS.md §7.1 limited to these tags |
+| 2026-10-25 | ~~Resource covers are illustrations (SVG)~~ — superseded the same day: each article has its own real photograph from Wikimedia Commons (public domain, CC0, CC BY-SA or GODL-India) showing objects or environments only — no people, faces, hands or human figures (user request, 2026-10-25), stored in public/images/resources/ with attribution in lib/content/resources/photos.ts, shown on the article page and in "Photo credits" on /student/resources. "Popular Resources" stays an editor's-picks list | User asked for genuine photographs instead of illustrations. Commons gives machine-verifiable licence and author data; Unsplash was unreachable from this network and Pexels blocks automated access. No readership data, so no popularity claims |
+| 2026-10-25 | One appearance per resource per screen: Featured is excluded from the list below it, Popular picks never overlap Featured, Related skips previous/next, official-link blocks are not repeated across articles | User asked to remove duplicated entries and repeated information while keeping one canonical record and URL per resource |
 
 ---
 
@@ -439,6 +444,155 @@ Next task:
 ## 13a. Update Log
 
 ```text
+Date: 2026-10-25 (resources: stale TAT / Self Description thumbnails)
+Task: T111 follow-up — user still saw the old photos of people on two cards
+Status: VERIFIED — targeted tests (44), eslint on changed files, tsc; served URLs checked on the
+        running dev server.
+
+Cause: the people-free replacements had kept the old file names, so next/image's optimizer cache
+and the browser cache (both keyed by URL) could keep serving the earlier photos.
+Fix: understanding-tat.jpg → understanding-tat-story-notebook.jpg and
+sdt-honest-self-description.jpg → sdt-self-description-journal.jpg (same people-free photos,
+attribution unchanged); mappings updated in lib/content/resources/photos.ts; old files removed
+(raw URLs now 404). New test asserts both cards render the new files and never the old ones.
+
+Date: 2026-10-25 (resources: title in header, in-page search, sidebar alignment, thumbnail re-check)
+Task: T111 follow-up — one search bar on Resources; every thumbnail people-free
+Status: VERIFIED in tests/lint/typecheck/build (see below). NOT verified in a browser: the only
+        running server (the user's `next dev` on port 3000) uses the hosted Supabase project and
+        needs a real login; no scratch copies or config workarounds were used, per user request.
+
+What changed:
+- Workspace header: new optional `searchPageTitle` (WorkspaceLayout → WorkspaceHeader). On the
+  search's own page (`pathname === searchAction`, i.e. exactly /student/resources) the header
+  shows "Resources" as the page h1, level with the profile, instead of a second search field.
+  Every other page (incl. other /student/resources/* routes) keeps the header search.
+- /student/resources: its own heading row removed; the page opens with a full-width search bar
+  (GET ?q=, keeps category + sort, back to page 1), then the tabs (All first), then Featured.
+  Sidebar drops by the section-heading row at xl (`xl:mt-14`) so its first panel lines up with
+  the cards; ResourcesSidebar gained an optional className (category pages unchanged).
+- Thumbnails: all 24 re-checked at full size. officer-like-qualities.jpg (two Tejas jets) showed
+  pilots in the canopies → replaced with vintage binoculars (Clem Onojeghuo, CC0, Commons
+  File:Binoculars_(Unsplash).jpg); attribution updated in lib/content/resources/photos.ts. Now
+  21 CC0, 1 public domain, 1 GODL-India, 1 CC BY-SA 4.0. No image shows a person.
+- Tests: tests/unit/components/workspace-header.test.tsx (new), resources-pages tests updated
+  for the new order and search form.
+
+Date: 2026-10-25 (resources: tabs row + people-free thumbnails)
+Task: T111 follow-up — full-width category tabs; replace all photos of people
+Status: VERIFIED locally — 738 tests (1 opt-in live test skipped), lint, typecheck; production
+        build of an identical copy of the working tree; browser check (production server,
+        LOCAL Supabase) at 1536/900/390 px. The repo's own `next build` was not re-run because
+        a separate `npm run dev` (hosted Supabase) was running on port 3000 and a concurrent
+        build had broken a dev server earlier today.
+
+What changed:
+- /student/resources: "Resources" heading, then the category tabs in a full-width bar spanning
+  both columns; the library and the right sidebar start below it, side by side (sidebar markup
+  unchanged). Tabs scroll horizontally inside the bar on narrow screens.
+- All 24 thumbnails replaced with object/environment photos (notebooks, pens, stopwatch,
+  empty meeting rooms, ropes, maps, books, globe, INS Vikramaditya, Tejas): 20 CC0, 1 public
+  domain, 2 GODL-India, 1 CC BY-SA 4.0; same file names; attribution regenerated in
+  lib/content/resources/photos.ts. Each checked visually for people.
+
+Not in scope, still contains a figure: the workspace sidebar's "Targeting Better Officers
+Together" card image (public/academy/sidebar-card.jpg) shows a silhouette.
+
+Date: 2026-10-25 (resources: header, photos, duplicates)
+Task: T111 follow-up — simplify Resources header, real photographs, remove duplicates
+Status: VERIFIED locally — 737 tests (1 opt-in live test skipped), lint, typecheck, next build;
+        browser check on LOCAL Supabase (no console errors, no broken images, no mobile overflow).
+
+What changed:
+- /student/resources: banner + intro text removed; page opens with "Resources", the category
+  tabs, then Featured. Featured items are not repeated in "All Resources" (count says
+  "plus 4 featured above"); compact collapsed "Photo credits" list at the bottom.
+- 24 real photos (one per article, no repeats) from Wikimedia Commons, licences verified via the
+  Commons API: public/images/resources/*.jpg, lib/content/resources/photos.ts. SVG covers and
+  components/student/resources/resource-cover.tsx removed; resource-photo.tsx added.
+- Duplicates: audit found no duplicated article text (no shared sections or sentences). Removed
+  repetition instead: Popular picks made disjoint from Featured; Related no longer repeats
+  previous/next; official-link blocks trimmed to each article's own links (the full set stays in
+  "Reading official notifications" and Recommended Reading); Recommended Reading no longer
+  re-lists library articles; Current Affairs category page no longer repeats the Daily Current
+  Affairs Quick Link; unused featured flag removed from interview-day-checklist.
+
+Not changed (out of scope): /student/news and /student/resources/current-affairs remain two
+views of the same shared feed (news integration untouched); article PDFs on the Downloads page.
+
+Date: 2026-10-25 (resources + news images)
+Task: T111 — Student Resources redesign (resources_ref.png) + dashboard news images/dates/sources
+Status: VERIFIED locally — 729 unit/component tests (1 opt-in live test skipped by default),
+        lint, tsc, next build; pages exercised in a browser against LOCAL Supabase (dev preview
+        student). Hosted DB untouched; nothing committed.
+
+What changed:
+- Resources: lib/content/resources/* (24 articles in 6 categories, 6 printables, 17 videos,
+  reading list) replaces lib/mock/resources.ts; lib/api/resources.ts (query/sort/paging, related,
+  prev/next). New routes: /student/resources/{category/[category], downloads, downloads/[slug]
+  (PDF), videos, reading, current-affairs}. Article page rebuilt. Illustrated SVG covers.
+  lib/pdf/simple-pdf.ts: dependency-free PDF writer (Helvetica, A4, wrap, paging).
+- Header search (WorkspaceHeader searchAction prop) submits to /student/resources?q= for students.
+- News: PIB Ministry of Defence listing (allRel.aspx postback, ministry 33) gives ~88 Defence
+  releases/month vs 0-1 in PIB RSS. Live check 2026-10-25: 90 items (87 PIB MoD, 3 UPSC), 24 with
+  excerpts, 17 with their own photos, 0 failed sources. Photos only from
+  static.pib.gov.in/WriteReadData/userfiles/image (next.config remotePatterns); topic fallback
+  art (Navy/Army/Air Force/Exams/Defence) otherwise. Catalog cached 1 h in memory, last good copy
+  kept on total outage. Fixed: release body is now #pibReleaseBody (excerpts were empty), unclosed
+  date <span> in listing, &rsquo; etc. not decoded. /student/news and Daily Current Affairs share
+  components/student/news-browser.tsx.
+
+What remains / not verified:
+- Indian Army, IAF and NDA sites fail TLS verification (UNABLE_TO_VERIFY_LEAF_SIGNATURE: their
+  servers send an incomplete chain); Indian Navy, DRDO, Coast Guard, DD News, NewsOnAir timed
+  out or reset. Not bypassed. Newspapers still excluded (licence terms, unchanged decision).
+- The in-memory cache is per server instance (fine for one Node server; on serverless each
+  instance refreshes hourly on its own).
+- scripts/dev-local.mjs fails on Windows (execFileSync("npx") without a shell); worked around by
+  setting the same env manually. tests/e2e/role-pages-local.spec.ts builds routes with
+  path.relative, giving backslashes on Windows, so every page is reported as "redirected" there.
+- One hydration warning seen once on a category page during first dev compile; not reproducible.
+
+Date: 2026-10-25 (news feed)
+Task: Latest Articles & News showed one article — root cause + All News page
+Status: VERIFIED (687 tests; live fetch returns 4 real items today)
+
+Root cause (supply, not display): PIB's RSS carries only its latest 20 releases across ~16
+ministries (1 was Defence today); the Ministry of Defence site was rebuilt and its parser returns
+0; and the 3 UPSC notices were all excluded from the card because the ticker used them.
+
+What changed:
+- lib/api/news.ts: one feed (buildFeed: canonical-URL + normalized-title dedupe, newest first,
+  90-day stale cutoff); the card no longer excludes ticker items; English version of Hindi PIB
+  Defence releases; PIB title parsing fixed (pages close <h2 id=Titleh2> with </h1>);
+  queryFeed (category, search, Load more). New /student/news page; card "View all news (N)".
+- Sources re-checked 2026-10-25 and NOT added (terms or robots): ThePrint, IDRW, Indian Defence
+  Review, Hindustan Times, NDTV, NewsOnAIR, Times of India; unreachable: DD News, DRDO, Coast
+  Guard, IAF careers, KSB. PIB's ministry-filtered listing needs a stateful ASP.NET form: not used.
+
+What remains (needs a decision):
+- 10+ items on most days needs either a small table + hourly job to keep PIB Defence releases
+  as they pass through the 20-item feed (schema change → approval), or a licensed news feed (cost).
+
+Date: 2026-10-25 (news)
+Task: Student dashboard news — SSBcrack replaced by official sources, in-app reader
+Status: VERIFIED (unit/component tests + live fetch of the real sources); not yet clicked
+        through in a browser by a student account
+
+What changed:
+- lib/api/news.ts: SSBcrack feeds removed. PIB press releases added via PIB's own RSS, kept only
+  when the release page names the Ministry of Defence; excerpt capped at 900 chars, no images.
+  Stable ids + getNewsArticle (lookup only within our own cached catalog), failedSources.
+- New /student/news/[id] reader (+ loading); panel and ticker now open it (no new tab).
+- Not integrated (verified 2026-10-25): The Hindu / Indian Express (RSS terms: personal or
+  non-commercial use only / syndication licence), Indian Army + IAF (broken TLS chain), Indian
+  Navy (timeout), NTA (no feed), MoD (site rebuilt as a JS app with no public feed — the existing
+  MoD parser now returns nothing; it degrades silently).
+- PIB's feed ignores its Lang parameter and returned only Hindi items on 2026-10-25.
+
+What remains:
+- Decide whether to license a newspaper feed (syndication) if more volume is wanted.
+
 Date: 2026-10-25 (final)
 Task: Stabilize auth / reset / Add Mentor / migrations for end-to-end testing
 Status: VERIFIED locally (unit + real local Supabase e2e). Hosted DB and SMTP NOT verified.

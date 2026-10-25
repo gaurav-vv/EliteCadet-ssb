@@ -112,7 +112,7 @@ export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: 
         )}
       </Section>
         </div>
-        {news && <LatestNewsPanel articles={news.latestArticles} />}
+        {news && <LatestNewsPanel articles={news.latestArticles} totalCount={news.totalCount} unavailable={news.failedSources.length > 0} fetchedAt={news.fetchedAt} />}
       </div>
     </div>
   );

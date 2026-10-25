@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +22,10 @@ interface WorkspaceHeaderProps {
   roleLabel: string;
   searchPlaceholder: string;
   searchLabel: string;
+  searchAction?: string;
+  // On searchAction's own page, which has its own search bar: the header shows
+  // this title (the page's h1) instead of a second search field.
+  searchPageTitle?: string;
   profileHref: string;
   profileLabel: string;
   // Hamburger + drawer, shown below md (see WorkspaceMobileNav).
@@ -35,20 +40,36 @@ function initialsOf(name: string): string {
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-export function WorkspaceHeader({ displayName, userName, roleLabel, searchPlaceholder, searchLabel, profileHref, profileLabel, mobileNav, unreadCount, notificationsHref }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ displayName, userName, roleLabel, searchPlaceholder, searchLabel, searchAction, searchPageTitle, profileHref, profileLabel, mobileNav, unreadCount, notificationsHref }: WorkspaceHeaderProps) {
+  const pathname = usePathname();
+  const onSearchPage = Boolean(searchAction && searchPageTitle && pathname === searchAction);
+  const field = (
+    <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-pill border border-hairline bg-white px-4 focus-within:border-brand-accent focus-within:ring-2 focus-within:ring-brand-accent/25 sm:max-w-md">
+      <Search aria-hidden="true" size={16} className="shrink-0 text-ink-secondary" />
+      <span className="sr-only">{searchLabel}</span>
+      <Input
+        type="search"
+        name={searchAction ? "q" : undefined}
+        maxLength={80}
+        placeholder={searchPlaceholder}
+        className="h-auto border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+      />
+    </label>
+  );
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-hairline bg-white/90 px-4 backdrop-blur-sm sm:px-6">
       {mobileNav}
 
-      <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-pill border border-hairline bg-white px-4 focus-within:border-brand-accent focus-within:ring-2 focus-within:ring-brand-accent/25 sm:max-w-md">
-        <Search aria-hidden="true" size={16} className="shrink-0 text-ink-secondary" />
-        <span className="sr-only">{searchLabel}</span>
-        <Input
-          type="search"
-          placeholder={searchPlaceholder}
-          className="h-auto border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
-        />
-      </label>
+      {onSearchPage ? (
+        <h1 className="min-w-0 flex-1 truncate text-[28px] leading-tight font-bold text-ink">{searchPageTitle}</h1>
+      ) : searchAction ? (
+        <form action={searchAction} method="get" role="search" className="flex min-w-0 flex-1 sm:max-w-md">
+          {field}
+        </form>
+      ) : (
+        field
+      )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
         <NotificationBell unreadCount={unreadCount} allHref={notificationsHref} />

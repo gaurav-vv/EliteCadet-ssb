@@ -27,8 +27,10 @@ export default async function StudentLayout({ children }: { children: React.Reac
       userName={name}
       displayName={name}
       contextName="Student"
-      searchPlaceholder="Search practice, resources, news…"
-      searchLabel="Search practice, resources and news"
+      searchPlaceholder="Search resources, guides, articles…"
+      searchLabel="Search resources, guides and articles"
+      searchAction="/student/resources"
+      searchPageTitle="Resources"
       profileHref="/student/profile"
       profileLabel="Profile"
       unreadCount={unreadCount}

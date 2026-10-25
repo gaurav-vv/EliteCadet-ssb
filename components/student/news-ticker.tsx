@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { NewsArticle } from "@/types/news";
@@ -21,6 +22,7 @@ const arrowClass =
 
 // Important News banner: one official/actionable update at a time, auto-advancing,
 // with manual arrows. Pauses while hovered/focused so the link stays clickable.
+// Each item opens in the in-app reader (/student/news/[id]), not a new tab.
 export function NewsTicker({ articles }: { articles: NewsArticle[] }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -63,16 +65,14 @@ export function NewsTicker({ articles }: { articles: NewsArticle[] }) {
             {current.date ? ` · ${formatDate(current.date)}` : ""}
           </span>
         </p>
-        <a
-          href={current.url}
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link
+          href={`/student/news/${current.id}`}
           title={current.title}
+          lang={current.lang}
           className="block truncate text-[14px] font-semibold text-ink no-underline hover:underline sm:text-[15px]"
         >
           {current.title}
-          <span className="sr-only"> (opens in a new tab)</span>
-        </a>
+        </Link>
       </div>
       <button type="button" aria-label="Next news" onClick={() => step(1)} disabled={count < 2} className={arrowClass}>
         <ChevronRight aria-hidden="true" size={18} />
