@@ -57,6 +57,28 @@ describe("updateSession", () => {
     expect(from).not.toHaveBeenCalled();
   });
 
+  it("skips Supabase entirely for a public page when the visitor has no auth cookie", async () => {
+    fakeSupabase(null, null);
+    const res = await updateSession(request("/"));
+    expect(redirectTarget(res)).toBeNull();
+    expect(mockedCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("still refreshes the session on a public page when an auth cookie is present", async () => {
+    const getUser = vi.fn().mockResolvedValue({ data: { user: { id: "u1" } } });
+    mockedCreateClient.mockReturnValue({ auth: { getUser } } as unknown as ReturnType<typeof createServerClient>);
+    const req = new NextRequest(new URL("/login", "http://localhost:3000"), { headers: { cookie: "sb-127-auth-token=abc" } });
+    await updateSession(req);
+    expect(getUser).toHaveBeenCalled();
+  });
+
+  it("still sends a cookie-less visitor away from a protected route", async () => {
+    fakeSupabase(null, null);
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(target?.pathname).toBe("/login");
+    expect(mockedCreateClient).toHaveBeenCalled();
+  });
+
   it("redirects a logged-out visitor to /login with next and reason", async () => {
     fakeSupabase(null, null);
     const res = await updateSession(request("/mentor/mentees"));
