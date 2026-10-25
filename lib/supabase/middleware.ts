@@ -8,7 +8,22 @@ import { publicSupabaseEnv } from "@/lib/supabase/env";
 // the mapping itself lives in lib/auth/redirect.ts so the login form shares it.
 export { roleForPath };
 
+// True when the browser sent a Supabase auth cookie (`sb-<ref>-auth-token`,
+// possibly chunked `.0`, `.1`, or the PKCE `-code-verifier`).
+function hasAuthCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
+}
+
 export async function updateSession(request: NextRequest) {
+  const requiredRole = roleForPath(request.nextUrl.pathname);
+
+  // A public page with no auth cookie has no session to refresh and nothing to
+  // authorize, so skip the Supabase round trip (`auth.getUser()` is a network
+  // call). Protected routes and anyone carrying a cookie take the full path.
+  if (!requiredRole && !hasAuthCookie(request)) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const { url, anonKey } = publicSupabaseEnv();
@@ -33,7 +48,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const requiredRole = roleForPath(request.nextUrl.pathname);
   if (!requiredRole) {
     return response;
   }
