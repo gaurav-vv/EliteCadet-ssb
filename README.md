@@ -120,7 +120,7 @@ lib/server/          domain services: users, academies, academy-people, content,
 lib/actions/         Server Actions
 lib/practice/        5-day journey structure and timing
 types/               shared domain types
-supabase/migrations/ 0001–0027, applied in order, one file per number
+supabase/migrations/ 0001–0033, applied in order, one file per number
 supabase/tests/      end-to-end database workflow check
 tests/               Vitest unit + integration, Playwright e2e
 ```
@@ -259,7 +259,7 @@ You do not need to reapply database migrations every time you start the platform
 
 ### Live meetings and database migrations
 
-One-to-one and batch meetings use LiveKit over WebRTC. The required meeting migrations include `0022`, `0023`, `0024`, and `0025` (all migrations `0001`–`0027` are needed). Apply them to the intended database in order, following the project's migration instructions.
+One-to-one and batch meetings use LiveKit over WebRTC. The required meeting migrations include `0022`, `0023`, `0024`, and `0025` (all migrations `0001`–`0033` are needed). Apply them to the intended database in order, following the project's migration instructions.
 
 Pushing migrations to GitHub does **not** apply them to a hosted Supabase database.
 

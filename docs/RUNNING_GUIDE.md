@@ -40,7 +40,7 @@ First run downloads Docker images and takes several minutes. Stop with `Ctrl+C`,
 | Check which are applied | `npx supabase migration list --local` | "Local" column filled = applied. |
 | Stop | `npx supabase stop` | Data is kept in a Docker volume. |
 
-Migrations live in `supabase/migrations/`, numbered `0001`…`0027`, **one file per number**. A test
+Migrations live in `supabase/migrations/`, numbered `0001`…`0033`, **one file per number**. A test
 (`tests/unit/lib/migrations-layout.test.ts`) fails if two files share a number or one is skipped.
 When two people add a migration at the same time, the second person renumbers theirs to the next
 free number **before merging**.
@@ -113,8 +113,8 @@ select
 
 | What you see | What to do |
 |---|---|
-| `has_profiles_status` is **false** (database is at `0004`) | Run `supabase/catchup/production_catchup_0005_0027.sql` once in the SQL Editor. It applies `0005`–`0027` in **one transaction** (all or nothing) and refuses to run if `0005` is already there. Then go to Step 3. |
-| Some newer features missing, `0005` already applied | Apply only the missing numbered files from `supabase/migrations/`, in order, one at a time. `0026` and `0027` are safe to re-run. |
+| `has_profiles_status` is **false** (database is at `0004`) | Run `supabase/catchup/production_catchup_0005_0033.sql` once in the SQL Editor. It applies `0005`–`0033` in **one transaction** (all or nothing) and refuses to run if `0005` is already there. Then go to Step 3. |
+| Some newer features missing, `0005` already applied | Apply only the missing numbered files from `supabase/migrations/`, in order, one at a time. `0026` and `0028`–`0033` are safe to re-run. |
 | Everything `true` | Nothing to apply. |
 
 Using the CLI instead: `npx supabase login`, `npx supabase link --project-ref <ref>`, then
@@ -140,7 +140,7 @@ containing the database error code. Look there first.
 | What you see | Likely cause | Fix |
 |---|---|---|
 | Login page says **"We couldn't load your account right now"**; log shows `code=42703` (or `42P01`, `PGRST200/204/205`) and `hint=the database schema is behind the app` | The database is missing a column/table the app expects, e.g. `profiles.status` (migration `0005` not applied) | Apply the pending migrations to **the project that `NEXT_PUBLIC_SUPABASE_URL` points at** (section 2 local, 3b hosted). |
-| **"Your sign-in worked, but your account isn't fully set up"** | The email/password are right, but the user has **no row in `public.profiles`** (account created before the profile trigger existed, or the row was deleted) | `npx supabase migration up` — migration `0027` creates the missing profile for such users without touching passwords or existing profiles. Hosted: apply `0027` too. |
+| **"Your sign-in worked, but your account isn't fully set up"** | The email/password are right, but the user has **no row in `public.profiles`** (account created before the profile trigger existed, or the row was deleted) | `npx supabase migration up` — migration `0028` creates the missing profile for such users without touching passwords or existing profiles. Hosted: apply `0028` too. |
 | **"Incorrect email or password."** | Wrong credentials, **or** the account lives in a different Supabase project (local vs hosted users are separate) | Check the URL in your env; reset the password via the local inbox `:54324`. |
 | "Confirm your email first…" | Email confirmation is on | Open the link in the local inbox (`http://127.0.0.1:54324`) or the real mailbox. |
 | Error names `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` as missing | `.env.local` missing or incomplete | Section 2; restart `npm run dev`. |

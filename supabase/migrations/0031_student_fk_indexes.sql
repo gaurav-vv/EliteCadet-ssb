@@ -1,6 +1,6 @@
 -- SSB Academy — index student-side foreign keys that had no index.
 --
--- Part 1 of 3 (see 0031, 0032). Deleting a practice item/bank or interview
+-- Part 1 of 3 (see 0032, 0033). Deleting a practice item/bank or interview
 -- topic, and looking up a student's rows by them, scanned the whole table.
 
 create index if not exists practice_answers_item_idx
