@@ -30,3 +30,21 @@ export async function inviteAcademyMentorAction(input: { email: string; fullName
   if (result.ok) refresh();
   return result;
 }
+
+export async function addMentorManuallyAction(input: { email: string; fullName: string; phone: string; qualifications: string; specialization: string }) {
+  const result = await service.addMentorManually(input);
+  if (result.ok) refresh();
+  return result;
+}
+
+export async function resendMentorInviteAction(mentorId: string) {
+  const result = await service.resendMentorInvite(mentorId, await origin());
+  if (result.ok) refresh();
+  return result;
+}
+
+export async function revokeMentorInviteAction(mentorId: string) {
+  const result = await service.revokeMentorInvite(mentorId);
+  if (result.ok) refresh();
+  return result;
+}

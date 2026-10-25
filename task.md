@@ -913,6 +913,24 @@ students don't.
     - A test over a real network/TURN.
     - Applying 0022–0025 to hosted databases.
 
+- **2026-10-25, meeting experience pass:**
+  - Diagnosed `[meetings] create room failed: invalid token`: `LIVEKIT_API_SECRET` in `.env.local`
+    was the dashboard's masked value (32 × "•"), so every server-signed JWT was rejected. Config,
+    not code. The server now treats masked/placeholder/malformed credentials as "not set up" and
+    logs which variable is wrong (names only); 401s are logged as a credential mismatch.
+  - Built: join-screen camera preview, mic level, device pickers and "You'll join as <name>";
+    in-room audio/video/speaker settings; speaker view with pinning (default for one-to-one) next to
+    gallery; full screen; elapsed time and scheduled end on the stage; the host's raise-hand queue
+    in raise order (`hand_at` attribute); "the host muted your microphone" notice.
+  - Tests: `tests/unit/lib/livekit-config.test.ts` (credential checks, token scope: room, identity,
+    sources, no data, TTL), room-logic queue/speaker tests, service grant fields,
+    `tests/integration/meeting-prejoin.test.tsx` (permission denied, camera off, preview stopped).
+    The two-browser e2e (extended for the new UI) passes against a local livekit-server.
+  - [ ] **Owner:** create a new LiveKit Cloud API key and put the real key + secret in `.env.local`
+    (and the host's env), then run the two-browser check (`E2E_LIVEKIT=1`) against LiveKit Cloud.
+  - [ ] Product decision + migration: private post-session notes / interview evaluation for
+    meetings (no existing table fits; `feedback` is per assessment attempt).
+
 ## T106 — Email delivery + independent mentors — P0 — `[-]`
 **Spec:** `specs.md` §8a.1 (mentor types), `docs/email.md`.
 - [x] Diagnosed: local email goes to Mailpit (never real inboxes); Mailpit loses mail on restart;
@@ -929,7 +947,14 @@ students don't.
 - [x] 2026-10-20: re-inviting an address that has another pending role/academy no longer "succeeds"
   silently (`decideInvite`). Pending invites are re-sent; active or mismatched accounts are refused
   with a clear message.
+- [x] 2026-10-25: password reset hardened for real inboxes. A link that fell back to the Site URL
+  (`/?code=…`) is forwarded to `/auth/callback`. Reset/invite sessions (token `amr`) always land on
+  "Set a new password". Console hints for built-in-mailer refusals and SMTP failures (UI stays
+  generic). `docs/email.md`: provider values, dashboard steps, a cross-device Reset template
+  (`token_hash`), and a real-inbox test procedure. Tests: callback, proxy, helper, reset API.
 - [ ] **Owner:** custom SMTP and URL configuration on the hosted Supabase project (`docs/email.md`).
+  The app now uses the hosted project `ibdlhzdrchcggmtnwbyj`; its SMTP settings can't be read
+  without a dashboard login or access token. Real delivery is **not verified**.
   Optional: `[auth.email.smtp]` in `supabase/config.toml` for real mail from the local stack.
   Then send yourself a real invite and a real reset.
 - [ ] Apply 0022–0024 to hosted databases, after approval.
@@ -1093,6 +1118,32 @@ FR-AI-01/02.
 - Production environment with backups, monitoring and SMTP.
 - Privacy policy, terms and consent (students may be under 18).
 - Pilot with one academy.
+
+## T110 — Add Mentor: manual profile + invite by email — P1 — `[-]`
+**Spec:** `specs.md` §8a.3c (academy mentors), `docs/email.md` → Adding mentors. **Depends on:** T106.
+**Requirements:**
+- Academy → Mentors offers two methods: **Invite by email** (existing Supabase Auth invite) and
+  **Add manually** (name, email, optional phone, qualifications, specialization).
+- Manual add sends no email and works without SMTP. The account has no password, so there's no
+  login until the mentor accepts an invite (or a reset link) and chooses their own password.
+- One account per email: duplicates refused (this academy's mentor: "already one of your mentors";
+  any other account: generic refusal).
+- Status per mentor: active · added, not invited · invite pending · invite expired · suspended.
+  Send/Resend and Revoke/Remove for never-activated mentors only. Revoking deletes the
+  never-activated account, so the link stops working.
+- Server-side authorization (active academy admin of that academy); RLS for reads; service role
+  only after that check; every add/invite/resend/revoke audited.
+**Acceptance:** both paths work end to end; duplicate, unauthorized, expiry, reuse and revoke cases
+are refused safely; invite failures are reported, never shown as sent.
+**Progress 2026-10-25:**
+- [x] `0027_mentor_onboarding.sql` (mentor_profiles.qualifications + academy-admin read policy;
+  written as 0026, renumbered 2026-10-25).
+- [x] Service/repository/actions, `AddMentorPanel`, `MentorInviteActions`, list statuses.
+- [x] Tests: `tests/unit/lib/add-mentor.test.ts` (25); e2e `tests/e2e/add-mentor-local.spec.ts`
+  (manual → no login → invite → accept → active; invite → revoke → dead link) against local Supabase.
+- [ ] **Owner:** apply 0027 to the hosted database (after approval); custom SMTP for invites
+  (`docs/email.md`); confirm "Email OTP Expiration" is 3600 s or update `INVITE_LINK_TTL_SECONDS`.
+- [ ] Super admin's independent-mentor invite still has no manual path or revoke (not requested).
 
 # Phase 10 — PRD Phase 2 (P1), after the pilot
 

@@ -26,7 +26,10 @@ function fake(opts: {
   update?: { error: AuthError };
   setSession?: { error: AuthError };
   user?: { id: string } | null;
+  // How the current session was created (the token's amr), as Supabase stamps it.
+  sessionMethod?: string;
 }) {
+  const accessToken = `h.${Buffer.from(JSON.stringify({ amr: [{ method: opts.sessionMethod ?? "otp", timestamp: 1 }] })).toString("base64url")}.s`;
   const auth = {
     signInWithPassword: vi.fn().mockResolvedValue({ data: { user: opts.signIn?.user ?? null }, error: opts.signIn?.error ?? null }),
     signOut: vi.fn().mockResolvedValue({ error: null }),
@@ -35,6 +38,7 @@ function fake(opts: {
     updateUser: vi.fn().mockResolvedValue(opts.update ?? { error: null }),
     setSession: vi.fn().mockResolvedValue(opts.setSession ?? { error: null }),
     getUser: vi.fn().mockResolvedValue({ data: { user: opts.user ?? null } }),
+    getSession: vi.fn().mockResolvedValue({ data: { session: opts.user ? { access_token: accessToken } : null } }),
   };
   const maybeSingle = vi.fn().mockResolvedValue(opts.profile ?? { data: null, error: null });
   vi.mocked(createClient).mockReturnValue({
@@ -141,6 +145,17 @@ describe("requestPasswordReset", () => {
     expect((await requestPasswordReset("cadet@example.com")).ok).toBe(false);
   });
 
+  it("keeps the built-in mailer's refusal generic on screen but explains the fix in the console", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    fake({ reset: { error: { code: "email_address_not_authorized", status: 400, message: "Email address not authorized" } } });
+    const result = await requestPasswordReset("cadet@gmail.com");
+    expect(result.ok).toBe(false);
+    expect(result.error?.message).not.toMatch(/organization|authorized|account/i);
+    expect(JSON.stringify(log.mock.calls)).toMatch(/custom SMTP/);
+    expect(JSON.stringify(log.mock.calls)).not.toContain("cadet@gmail.com");
+    log.mockRestore();
+  });
+
   it("reports rate limiting", async () => {
     fake({ reset: { error: { code: "over_email_send_rate_limit", status: 429, message: "rate limit" } } });
     expect((await requestPasswordReset("cadet@example.com")).error?.code).toBe("rate_limited");
@@ -176,6 +191,18 @@ describe("establishRecoverySession", () => {
   it("is ready when /auth/callback already created the session", async () => {
     fake({ user: { id: "u1" } });
     expect(await establishRecoverySession()).toBe("ready");
+  });
+
+  it("is ready for a PKCE reset session (recovery) and an implicit/token_hash one (otp)", async () => {
+    fake({ user: { id: "u1" }, sessionMethod: "recovery" });
+    expect(await establishRecoverySession()).toBe("ready");
+    fake({ user: { id: "u1" }, sessionMethod: "otp" });
+    expect(await establishRecoverySession()).toBe("ready");
+  });
+
+  it("refuses an ordinary password session: changing the password needs a reset/invite link", async () => {
+    fake({ user: { id: "u1" }, sessionMethod: "password" });
+    expect(await establishRecoverySession()).toBe("invalid");
   });
 
   it("is invalid with no session (link opened twice, expired, or another browser)", async () => {

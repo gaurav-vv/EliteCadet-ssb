@@ -29,3 +29,6 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join("") || "?";
+
+// Server stamp for when the hand went up (setHandRaised), or null.
+export const handRaisedAt = (p: Participant) => (handRaised(p) && p.attributes?.hand_at ? p.attributes.hand_at : null);

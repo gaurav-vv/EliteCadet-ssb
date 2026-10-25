@@ -105,3 +105,23 @@ export function formatClock(totalSeconds: number): string {
   const sec = s % 60;
   return `${h > 0 ? `${String(h).padStart(2, "0")}:` : ""}${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
+
+// The host's raise-hand queue: first hand up first. `raisedAt` is the server
+// stamp (participant attribute hand_at); hands without one go last, by name.
+export function handQueue<T extends { name: string; identity: string; handRaised: boolean; raisedAt: string | null }>(people: T[]): T[] {
+  const at = (p: T) => (p.raisedAt && !Number.isNaN(Date.parse(p.raisedAt)) ? Date.parse(p.raisedAt) : Number.POSITIVE_INFINITY);
+  return people.filter((p) => p.handRaised).sort((a, b) => at(a) - at(b) || a.name.localeCompare(b.name) || a.identity.localeCompare(b.identity));
+}
+
+// Speaker view: who takes the big tile. A pinned person (while still here),
+// else the loudest current remote speaker, else the last one who spoke, else a
+// host, else the first other person, else yourself.
+export function featuredIdentity(input: { people: { identity: string; isHost: boolean; isLocal: boolean }[]; pinned: string | null; speaking: string[]; lastSpeaker: string | null }): string | null {
+  const here = new Set(input.people.map((p) => p.identity));
+  const remote = (id: string) => here.has(id) && !input.people.find((p) => p.identity === id)?.isLocal;
+  if (input.pinned && here.has(input.pinned)) return input.pinned;
+  const speaker = input.speaking.find(remote);
+  if (speaker) return speaker;
+  if (input.lastSpeaker && remote(input.lastSpeaker)) return input.lastSpeaker;
+  return input.people.find((p) => p.isHost && !p.isLocal)?.identity ?? input.people.find((p) => !p.isLocal)?.identity ?? input.people[0]?.identity ?? null;
+}

@@ -22,6 +22,15 @@ export async function updateSession(request: NextRequest) {
   // call). Protected routes and anyone carrying a cookie take the full path.
   if (!requiredRole && !hasAuthCookie(request)) {
     return NextResponse.next({ request });
+  // An email link that Supabase sent to the Site URL instead of
+  // /auth/callback (its fallback when the redirect URL isn't allow-listed)
+  // arrives as "/?code=…" (or "/?token_hash=…&type=…"). Hand it to the
+  // callback, which exchanges it and routes resets to "Set a new password".
+  const params = request.nextUrl.searchParams;
+  if (request.nextUrl.pathname === "/" && (params.has("code") || (params.has("token_hash") && params.has("type")))) {
+    const callback = request.nextUrl.clone();
+    callback.pathname = "/auth/callback";
+    return NextResponse.redirect(callback);
   }
 
   let response = NextResponse.next({ request });
