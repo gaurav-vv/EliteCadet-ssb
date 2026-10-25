@@ -17,11 +17,6 @@ function hasAuthCookie(request: NextRequest): boolean {
 export async function updateSession(request: NextRequest) {
   const requiredRole = roleForPath(request.nextUrl.pathname);
 
-  // A public page with no auth cookie has no session to refresh and nothing to
-  // authorize, so skip the Supabase round trip (`auth.getUser()` is a network
-  // call). Protected routes and anyone carrying a cookie take the full path.
-  if (!requiredRole && !hasAuthCookie(request)) {
-    return NextResponse.next({ request });
   // An email link that Supabase sent to the Site URL instead of
   // /auth/callback (its fallback when the redirect URL isn't allow-listed)
   // arrives as "/?code=…" (or "/?token_hash=…&type=…"). Hand it to the
@@ -31,6 +26,15 @@ export async function updateSession(request: NextRequest) {
     const callback = request.nextUrl.clone();
     callback.pathname = "/auth/callback";
     return NextResponse.redirect(callback);
+  }
+
+  // A public page with no auth cookie has no session to refresh and nothing to
+  // authorize, so skip the Supabase round trip (`auth.getUser()` is a network
+  // call). This must stay AFTER the email-link redirect above: a new user
+  // opening a confirmation/reset link has no cookie yet. Protected routes and
+  // anyone carrying a cookie take the full path.
+  if (!requiredRole && !hasAuthCookie(request)) {
+    return NextResponse.next({ request });
   }
 
   let response = NextResponse.next({ request });
