@@ -1,5 +1,9 @@
 -- Fix: mentors could not schedule a session.
 --
+-- Idempotent on purpose: this fix first shipped as 0022_fix_sessions_read_returning.sql,
+-- which collided with 0022_live_meetings.sql (two files, one version number) and was
+-- renumbered to 0026. A database that already ran the old file can safely run this one.
+--
 -- `scheduleSession` does `insert(...).select("id")` (INSERT ... RETURNING).
 -- PostgreSQL evaluates the table's SELECT RLS policy against the new row for
 -- the RETURNING clause. The old `sessions_read` policy called
@@ -14,7 +18,7 @@
 -- keeps the participant lookup from recursing into session_participants' own
 -- RLS (which itself reads sessions).
 
-create function public.can_see_session_row(
+create or replace function public.can_see_session_row(
   p_id uuid,
   p_mentor uuid,
   p_academy uuid,
@@ -38,7 +42,7 @@ as $$
     ))
 $$;
 
-drop policy "sessions_read" on public.sessions;
+drop policy if exists "sessions_read" on public.sessions;
 create policy "sessions_read" on public.sessions
   for select using (
     public.can_see_session_row(id, mentor_id, academy_id, batch_id, for_whole_batch)
