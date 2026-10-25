@@ -65,8 +65,11 @@ export interface ExistingAccount {
   id: string;
   role: string;
   academyId: string | null;
-  // Invited but never accepted: no confirmed email and never signed in.
+  // Never activated: no confirmed email and never signed in. Covers invites
+  // not yet accepted AND mentors added manually who were never invited.
   pending: boolean;
+  // Null for an account that was never sent an invite (added manually).
+  invitedAt: string | null;
 }
 
 export type InviteDecision = { kind: "invite" } | { kind: "resend" } | { kind: "refuse"; reason: "same_academy_active" | "other_account" };
@@ -82,3 +85,64 @@ export function decideInvite(existing: ExistingAccount | null, wanted: { role: "
   if (sameTarget) return { kind: "refuse", reason: "same_academy_active" };
   return { kind: "refuse", reason: "other_account" };
 }
+
+// ---- Add mentor manually ---------------------------------------------------
+
+export type ManualMentorCheck =
+  | { ok: true; email: string; fullName: string; phone: string | null; qualifications: string | null; specialization: string[] }
+  | { ok: false; field: "email" | "fullName" | "phone" | "qualifications" | "specialization"; message: string };
+
+const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;
+
+// Same name/email rules as an invite, plus the optional profile details.
+// Specialization is a comma-separated list stored in mentor_profiles.expertise.
+export function checkManualMentorInput(input: { email?: unknown; fullName?: unknown; phone?: unknown; qualifications?: unknown; specialization?: unknown }): ManualMentorCheck {
+  const person = checkPersonInput(input, true);
+  if (!person.ok) return person;
+  const text = (v: unknown) => (typeof v === "string" ? v.trim().replace(/[ \t]+/g, " ") : "");
+  const phone = text(input.phone);
+  if (phone && !PHONE_RE.test(phone)) return { ok: false, field: "phone", message: "Enter a phone number of 7–20 digits (spaces, +, - and brackets are fine), or leave it empty." };
+  const qualifications = text(input.qualifications);
+  if (qualifications.length > 500) return { ok: false, field: "qualifications", message: "Keep qualifications under 500 characters." };
+  const specialization = [...new Set(text(input.specialization).split(",").map((s) => s.trim()).filter(Boolean))];
+  if (specialization.length > 10 || specialization.some((s) => s.length > 60)) return { ok: false, field: "specialization", message: "Up to 10 specializations, each under 60 characters, separated by commas." };
+  return { ok: true, email: person.email, fullName: person.fullName, phone: phone || null, qualifications: qualifications || null, specialization };
+}
+
+// ---- Mentor access status ----------------------------------------------------
+
+// How long a Supabase invite link works. Must match the project's
+// Authentication → Emails → "Email OTP Expiration" (Supabase's default, and
+// supabase/config.toml's otp_expiry, is 3600 s). Supabase enforces the real
+// expiry; this only labels the invite "expired" so the admin knows to resend.
+export const INVITE_LINK_TTL_SECONDS = 3600;
+
+export type MentorAccess =
+  | "active" // has signed in / set a password
+  | "not_invited" // added manually, no invite sent: profile only, can't log in
+  | "invited" // invite sent, link still valid
+  | "expired" // invite sent, link expired: resend
+  | "suspended";
+
+export interface MentorAuthState {
+  invitedAt: string | null;
+  // When the latest invite email was sent (re-sends update it).
+  sentAt: string | null;
+  confirmedAt: string | null;
+  lastSignInAt: string | null;
+}
+
+// `auth` is null when the auth record couldn't be read (no service key):
+// then a mentor who never signed in is shown as invited, as before.
+export function mentorAccess(m: { status: "active" | "suspended"; lastLoginAt: string | null }, auth: MentorAuthState | null, nowMs: number): MentorAccess {
+  if (m.status === "suspended") return "suspended";
+  if (m.lastLoginAt || auth?.lastSignInAt || auth?.confirmedAt) return "active";
+  if (!auth) return "invited";
+  if (!auth.invitedAt) return "not_invited";
+  const sent = Date.parse(auth.sentAt ?? auth.invitedAt);
+  return Number.isFinite(sent) && nowMs - sent > INVITE_LINK_TTL_SECONDS * 1000 ? "expired" : "invited";
+}
+
+// Only an account nobody has activated can have its invite revoked (which
+// deletes it); an activated mentor is suspended by the platform team instead.
+export const canRevoke = (access: MentorAccess) => access === "not_invited" || access === "invited" || access === "expired";

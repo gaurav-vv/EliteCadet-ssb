@@ -184,3 +184,21 @@ describe("updateSession — /admin (super_admin workspace) and account status", 
     expect(redirectTarget(await updateSession(request("/admin")))).toBeNull();
   });
 });
+
+describe("updateSession — email links that fell back to the Site URL", () => {
+  it("forwards /?code=… to /auth/callback with the query intact", async () => {
+    fakeSupabase(null, null);
+    const target = redirectTarget(await updateSession(request("/?code=abc123")));
+    expect(target?.pathname).toBe("/auth/callback");
+    expect(target?.searchParams.get("code")).toBe("abc123");
+  });
+
+  it("forwards a token_hash link too, and leaves the plain home page alone", async () => {
+    fakeSupabase(null, null);
+    const target = redirectTarget(await updateSession(request("/?token_hash=th&type=recovery")));
+    expect(target?.pathname).toBe("/auth/callback");
+    expect(target?.searchParams.get("type")).toBe("recovery");
+    expect(redirectTarget(await updateSession(request("/")))).toBeNull();
+    expect(redirectTarget(await updateSession(request("/?token_hash=th")))).toBeNull();
+  });
+});

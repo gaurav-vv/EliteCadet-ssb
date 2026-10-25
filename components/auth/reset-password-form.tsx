@@ -63,7 +63,7 @@ export function ResetPasswordForm() {
       <div className="glass-regular flex flex-col items-center gap-3 px-8 py-10 text-center">
         <h1 className="text-xl font-semibold text-ink">This link has expired or was already used</h1>
         <p className="text-sm text-ink-secondary">
-          Invite and reset links work once and expire after an hour. For a password reset, request a new link and open it in this same browser. For an invite, ask whoever invited you to send it again.
+          Invite and reset links work once and expire after an hour, and only the newest reset link works. Request a new link and open it from the newest email. If it still fails, open it in the same browser where you asked for it. For an invite, ask whoever invited you to send it again.
         </p>
         <Button asChild size="sm">
           <Link href="/forgot-password">Request a new link</Link>

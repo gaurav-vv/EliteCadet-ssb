@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/auth/guard", () => ({ authorize: vi.fn(), getActor: vi.fn(), isGuardFailure: (v: object) => "ok" in v }));
-vi.mock("@/lib/server/academy-people/repository", () => ({ inviteByEmail: vi.fn(), findAccountByEmail: vi.fn() }));
+vi.mock("@/lib/server/academy-people/repository", () => ({ inviteByEmail: vi.fn(), findAccountByEmail: vi.fn(), auditAsService: vi.fn(async () => undefined) }));
 vi.mock("@/lib/server/users/repository", () => ({ insertAudit: vi.fn(async () => ({ data: null, error: null })) }));
 
 import { authorize, getActor } from "@/lib/server/auth/guard";
@@ -58,7 +58,7 @@ describe("inviteIndependentMentor", () => {
   it("validates input and explains an existing account", async () => {
     vi.mocked(authorize).mockResolvedValue(superActor);
     expect((await inviteIndependentMentor({ email: "nope", fullName: "X Y" }, "http://x")).field).toBe("email");
-    vi.mocked(findAccountByEmail).mockResolvedValue({ data: { id: NEW_ID, role: "student", academyId: ACADEMY, pending: false }, error: null });
+    vi.mocked(findAccountByEmail).mockResolvedValue({ data: { id: NEW_ID, role: "student", academyId: ACADEMY, pending: false, invitedAt: "2026-10-20T00:00:00Z" }, error: null });
     expect((await inviteIndependentMentor(input, "http://x")).error?.message).toMatch(/already belongs to a student in an academy/);
     expect(inviteByEmail).not.toHaveBeenCalled();
     expect(usersRepo.insertAudit).not.toHaveBeenCalled();
@@ -81,7 +81,7 @@ describe("academy admins stay inside their academy", () => {
 });
 
 describe("decideInvite — an existing account is never silently kept in the wrong role", () => {
-  const acct = (over: Partial<{ role: string; academyId: string | null; pending: boolean }> = {}) => ({ id: NEW_ID, role: "mentor", academyId: ACADEMY, pending: true, ...over });
+  const acct = (over: Partial<{ role: string; academyId: string | null; pending: boolean }> = {}) => ({ id: NEW_ID, role: "mentor", academyId: ACADEMY, pending: true, invitedAt: "2026-10-20T00:00:00Z", ...over });
   it("invites a new address", () => expect(decideInvite(null, { role: "mentor", academyId: ACADEMY })).toEqual({ kind: "invite" }));
   it("re-sends an unaccepted invite for the same role and academy", () => expect(decideInvite(acct(), { role: "mentor", academyId: ACADEMY })).toEqual({ kind: "resend" }));
   it("refuses an active account that already is that mentor", () => expect(decideInvite(acct({ pending: false }), { role: "mentor", academyId: ACADEMY })).toEqual({ kind: "refuse", reason: "same_academy_active" }));
@@ -97,13 +97,13 @@ describe("inviteAcademyMentor with an existing account", () => {
   const adminActor = { id: ADMIN, email: null, profile: { id: ADMIN, role: "academy_admin" as const, fullName: "A", academyId: ACADEMY, status: "active" as const } };
   it("re-sends a pending invite to the same academy and says so", async () => {
     vi.mocked(getActor).mockResolvedValue(adminActor);
-    vi.mocked(findAccountByEmail).mockResolvedValue({ data: { id: NEW_ID, role: "mentor", academyId: ACADEMY, pending: true }, error: null });
+    vi.mocked(findAccountByEmail).mockResolvedValue({ data: { id: NEW_ID, role: "mentor", academyId: ACADEMY, pending: true, invitedAt: "2026-10-20T00:00:00Z" }, error: null });
     vi.mocked(inviteByEmail).mockResolvedValue({ data: { id: NEW_ID }, error: null });
     expect((await inviteAcademyMentor(input, "http://x")).data).toEqual({ name: "Indie Mentor", resent: true });
   });
   it("refuses — without revealing details — an address that is a student or in another academy", async () => {
     vi.mocked(getActor).mockResolvedValue(adminActor);
-    vi.mocked(findAccountByEmail).mockResolvedValue({ data: { id: NEW_ID, role: "student", academyId: "elsewhere", pending: true }, error: null });
+    vi.mocked(findAccountByEmail).mockResolvedValue({ data: { id: NEW_ID, role: "student", academyId: "elsewhere", pending: true, invitedAt: "2026-10-20T00:00:00Z" }, error: null });
     const res = await inviteAcademyMentor(input, "http://x");
     expect(res.error?.message).toMatch(/already has an EliteCadet account/);
     expect(res.error?.message).not.toMatch(/student|elsewhere/);

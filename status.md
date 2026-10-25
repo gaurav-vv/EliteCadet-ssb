@@ -439,6 +439,139 @@ Next task:
 ## 13a. Update Log
 
 ```text
+Date: 2026-10-25 (final)
+Task: Stabilize auth / reset / Add Mentor / migrations for end-to-end testing
+Status: VERIFIED locally (unit + real local Supabase e2e). Hosted DB and SMTP NOT verified.
+
+What changed:
+- Found: Supabase stamps amr "otp" for reset and invite links (and "recovery" for PKCE), not
+  "recovery"/"invite" as assumed earlier, so the callback's lost-next routing never fired.
+  isPasswordSetupSession now matches real values; the callback honours an explicit next.
+- /reset-password now requires an email-link session (reset/invite); a normal signed-in session
+  is refused (e2e added).
+- Invite path: a concurrent duplicate (Auth email_exists) is reported as an existing account,
+  not "couldn't send".
+- Verified locally: the cross-device token_hash Reset template works with PKCE (pkce_ token).
+- docs/database-migrations.md (sequence, other-developer recovery, read-only hosted audit SQL);
+  docs/email.md (no-domain limits, DNS steps, Secure password change).
+
+What remains:
+- Owner: hosted audit SQL, apply missing migrations by hand, SMTP with a verified domain.
+
+Date: 2026-10-25 (night)
+Task: Migration versions — duplicate 0022 resolved
+Status: VERIFIED locally (history reconciled with the CLI; fresh-database apply + RLS check pass).
+        Hosted database NOT changed.
+
+What changed:
+- 0022_fix_sessions_read_returning.sql → 0026_fix_sessions_read_returning.sql (re-runnable:
+  create or replace function, drop policy if exists + identical policy). Matches the local
+  history, which already recorded version 0026 = fix_sessions_read_returning (same SQL).
+- 0026_mentor_onboarding.sql → 0027_mentor_onboarding.sql (re-runnable: add column if not exists,
+  constraint and policy recreated identically). References updated (comments, log hint, docs).
+- Local history: `supabase migration up --local` recorded 0027 (schema already present). No reset,
+  no manual edits to supabase_migrations.
+
+Decision:
+- Version numbers are unique and follow the order history recorded on this machine:
+  0022 = live_meetings, 0026 = the sessions_read fix, 0027 = mentor onboarding.
+
+What remains:
+- Hosted: read supabase_migrations.schema_migrations and check objects before applying anything.
+  Never `db push` to a project with incomplete history.
+- Other developers' local DBs that recorded 0022 = fix_sessions_read_returning (see below) need checking.
+
+Next task:
+- Owner: hosted migration audit (read-only queries in docs/status), then apply 0022–0027 as needed
+
+Date: 2026-10-25 (evening)
+Task: T110 — Add Mentor: manual profile + invite by email
+Status: PARTIAL — VERIFIED locally (unit + real local Supabase e2e); hosted DB needs 0027; invites
+        to real inboxes need custom SMTP (T106)
+
+What changed:
+- supabase/migrations/0027_mentor_onboarding.sql (renumbered from 0026): mentor_profiles.qualifications; academy admins
+  may read their own mentors' mentor_profiles. Applied to the LOCAL database only.
+- lib/server/academy-people/{service,repository,validation}.ts: addMentorManually (password-less
+  account via service role, details, all-or-nothing), resendMentorInvite, revokeMentorInvite
+  (deletes never-activated account), mentorAccess statuses, genuine invite-failure messages,
+  audit via service role. findAccountByEmail: exact match instead of ilike ("_"/"%" wildcards).
+- UI: AddMentorPanel (Invite by email | Add manually), MentorInviteActions, list statuses;
+  Reports label "Not activated yet".
+- Tests: add-mentor.test.ts (25), add-mentor-local.spec.ts (2, real local Auth + Mailpit);
+  auth-flows-local.spec.ts selectors updated for the new panel (6 pass).
+
+What remains:
+- Owner: apply 0027 to hosted (after approval); custom SMTP; keep Email OTP Expiration = 3600 s.
+
+Blocker:
+- None for local use; hosted needs 0027.
+
+Next task:
+- Apply 0027 to hosted after approval
+
+Date: 2026-10-25 (later)
+Task: T106 — password reset email to real inboxes
+Status: PARTIAL — code + tests VERIFIED; real delivery UNVERIFIED (needs owner SMTP + URL config)
+
+What changed:
+- Found: .env.local now points at the hosted project (ibdlhzdrchcggmtnwbyj.supabase.co), not the
+  local stack, so Mailpit isn't involved. Its SMTP settings aren't visible without a dashboard
+  login. Supabase's built-in mailer only sends to organization members, so other Gmail addresses
+  won't receive resets until custom SMTP is enabled.
+- app/auth/callback: reset/invite sessions (amr recovery|invite) go to /reset-password even when
+  the link lost `next`. lib/supabase/middleware.ts: "/?code=…" or "/?token_hash=…&type=…"
+  (Site URL fallback) is forwarded to /auth/callback. lib/auth/redirect.ts: isPasswordSetupSession.
+- lib/api/auth.ts: console hint for email_address_not_authorized / SMTP failures / redirect
+  errors. UI stays generic (doesn't reveal which emails have accounts).
+- Reset page "link expired" copy now says only the newest link works.
+- docs/email.md: provider values, dashboard steps, cross-device Reset template, real-inbox test.
+- Tests: +8.
+
+What remains:
+- Owner: custom SMTP, Site URL + Redirect URLs, optional Reset template, then the real-inbox test
+  in docs/email.md.
+
+Blocker:
+- Hosted Supabase SMTP configuration (owner action).
+
+Next task:
+- Owner real-inbox reset test
+
+Date: 2026-10-25
+Task: T094 — meeting experience pass + "create room failed: invalid token"
+Status: PARTIAL — VERIFIED locally: unit/integration tests, build, and the real two-browser e2e
+        (E2E_LIVEKIT=1) against a local livekit-server 1.13.10 incl. the new UI. LiveKit Cloud
+        UNVERIFIED (blocked on a real API secret)
+
+What changed:
+- Root cause of "invalid token": LIVEKIT_API_SECRET in .env.local was the LiveKit Cloud dashboard's
+  masked value (32 × "•"). Every JWT the server signed (createRoom, tokens) was rejected. Config,
+  not code; no SDK or auth changes needed.
+- lib/server/meetings/livekit.ts: invalidLiveKitConfig() (masked/placeholder/whitespace values,
+  bad URL scheme) → treated as "not set up", logged by variable name only; describeProviderError()
+  logs 401s as a key/secret mismatch. setHandRaised also stamps hand_at.
+- lib/server/meetings/service.ts: viewer.name (profile) in MeetingView, startedAt in JoinGrant.
+- UI: join-screen preview + mic level + device pickers + "You'll join as"; in-room device settings
+  (incl. speaker where supported); speaker view with pinning; full screen; elapsed time and
+  scheduled end; host raise-hand queue; "host muted your microphone" notice.
+  New: components/meetings/{device-controls,prejoin-preview}.tsx.
+- Docs: docs/live-meetings.md (UI, Troubleshooting).
+- Tests: +16 Vitest (620 total, all pass): livekit-config 9, room-logic 3, service 1, prejoin
+  integration 3. e2e extended (join preview + name, hand queue, host mute notice, speaker view +
+  pin, device settings) and passing with two real Chromium browsers through the SFU.
+
+What remains:
+- Owner: real LiveKit key/secret in .env.local and the host env; then the two-browser e2e
+  (E2E_LIVEKIT=1) against LiveKit Cloud, plus real-device checks (mobile Safari, Android Chrome).
+- Post-session notes / private interview evaluation: needs a product decision + migration.
+
+Blocker:
+- LiveKit Cloud credentials (owner action).
+
+Next task:
+- T094 two-browser verification once credentials are fixed
+
 Date: 2026-10-20 (evening)
 Task: T094 meetings production pass + T106 invite fix
 Status: Meetings verified locally with two real browsers; email local-only (real delivery needs owner SMTP)

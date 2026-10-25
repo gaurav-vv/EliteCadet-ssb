@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { VideoTrack, isTrackReference, useConnectionQualityIndicator, useIsSpeaking, type TrackReferenceOrPlaceholder } from "@livekit/components-react";
 import { ConnectionQuality, Track } from "livekit-client";
-import { ChevronLeft, ChevronRight, Crown, Hand, Mic, MicOff, MonitorUp, WifiOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crown, Hand, Mic, MicOff, MonitorUp, Pin, WifiOff } from "lucide-react";
 import { cn } from "cn";
 import { handRaised, initials, isHostRole, roleOf } from "@/components/meetings/participant-utils";
-import { orderForGrid, pageCount } from "@/lib/meetings/room-logic";
+import { featuredIdentity, orderForGrid, pageCount } from "@/lib/meetings/room-logic";
 
 const PER_PAGE = 9;
+// Speaker view shows this many others beside the main tile; the rest are in gallery view.
+const STRIP = 6;
 
-function Tile({ trackRef, featured }: { trackRef: TrackReferenceOrPlaceholder; featured?: boolean }) {
+export type StageLayout = "gallery" | "speaker";
+
+function Tile({ trackRef, featured, pinned }: { trackRef: TrackReferenceOrPlaceholder; featured?: boolean; pinned?: boolean }) {
   const p = trackRef.participant;
   const speaking = useIsSpeaking(p);
   const { quality } = useConnectionQualityIndicator({ participant: p });
@@ -32,6 +36,11 @@ function Tile({ trackRef, featured }: { trackRef: TrackReferenceOrPlaceholder; f
       ) : (
         <span aria-hidden="true" className={cn("flex items-center justify-center rounded-full bg-ink-secondary font-semibold text-white", featured ? "size-24 text-[28px]" : "size-14 text-[16px]")}>
           {initials(name)}
+        </span>
+      )}
+      {pinned && (
+        <span className="absolute top-2 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-pill bg-ink/70 px-2 py-0.5 text-[12px] text-white">
+          <Pin aria-hidden="true" size={12} /> Pinned
         </span>
       )}
       {hand && !isScreen && (
@@ -58,15 +67,39 @@ function Tile({ trackRef, featured }: { trackRef: TrackReferenceOrPlaceholder; f
   );
 }
 
+// In speaker view, a tile is a button: choosing it pins that person to the
+// main tile (choosing the pinned one again unpins).
+function PinnableTile({ trackRef, pinned, onPin, featured }: { trackRef: TrackReferenceOrPlaceholder; pinned: boolean; onPin: (identity: string | null) => void; featured?: boolean }) {
+  const name = trackRef.participant.name || "Participant";
+  return (
+    <button
+      type="button"
+      onClick={() => onPin(pinned ? null : trackRef.participant.identity)}
+      aria-pressed={pinned}
+      aria-label={pinned ? `Unpin ${name}` : `Pin ${name} to the main view`}
+      title={pinned ? "Unpin" : "Pin to the main view"}
+      className="block w-full min-w-0 rounded-card text-left focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink focus-visible:outline-none"
+    >
+      <Tile trackRef={trackRef} pinned={pinned} featured={featured} />
+    </button>
+  );
+}
+
 interface VideoGridProps {
   tracks: TrackReferenceOrPlaceholder[]; // camera (with placeholders) + screen shares
+  layout: StageLayout;
+  // Speaker view: current speakers (loudest first), the last remote speaker, and a pin.
+  speaking: string[];
+  lastSpeaker: string | null;
+  pinned: string | null;
+  onPin: (identity: string | null) => void;
 }
 
 // session_ref.png centre: a paged grid of everyone in the room (host first,
 // raised hands next). Students who aren't allowed to publish show their
 // initials, so a batch room never streams 100 videos. A screen share takes the
 // main area with the cameras in a strip beside it.
-export function VideoGrid({ tracks }: VideoGridProps) {
+export function VideoGrid({ tracks, layout, speaking, lastSpeaker, pinned, onPin }: VideoGridProps) {
   const [page, setPage] = useState(0);
   const screen = tracks.find((t) => t.source === Track.Source.ScreenShare && isTrackReference(t));
   const cameras = orderForGrid(
@@ -86,6 +119,31 @@ export function VideoGrid({ tracks }: VideoGridProps) {
             <Tile key={`${t.participant.identity}-cam`} trackRef={t} />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (layout === "speaker" && cameras.length > 1) {
+    const mainId = featuredIdentity({ people: cameras.map((t) => ({ identity: t.participant.identity, isHost: isHostRole(t.participant), isLocal: t.participant.isLocal })), pinned, speaking, lastSpeaker });
+    const main = cameras.find((t) => t.participant.identity === mainId) ?? cameras[0];
+    const others = cameras.filter((t) => t !== main);
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <div className="mx-auto w-full max-w-4xl">
+          <PinnableTile trackRef={main} pinned={pinned === main.participant.identity} onPin={onPin} featured />
+        </div>
+        <ul aria-label="Others in the room" className="flex gap-2 overflow-x-auto pb-1">
+          {others.slice(0, STRIP).map((t) => (
+            <li key={`${t.participant.identity}-cam`} className="w-36 shrink-0 sm:w-44">
+              <PinnableTile trackRef={t} pinned={false} onPin={onPin} />
+            </li>
+          ))}
+          {others.length > STRIP && (
+            <li className="flex w-36 shrink-0 items-center justify-center rounded-card bg-ink-secondary/30 px-2 text-center text-[12px] text-white sm:w-44">
+              +{others.length - STRIP} more in gallery view
+            </li>
+          )}
+        </ul>
       </div>
     );
   }

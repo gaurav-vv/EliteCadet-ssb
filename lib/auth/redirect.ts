@@ -46,6 +46,30 @@ export function safeNextPath(next: string | null | undefined): string | null {
   }
 }
 
+// Supabase stamps how a session was created in the access token's `amr`
+// claim. Verified on the local stack (GoTrue, 2026-10-25): reset and invite
+// links both produce "otp" (implicit and token_hash flows); PKCE resets are
+// recorded as "recovery"; a password login is "password". This app sends no
+// magic links, so an email-link session is a reset, an invite or (if email
+// confirmation is ever enabled) a sign-up confirmation. Used to (1) route a
+// link that lost its `next` to "Set a new password" and (2) only let the
+// reset page change a password for a session that came from an email link.
+// Not an authorization boundary: Supabase issued the token; this only
+// decides where the user goes and what the page offers.
+const EMAIL_LINK_METHODS = new Set(["otp", "recovery", "invite", "magiclink"]);
+
+export function isPasswordSetupSession(accessToken: string | undefined): boolean {
+  const payload = accessToken?.split(".")[1];
+  if (!payload) return false;
+  try {
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="))) as { amr?: { method?: string }[] };
+    return (claims.amr ?? []).some((entry) => typeof entry?.method === "string" && EMAIL_LINK_METHODS.has(entry.method));
+  } catch {
+    return false;
+  }
+}
+
 // Pages a signed-in user should never be sent back to after logging in —
 // following them would just show the login form again (or a dead end).
 const AUTH_PAGES = ["/login", "/signup", "/forgot-password", "/reset-password", "/forbidden"];

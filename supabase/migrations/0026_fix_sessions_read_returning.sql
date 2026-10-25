@@ -1,3 +1,14 @@
+-- Renumbered 0022 -> 0026 (2026-10-25): it shared version 0022 with
+-- 0022_live_meetings.sql, so `supabase start` failed on schema_migrations_pkey.
+-- It is independent of 0022–0025 (none of them touch sessions_read or
+-- can_see_session_row), so running it last is equivalent.
+--
+-- Safe to re-run: a database that already ran this fix (as 0022, or by hand
+-- in the SQL Editor) ends in the same state — the function is replaced with
+-- the identical definition and the policy is recreated with the identical
+-- check. Nothing is weakened at any point: both statements run in the
+-- migration's transaction, so no moment exists without a sessions_read policy.
+--
 -- Fix: mentors could not schedule a session.
 --
 -- `scheduleSession` does `insert(...).select("id")` (INSERT ... RETURNING).
@@ -14,7 +25,7 @@
 -- keeps the participant lookup from recursing into session_participants' own
 -- RLS (which itself reads sessions).
 
-create function public.can_see_session_row(
+create or replace function public.can_see_session_row(
   p_id uuid,
   p_mentor uuid,
   p_academy uuid,
@@ -38,7 +49,7 @@ as $$
     ))
 $$;
 
-drop policy "sessions_read" on public.sessions;
+drop policy if exists "sessions_read" on public.sessions;
 create policy "sessions_read" on public.sessions
   for select using (
     public.can_see_session_row(id, mentor_id, academy_id, batch_id, for_whole_batch)
