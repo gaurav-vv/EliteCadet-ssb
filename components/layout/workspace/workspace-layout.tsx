@@ -1,4 +1,5 @@
 import { WorkspaceBrand } from "@/components/layout/workspace/workspace-brand";
+import { WorkspaceFooter } from "@/components/layout/workspace/workspace-footer";
 import { WorkspaceHeader } from "@/components/layout/workspace/workspace-header";
 import { WorkspaceMobileNav } from "@/components/layout/workspace/workspace-mobile-nav";
 import { WorkspaceNavigation } from "@/components/layout/workspace/workspace-navigation";
@@ -78,6 +79,7 @@ export function WorkspaceLayout({
         <main id="workspace-content" className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
+        <WorkspaceFooter workspaceLabel={workspaceLabel} />
       </div>
     </div>
   );

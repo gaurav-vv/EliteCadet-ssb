@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { postLoginPath, safeNextPath } from "@/lib/auth/redirect";
+import { isPasswordSetupSession, postLoginPath, safeNextPath } from "@/lib/auth/redirect";
 
 describe("safeNextPath", () => {
   it.each(["/student/practice", "/academy?tab=1", "/"])("keeps the same-origin path %s", (next) => {
@@ -33,5 +33,22 @@ describe("postLoginPath", () => {
 
   it("falls back to the dashboard for unsafe next values", () => {
     expect(postLoginPath("super_admin", "//evil.com/admin")).toBe("/admin");
+  });
+});
+
+describe("isPasswordSetupSession", () => {
+  const token = (amr: unknown) => `h.${Buffer.from(JSON.stringify({ amr })).toString("base64url")}.s`;
+  it("is true for email-link sessions (what Supabase really stamps), false for password logins", () => {
+    // Observed on local GoTrue: reset and invite links → "otp"; PKCE reset → "recovery".
+    expect(isPasswordSetupSession(token([{ method: "otp" }]))).toBe(true);
+    expect(isPasswordSetupSession(token([{ method: "recovery" }]))).toBe(true);
+    expect(isPasswordSetupSession(token([{ method: "invite" }]))).toBe(true);
+    expect(isPasswordSetupSession(token([{ method: "password" }]))).toBe(false);
+    expect(isPasswordSetupSession(token([{ method: "oauth" }]))).toBe(false);
+  });
+  it("is false for missing or malformed tokens", () => {
+    expect(isPasswordSetupSession(undefined)).toBe(false);
+    expect(isPasswordSetupSession("not-a-jwt")).toBe(false);
+    expect(isPasswordSetupSession("a.%%%.b")).toBe(false);
   });
 });

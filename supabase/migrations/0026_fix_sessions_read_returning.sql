@@ -1,8 +1,15 @@
--- Fix: mentors could not schedule a session.
+-- Renumbered 0022 -> 0026 (2026-10-25): it shared version 0022 with
+-- 0022_live_meetings.sql, so `supabase start` failed on schema_migrations_pkey.
+-- It is independent of 0022–0025 (none of them touch sessions_read or
+-- can_see_session_row), so running it last is equivalent.
 --
--- Idempotent on purpose: this fix first shipped as 0022_fix_sessions_read_returning.sql,
--- which collided with 0022_live_meetings.sql (two files, one version number) and was
--- renumbered to 0026. A database that already ran the old file can safely run this one.
+-- Safe to re-run: a database that already ran this fix (as 0022, or by hand
+-- in the SQL Editor) ends in the same state — the function is replaced with
+-- the identical definition and the policy is recreated with the identical
+-- check. Nothing is weakened at any point: both statements run in the
+-- migration's transaction, so no moment exists without a sessions_read policy.
+--
+-- Fix: mentors could not schedule a session.
 --
 -- `scheduleSession` does `insert(...).select("id")` (INSERT ... RETURNING).
 -- PostgreSQL evaluates the table's SELECT RLS policy against the new row for
