@@ -4,6 +4,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { describeLookupFailure, loadAccountAccess } from "@/lib/auth/account";
+import { isPasswordSetupSession } from "@/lib/auth/redirect";
 import type { AuthResult, LoginInput, SignupInput } from "@/types/auth";
 
 export const SUSPENDED_MESSAGE = "This account has been suspended. Contact your academy or the platform team for help.";
@@ -56,6 +57,21 @@ export function validateLoginInput(input: LoginInput): Record<string, string> {
 // Each origin used must be in Supabase → Auth → URL Configuration → Redirect URLs.
 function callbackUrl(next: string): string {
   return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+}
+
+// For the console only (never shown to the user, so the page can't reveal
+// which addresses have accounts): what the Supabase project needs.
+function resetFailureHint(error: { status?: number; code?: string; message?: string }): string {
+  if (error.code === "email_address_not_authorized") {
+    return "Supabase's built-in email only sends to members of the Supabase organization. Set up custom SMTP (docs/email.md).";
+  }
+  if (error.status === 500 || /sending .*email/i.test(error.message ?? "")) {
+    return "Supabase couldn't hand the email to its SMTP server. Check Authentication → Emails → SMTP Settings and the provider's logs (docs/email.md).";
+  }
+  if (/redirect/i.test(error.message ?? "")) {
+    return "Add this site's origin to Authentication → URL Configuration → Redirect URLs (docs/email.md).";
+  }
+  return "See docs/email.md → Troubleshooting.";
 }
 
 function isRateLimited(error: { status?: number; code?: string }): boolean {
@@ -190,7 +206,7 @@ export async function requestPasswordReset(email: string): Promise<AuthResult<nu
       if (isRateLimited(error)) {
         return { ok: false, error: { code: "rate_limited", message: "Too many reset requests. Please wait a few minutes and try again." } };
       }
-      console.error("[auth] password reset request failed", { code: error.code, status: error.status });
+      console.error("[auth] password reset request failed", { code: error.code, status: error.status, hint: resetFailureHint(error) });
       return { ok: false, error: { code: "unknown_error", message: "We couldn't send the reset email right now. Please try again shortly." } };
     }
   } catch {
@@ -271,5 +287,13 @@ async function readRecoverySession(): Promise<"ready" | "invalid"> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user ? "ready" : "invalid";
+  if (!user) return "invalid";
+  // Only a session that came from a reset or invite email may set a new
+  // password here — not an ordinary signed-in session that happens to open
+  // /reset-password. (Server-side, Supabase's "Secure password change"
+  // setting is the matching control; see docs/email.md.)
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return isPasswordSetupSession(session?.access_token) ? "ready" : "invalid";
 }

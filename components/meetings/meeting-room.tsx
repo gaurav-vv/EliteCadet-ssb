@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LiveKitRoom } from "@livekit/components-react";
-import { MediaDeviceFailure, type DisconnectReason } from "livekit-client";
-import { CalendarClock, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { MediaDeviceFailure, type DisconnectReason, type RoomOptions } from "livekit-client";
+import { CalendarClock } from "lucide-react";
+import { PrejoinPreview, type DeviceChoice } from "@/components/meetings/prejoin-preview";
 import { RoomStage } from "@/components/meetings/room-stage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ interface MeetingRoomProps {
   title: string;
   role: "mentor" | "admin" | "student";
   viewerId: string;
+  viewerName: string;
   kind: "one_to_one" | "batch";
   initialJoin: JoinState;
   opensAtLabel: string;
@@ -46,15 +48,25 @@ const OUTCOME: Record<RoomOutcome, { title: string; description: string; rejoin:
 
 // Lobby → (token from the server) → LiveKit room → outcome. The media token
 // comes only from joinMeetingAction, which re-checks everything server-side.
-export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoin, opensAtLabel, backHref, hostName }: MeetingRoomProps) {
+export function MeetingRoom({ sessionId, title, role, viewerId, viewerName, kind, initialJoin, opensAtLabel, backHref, hostName }: MeetingRoomProps) {
   const [join, setJoin] = useState<JoinState>(initialJoin);
   const [phase, setPhase] = useState<Phase>({ name: "lobby" });
   const [pending, setPending] = useState(false);
   const [deviceWarning, setDeviceWarning] = useState<string | null>(null);
   const isHost = role !== "student";
   const publishesOnJoin = isHost || kind === "one_to_one";
-  const [camera, setCamera] = useState(publishesOnJoin);
-  const [mic, setMic] = useState(publishesOnJoin);
+  const [devices, setDevices] = useState<DeviceChoice>({ camera: publishesOnJoin, mic: publishesOnJoin, cameraId: "", micId: "" });
+  // Stable, so LiveKitRoom never rebuilds the room on a re-render. Later
+  // toggles in the room reuse the devices chosen on the join screen.
+  const roomOptions = useMemo<RoomOptions>(
+    () => ({
+      adaptiveStream: true,
+      dynacast: true,
+      audioCaptureDefaults: devices.micId ? { deviceId: devices.micId } : undefined,
+      videoCaptureDefaults: devices.cameraId ? { deviceId: devices.cameraId } : undefined,
+    }),
+    [devices.cameraId, devices.micId],
+  );
   // Set BEFORE this client disconnects whenever the meeting is over for
   // everyone, so the outcome can't depend on which disconnect reason wins.
   const endedHere = useRef(false);
@@ -126,9 +138,9 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
         serverUrl={grant.serverUrl}
         token={grant.token}
         connect
-        audio={mic}
-        video={camera}
-        options={{ adaptiveStream: true, dynacast: true }}
+        audio={publishesOnJoin && devices.mic}
+        video={publishesOnJoin && devices.camera}
+        options={roomOptions}
         onDisconnected={onDisconnected}
         onMediaDeviceFailure={onDeviceFailure}
         onError={onError}
@@ -139,7 +151,7 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
             <AlertDescription>{deviceWarning}</AlertDescription>
           </Alert>
         )}
-        <RoomStage sessionId={sessionId} title={title} role={grant.role} viewerId={viewerId} kind={grant.kind} endsAt={grant.endsAt} hostName={hostName} onMeetingOver={markEnded} />
+        <RoomStage sessionId={sessionId} title={title} role={grant.role} viewerId={viewerId} kind={grant.kind} endsAt={grant.endsAt} startedAt={grant.startedAt} hostName={hostName} onMeetingOver={markEnded} />
       </LiveKitRoom>
     );
   }
@@ -203,21 +215,15 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
                 : "You'll join listening. Your mentor can let you speak or turn on your camera. Chat, reactions and raise hand work for everyone. Meetings aren't recorded."}
         </p>
       </div>
-      {publishesOnJoin && (
-        <fieldset className="flex flex-wrap gap-3">
-          <legend className="sr-only">Devices on joining</legend>
-          <Button type="button" variant="outline" className="min-h-11" aria-pressed={camera} onClick={() => setCamera((v) => !v)}>
-            {camera ? <Video aria-hidden="true" size={16} /> : <VideoOff aria-hidden="true" size={16} />}
-            {camera ? "Camera on" : "Camera off"}
-          </Button>
-          <Button type="button" variant="outline" className="min-h-11" aria-pressed={mic} onClick={() => setMic((v) => !v)}>
-            {mic ? <Mic aria-hidden="true" size={16} /> : <MicOff aria-hidden="true" size={16} />}
-            {mic ? "Microphone on" : "Microphone off"}
-          </Button>
-        </fieldset>
-      )}
-      <p className="text-[13px] text-ink-secondary">Your browser will ask to use your camera and microphone. You can still join if you say no.</p>
-      <div className="flex justify-end">
+      {publishesOnJoin && <PrejoinPreview name={viewerName} choice={devices} onChange={setDevices} />}
+      <p className="text-[13px] text-ink-secondary">
+        {publishesOnJoin ? "Your browser will ask to use your camera and microphone. You can still join if you say no." : "You won't need your camera or microphone unless the host lets you speak."}
+      </p>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[14px] text-ink">
+          You&apos;ll join as <strong className="font-semibold">{viewerName}</strong>
+          <span className="block text-[12px] text-ink-secondary">The name on your profile is what everyone in the room sees.</span>
+        </p>
         <Button type="button" className="min-h-11" onClick={enter} disabled={pending}>
           {pending ? "Connecting…" : isHost ? "Start or rejoin meeting" : "Join meeting"}
         </Button>

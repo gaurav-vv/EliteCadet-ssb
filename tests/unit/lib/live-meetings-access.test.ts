@@ -19,6 +19,7 @@ vi.mock("@/lib/server/meetings/livekit", () => ({
   broadcast: vi.fn(async () => undefined),
   setHandRaised: vi.fn(async () => undefined),
   connectedIdentities: vi.fn(async () => []),
+  describeProviderError: vi.fn((e: Error) => e?.message ?? "unknown"),
 }));
 
 import { getActor } from "@/lib/server/auth/guard";
@@ -131,7 +132,17 @@ describe("hosts", () => {
     const res = await meetings.joinMeeting(MEETING);
     expect(res.ok).toBe(true);
     expect(db.rpc).not.toHaveBeenCalledWith("start_live_meeting", expect.anything());
-    expect(livekit.createJoinToken).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: STUDENT, role: "student" }));
+    expect(livekit.createJoinToken).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: STUDENT, role: "student", name: "Person" }));
+  });
+
+  it("returns the server start time for the room timer, and the profile name as the display name", async () => {
+    const startedAt = "2026-10-25T09:00:00.000Z";
+    vi.mocked(getActor).mockResolvedValue(actor("student", STUDENT));
+    db.queue.push({ data: meetingRow({ actual_started_at: startedAt }), error: null }, { data: null, error: null });
+    const res = await meetings.joinMeeting(MEETING);
+    expect(res.data?.startedAt).toBe(startedAt);
+    db.queue.push({ data: meetingRow({ actual_started_at: startedAt }), error: null }, { data: null, error: null });
+    expect((await meetings.getMeetingView(MEETING)).data?.viewer).toEqual({ id: STUDENT, role: "student", name: "Person" });
   });
 
   it("refuses end and moderation to students", async () => {

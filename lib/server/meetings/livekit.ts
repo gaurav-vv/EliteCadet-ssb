@@ -18,10 +18,46 @@ export function missingLiveKitConfig(): string[] {
   return ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"].filter((name) => !process.env[name]);
 }
 
+// Values that are set but can't work — names and reasons only, never values.
+// The classic case: a secret copied from the LiveKit Cloud dashboard while it
+// was still masked ("••••…"). Every token signed with it is rejected by
+// LiveKit as "invalid token", so it's treated as not configured instead.
+export function invalidLiveKitConfig(env: Record<string, string | undefined> = process.env): string[] {
+  const problems: string[] = [];
+  const url = env.LIVEKIT_URL;
+  if (url && !/^(wss?|https?):\/\/[^\s/]+/.test(url)) problems.push("LIVEKIT_URL must start with wss:// (or ws:// locally)");
+  for (const name of ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"]) {
+    const value = env[name];
+    if (!value) continue;
+    if (!/^[\x21-\x7e]+$/.test(value)) problems.push(`${name} has spaces or non-ASCII characters (was a masked value copied from the dashboard instead of the real one?)`);
+    else if (new Set(value).size === 1) problems.push(`${name} is a placeholder (one repeated character)`);
+  }
+  return problems;
+}
+
+let reportedProblems = "";
+
 export function liveKitConfig(): LiveKitConfig | null {
   if (typeof window !== "undefined") throw new Error("LiveKit server config must never be read in the browser.");
   if (missingLiveKitConfig().length > 0) return null;
+  const problems = invalidLiveKitConfig();
+  if (problems.length > 0) {
+    const summary = problems.join("; ");
+    if (summary !== reportedProblems) console.error(`[meetings] LiveKit is not usable: ${summary}. See docs/live-meetings.md → Troubleshooting.`);
+    reportedProblems = summary;
+    return null;
+  }
   return { url: process.env.LIVEKIT_URL!, apiKey: process.env.LIVEKIT_API_KEY!, apiSecret: process.env.LIVEKIT_API_SECRET! };
+}
+
+// For server logs: a 401 from LiveKit means the key/secret pair is wrong, not
+// that the service is down. Never includes credential values.
+export function describeProviderError(error: unknown): string {
+  const e = error as { status?: number; message?: string } | null;
+  if (e?.status === 401 || /invalid token|unauthorized/i.test(e?.message ?? "")) {
+    return `${e?.message ?? "unauthorized"} — LiveKit rejected the credentials: LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be the same key pair from the project LIVEKIT_URL points to`;
+  }
+  return e?.message ?? "unknown";
 }
 
 function httpUrl(wsUrl: string): string {
@@ -132,8 +168,9 @@ export async function broadcast(cfg: LiveKitConfig, sessionId: string, message: 
 }
 
 // Raised hand = a participant attribute every client sees (late joiners too).
+// hand_at (server clock) lets the host see hands in the order they went up.
 export async function setHandRaised(cfg: LiveKitConfig, sessionId: string, identity: string, raised: boolean): Promise<void> {
-  await rooms(cfg).updateParticipant(roomNameFor(sessionId), identity, { attributes: { hand: raised ? "raised" : "" } });
+  await rooms(cfg).updateParticipant(roomNameFor(sessionId), identity, { attributes: { hand: raised ? "raised" : "", hand_at: raised ? new Date().toISOString() : "" } });
 }
 
 export async function connectedIdentities(cfg: LiveKitConfig, sessionId: string): Promise<{ identity: string; handRaised: boolean }[]> {
