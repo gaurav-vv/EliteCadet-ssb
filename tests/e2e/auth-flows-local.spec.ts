@@ -73,6 +73,15 @@ test.describe("auth flows on a local Supabase stack", () => {
     await expect(other).toHaveURL(/\/student$/);
   });
 
+  test("a signed-in session can't change the password without a reset link", async ({ page }) => {
+    const email = uniqueEmail("nogate");
+    await signUp(page, email);
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await page.goto("/reset-password");
+    await expect(page.getByText(/this link has expired or was already used/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel("New password")).toHaveCount(0);
+  });
+
   test("wrong password shows a clear error", async ({ page }) => {
     const email = uniqueEmail("wrongpw");
     await signUp(page, email);
@@ -135,16 +144,16 @@ test.describe("auth flows on a local Supabase stack", () => {
 
     const mentorEmail = uniqueEmail("mentor");
     await admin.goto("/academy/mentors");
-    await admin.getByLabel("Full name").fill("E2E Mentor");
-    await admin.getByLabel("Email").fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByLabel("Full name", { exact: true }).fill("E2E Mentor");
+    await admin.getByLabel("Email", { exact: true }).fill(mentorEmail);
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("status")).toContainText(/invite sent/i);
     await expect(admin.getByText(/not sent to a real inbox/i)).toBeVisible();
 
     // Inviting the same person again before they accept re-sends it (no duplicate account).
-    await admin.getByLabel("Full name").fill("E2E Mentor");
-    await admin.getByLabel("Email").fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByLabel("Full name", { exact: true }).fill("E2E Mentor");
+    await admin.getByLabel("Email", { exact: true }).fill(mentorEmail);
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("status").filter({ hasText: /re-sent/i })).toBeVisible({ timeout: 15_000 });
 
     // Captured by the local Mailpit inbox — proof an email was generated and
@@ -180,9 +189,9 @@ test.describe("auth flows on a local Supabase stack", () => {
     await expect(again.getByText(/this link has expired or was already used/i)).toBeVisible();
 
     // Inviting them now (an active mentor of this academy) is refused with a clear message.
-    await admin.getByLabel("Full name").fill("E2E Mentor");
-    await admin.getByLabel("Email").fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByLabel("Full name", { exact: true }).fill("E2E Mentor");
+    await admin.getByLabel("Email", { exact: true }).fill(mentorEmail);
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("alert").filter({ hasText: /already a mentor in your academy/i })).toBeVisible({ timeout: 15_000 });
   });
 
@@ -208,7 +217,7 @@ test.describe("auth flows on a local Supabase stack", () => {
     await admin.goto("/admin/users");
     await admin.getByRole("textbox", { name: "Full name", exact: true }).fill("E2E Indie Mentor");
     await admin.getByRole("textbox", { name: "Email", exact: true }).fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("status").filter({ hasText: /invite sent/i })).toBeVisible({ timeout: 15_000 });
 
     const link = await emailLink(mentorEmail);

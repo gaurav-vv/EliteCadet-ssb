@@ -43,6 +43,12 @@ function participantRole(actor: Actor): livekit.ParticipantRole {
   return actor.profile.role === "mentor" ? "mentor" : actor.profile.role === "academy_admin" ? "admin" : "student";
 }
 
+// The name others see in the room — from the profile, never from the browser.
+function displayName(actor: Actor): string {
+  const role = participantRole(actor);
+  return actor.profile.fullName?.trim() || (role === "mentor" ? "Mentor" : role === "admin" ? "Academy admin" : "Student");
+}
+
 // A started meeting whose scheduled end has passed is finished (end clamped
 // to the schedule), whoever looks at it first.
 async function finalizeIfOver(session: SessionRecord, nowMs: number): Promise<boolean> {
@@ -71,7 +77,7 @@ export type JoinState =
 
 export interface MeetingView {
   session: SessionRecord;
-  viewer: { id: string; role: livekit.ParticipantRole };
+  viewer: { id: string; role: livekit.ParticipantRole; name: string };
   join: JoinState;
   opensAt: string;
   // How many students the meeting is for (whole batch as enrolled now, or 1).
@@ -103,7 +109,7 @@ export async function getMeetingView(id: string): Promise<ServiceResult<MeetingV
   if (join === "open" && !livekit.liveKitConfig()) join = "not_configured";
   const supabase = await createClient();
   const { data: count } = await supabase.rpc("live_meeting_audience_count", { p_session: s.id });
-  return { ok: true, data: { session: s, viewer: { id: actor.id, role }, join, opensAt, audienceCount: typeof count === "number" ? count : null } };
+  return { ok: true, data: { session: s, viewer: { id: actor.id, role, name: displayName(actor) }, join, opensAt, audienceCount: typeof count === "number" ? count : null } };
 }
 
 async function isRemoved(sessionId: string, userId: string): Promise<boolean> {
@@ -120,6 +126,8 @@ export interface JoinGrant {
   role: livekit.ParticipantRole;
   kind: "one_to_one" | "batch";
   endsAt: string;
+  // When the meeting actually started (server clock), for the elapsed timer.
+  startedAt: string;
 }
 
 const JOIN_REFUSED: Record<Exclude<JoinState, "open">, string> = {
@@ -149,16 +157,16 @@ export async function joinMeeting(id: string): Promise<ServiceResult<JoinGrant>>
     try {
       await livekit.ensureRoom(cfg, s.id, s.meetingKind === "batch" ? MEETING_BATCH_MAX_STUDENTS + 2 : 3);
     } catch (error) {
-      console.error(`[meetings] create room failed: ${(error as Error)?.message ?? "unknown"}`);
+      console.error(`[meetings] create room failed: ${livekit.describeProviderError(error)}`);
       return fail("server_error", PROVIDER_DOWN);
     }
   }
 
-  const actor = await getActor();
-  const name = actor?.profile.fullName?.trim() || (viewer.role === "mentor" ? "Mentor" : viewer.role === "admin" ? "Academy admin" : "Student");
+  // A host's first join just started it: start_live_meeting stamped now().
+  const startedAt = s.actualStartedAt ?? new Date().toISOString();
   try {
-    const token = await livekit.createJoinToken(cfg, { sessionId: s.id, userId: viewer.id, name, role: viewer.role, kind: s.meetingKind! });
-    return { ok: true, data: { serverUrl: cfg.url, token, role: viewer.role, kind: s.meetingKind!, endsAt: s.endsAt } };
+    const token = await livekit.createJoinToken(cfg, { sessionId: s.id, userId: viewer.id, name: viewer.name, role: viewer.role, kind: s.meetingKind! });
+    return { ok: true, data: { serverUrl: cfg.url, token, role: viewer.role, kind: s.meetingKind!, endsAt: s.endsAt, startedAt } };
   } catch {
     return fail("server_error", "We couldn't prepare your meeting access. Please try again.");
   }
@@ -207,7 +215,7 @@ export async function endMeeting(id: string): Promise<ServiceResult<null>> {
       await livekit.closeRoom(cfg, id);
       return { ok: true, data: null };
     } catch (e) {
-      console.error(`[meetings] close room failed (attempt ${attempt}): ${(e as Error)?.message ?? "unknown"}`);
+      console.error(`[meetings] close room failed (attempt ${attempt}): ${livekit.describeProviderError(e)}`);
       if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
     }
   }
@@ -264,7 +272,7 @@ export async function moderateParticipant(id: string, studentId: string, action:
   } catch (error) {
     const status = (error as { status?: number })?.status;
     if (status === 404) return fail("not_found", "That student isn't in the room right now.");
-    console.error(`[meetings] moderation failed: ${(error as Error)?.message ?? "unknown"}`);
+    console.error(`[meetings] moderation failed: ${livekit.describeProviderError(error)}`);
     return fail("server_error", PROVIDER_DOWN);
   }
   return { ok: true, data: null };

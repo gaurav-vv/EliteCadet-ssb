@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Layers } from "lucide-react";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { SiteMobileMenu } from "@/components/layout/site-mobile-menu";
 import { SITE_NAV_LINKS } from "@/components/layout/site-nav-links";
 
@@ -8,7 +8,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-20 border-b border-[var(--site-line)] bg-[var(--site-bg)]">
       <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-12">
         <Link href="/" className="site-link flex items-center gap-2 text-[var(--site-navy)]" aria-label="EliteCadet home">
-          <Layers aria-hidden="true" className="size-7" strokeWidth={2.2} />
+          <BrandLogo size={36} />
           <span className="text-xl font-semibold tracking-tight">EliteCadet</span>
         </Link>
 

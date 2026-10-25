@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RoomAudioRenderer, useConnectionState, useLocalParticipant, useLocalParticipantPermissions, useParticipants, useRoomContext, useTracks } from "@livekit/components-react";
-import { ConnectionState, RoomEvent, Track, type RemoteParticipant } from "livekit-client";
-import { Signal } from "lucide-react";
+import { RoomAudioRenderer, useConnectionState, useLocalParticipant, useLocalParticipantPermissions, useParticipants, useRoomContext, useSpeakingParticipants, useTracks } from "@livekit/components-react";
+import { ConnectionState, RoomEvent, Track, type Participant, type RemoteParticipant, type TrackPublication } from "livekit-client";
+import { Maximize2, Minimize2, Signal } from "lucide-react";
+import { InRoomDeviceSettings } from "@/components/meetings/device-controls";
 import { MeetingSidePanel, type HostAction, type PanelTab } from "@/components/meetings/meeting-side-panel";
 import { MeetingToolbar } from "@/components/meetings/meeting-toolbar";
 import { allows, handRaised, isHostRole, SOURCE, type Perm } from "@/components/meetings/participant-utils";
-import { VideoGrid } from "@/components/meetings/video-grid";
+import { VideoGrid, type StageLayout } from "@/components/meetings/video-grid";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,14 +24,18 @@ import {
 } from "@/lib/actions/meetings";
 import { formatClock, mergeMessages, parseRoomMessage, type ChatItem } from "@/lib/meetings/room-logic";
 
-function useSecondsUntil(iso: string): number {
-  const [left, setLeft] = useState(() => Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 1000)));
+// The browser clock, ticking each second — only for display (time left,
+// elapsed). Joining and ending are always decided by the server's clock.
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setLeft(Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 1000))), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [iso]);
-  return left;
+  }, []);
+  return now;
 }
+
+const END_TIME = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
 
 type Notice = { tone: "status" | "alert"; text: string } | null;
 type Reaction = { key: string; name: string; emoji: string };
@@ -42,6 +47,7 @@ interface RoomStageProps {
   viewerId: string;
   kind: "one_to_one" | "batch";
   endsAt: string;
+  startedAt: string;
   hostName: string;
   // Tells the shell the meeting is over for everyone BEFORE this client
   // disconnects, so it shows "ended" rather than "you left".
@@ -52,7 +58,7 @@ interface RoomStageProps {
 // panel. Media is host-led: in a batch meeting only the host (and students the
 // host allows) publish. Chat, reactions and raised hands go through the server
 // (authorized per call) and arrive here as server-sent data.
-export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, hostName, onMeetingOver }: RoomStageProps) {
+export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, startedAt, hostName, onMeetingOver }: RoomStageProps) {
   const room = useRoomContext();
   const connection = useConnectionState();
   const participants = useParticipants();
@@ -77,7 +83,20 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
   const [busy, setBusy] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
   const [, setTick] = useState(0);
-  const secondsLeft = useSecondsUntil(endsAt);
+  const now = useNow();
+  const secondsLeft = Math.max(0, Math.round((Date.parse(endsAt) - now) / 1000));
+  const elapsed = Math.max(0, Math.round((now - Date.parse(startedAt)) / 1000));
+  const speakers = useSpeakingParticipants();
+  const [layout, setLayout] = useState<StageLayout>(kind === "one_to_one" ? "speaker" : "gallery");
+  const [pinned, setPinned] = useState<string | null>(null);
+  const [lastSpeaker, setLastSpeaker] = useState<string | null>(null);
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  // Rendered only after the room connects (never on the server).
+  const [canFullscreen] = useState(() => typeof document !== "undefined" && Boolean(document.fullscreenEnabled));
+  // True while this person is toggling their own mic, so a mute that arrives
+  // otherwise can be explained as the host's.
+  const selfToggling = useRef(false);
   const over = useRef(false);
   const panelRef = useRef<PanelTab | null>(panel);
   useEffect(() => {
@@ -140,11 +159,24 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
       }
     };
     const rerender = () => setTick((n) => n + 1);
+    const onSpeakers = (list: Participant[]) => {
+      const remote = list.find((p) => !p.isLocal);
+      if (remote) setLastSpeaker(remote.identity);
+    };
+    const onMuted = (publication: TrackPublication, participant: Participant) => {
+      if (participant.isLocal && publication.source === Track.Source.Microphone && !selfToggling.current) {
+        setNotice({ tone: "status", text: "The host muted your microphone. Unmute when you're ready to speak." });
+      }
+    };
     room.on(RoomEvent.DataReceived, onData);
     room.on(RoomEvent.ParticipantAttributesChanged, rerender);
+    room.on(RoomEvent.ActiveSpeakersChanged, onSpeakers);
+    room.on(RoomEvent.TrackMuted, onMuted);
     return () => {
       room.off(RoomEvent.DataReceived, onData);
       room.off(RoomEvent.ParticipantAttributesChanged, rerender);
+      room.off(RoomEvent.ActiveSpeakersChanged, onSpeakers);
+      room.off(RoomEvent.TrackMuted, onMuted);
       for (const t of timers) clearTimeout(t);
     };
   }, [room, viewerId]);
@@ -170,6 +202,23 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
     else void room.disconnect();
   }, [isHost, onMeetingOver, room, secondsLeft, sessionId]);
 
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement !== null);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  // The whole page goes full screen and the room covers it, so menus,
+  // pickers and dialogs (portalled to <body>) stay visible. Esc exits.
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      setNotice({ tone: "alert", text: "Full screen isn't available here." });
+    }
+  }
+
   function openPanel(tab: PanelTab) {
     setPanel((current) => (current === tab ? null : tab));
     setLastTab(tab);
@@ -177,6 +226,7 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
   }
 
   async function toggle(what: "mic" | "camera" | "screen") {
+    selfToggling.current = what === "mic";
     try {
       if (what === "mic") await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
       if (what === "camera") await localParticipant.setCameraEnabled(!isCameraEnabled);
@@ -185,6 +235,8 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
       const denied = (error as Error)?.name === "NotAllowedError";
       const device = what === "mic" ? "microphone" : what === "camera" ? "camera" : "screen sharing";
       setNotice({ tone: "alert", text: denied ? `Your browser blocked ${device}. Allow it in the site settings and try again.` : `We couldn't turn on your ${device}.` });
+    } finally {
+      selfToggling.current = false;
     }
   }
 
@@ -256,7 +308,7 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={fullscreen ? "fixed inset-0 z-40 flex flex-col gap-3 overflow-y-auto bg-surface-base p-3" : "flex flex-col gap-3"}>
       <RoomAudioRenderer />
       {connection === ConnectionState.Reconnecting && (
         <Alert role="status">
@@ -297,14 +349,34 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
                 {sharer.participant.isLocal ? "You are sharing your screen" : `${sharer.participant.name || "Someone"} is sharing their screen`}
               </span>
             )}
-            <span className="inline-flex items-center gap-2">
+            <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+              <span title="Time since the meeting started">
+                <span className="sr-only">Elapsed </span>
+                {formatClock(elapsed)}
+              </span>
+              <span className="hidden sm:inline" title="Scheduled end">
+                Ends {END_TIME.format(new Date(endsAt))}
+              </span>
               <span>{formatClock(secondsLeft)} left</span>
-              <Signal aria-hidden="true" size={14} className={connection === ConnectionState.Connected ? "text-success" : "text-warning"} />
-              <span className="sr-only">{connection === ConnectionState.Connected ? "Connected" : "Reconnecting"}</span>
+              <span className="inline-flex items-center gap-1">
+                <Signal aria-hidden="true" size={14} className={connection === ConnectionState.Connected ? "text-success" : "text-warning"} />
+                {connection === ConnectionState.Connected ? <span className="sr-only">Connected</span> : <span>Reconnecting…</span>}
+              </span>
+              {canFullscreen && (
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  aria-label={fullscreen ? "Exit full screen" : "Full screen"}
+                  title={fullscreen ? "Exit full screen" : "Full screen"}
+                  className="inline-flex size-9 items-center justify-center rounded-full hover:bg-ink-secondary/40 focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:outline-none"
+                >
+                  {fullscreen ? <Minimize2 aria-hidden="true" size={16} /> : <Maximize2 aria-hidden="true" size={16} />}
+                </button>
+              )}
             </span>
           </div>
           <div className="relative flex min-h-[260px] flex-1 flex-col p-3 sm:min-h-[360px]">
-            <VideoGrid tracks={tracks} />
+            <VideoGrid tracks={tracks} layout={layout} speaking={speakers.map((p) => p.identity)} lastSpeaker={lastSpeaker} pinned={pinned} onPin={setPinned} />
             {reactions.length > 0 && (
               <ul aria-live="polite" aria-label="Reactions" className="pointer-events-none absolute bottom-4 left-4 flex flex-col gap-1">
                 {reactions.map((r) => (
@@ -345,6 +417,12 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
               setEndError(null);
               setConfirm({ kind: "end" });
             }}
+            layout={layout}
+            onLayout={() => setLayout((l) => (l === "gallery" ? "speaker" : "gallery"))}
+            fullscreen={fullscreen}
+            canFullscreen={canFullscreen}
+            onFullscreen={toggleFullscreen}
+            onDevices={() => setDevicesOpen(true)}
           />
         </section>
         <div className={panel ? "block" : "hidden"}>
@@ -369,6 +447,16 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
           />
         </div>
       </div>
+
+      <Dialog open={devicesOpen} onOpenChange={setDevicesOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Audio and video settings</DialogTitle>
+            <DialogDescription>Changes apply straight away.</DialogDescription>
+          </DialogHeader>
+          <InRoomDeviceSettings onError={(text) => setNotice({ tone: "alert", text })} />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirm !== null} onOpenChange={(open) => !open && !busy && setConfirm(null)}>
         <DialogContent>
