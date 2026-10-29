@@ -10,8 +10,8 @@ import { sanitize } from "../lib/report.mjs";
 // from one browser on one machine; they are NOT field (real-user) data and say
 // nothing about devices or networks other than this one.
 //
-// Readiness is defined by content, not by the load event: the workspace's <h1> inside
-// #workspace-content (the loading skeleton has none). No artificial waits are used.
+// Readiness is defined by content, not by the load event: a heading inside #workspace-content
+// (the loading skeleton has none). No artificial waits are used.
 
 const target = process.env.PERF_TARGET ?? "";
 const baseUrl = process.env.PERF_BASE_URL ?? "";
@@ -24,6 +24,12 @@ try {
 }
 
 const roles = Object.keys(ROLES).filter((r) => credentialsFor(r));
+
+// Hosts the app is responsible for: itself and its Supabase project. Anything else (publisher
+// images on the news panel, for example) is a third party the app cannot control: its network
+// failures are recorded in the results but do not fail the journey.
+const firstPartyHosts = new Set([new URL(baseUrl || "http://invalid.local").host, process.env.PERF_SUPABASE_URL ? new URL(process.env.PERF_SUPABASE_URL).host : ""].filter(Boolean));
+const isFirstParty = (url: string) => firstPartyHosts.has(new URL(url).host);
 test.skip(!guard.ok, guard.ok ? "" : `unsafe or missing target: ${guard.ok ? "" : guard.reason}`);
 test.skip(roles.length === 0, "no PERF_<ROLE>_EMAIL/_PASSWORD test accounts configured");
 
@@ -43,8 +49,20 @@ const OBSERVERS = `
 `;
 
 const readVitals = (page: Page) => page.evaluate(() => (window as unknown as { __perf: Vitals }).__perf);
-const ready = (page: Page) => page.locator("#workspace-content h1").first().waitFor({ state: "visible", timeout: 30_000 });
+// A page is ready when its own content has a heading. Some pages put the page title (h1) in the
+// header, outside #workspace-content, so h1 alone is not enough; every page has an h1 or h2 in its
+// content, and the loading skeleton has no headings at all, so this never matches a loading state.
+const ready = (page: Page) => page.locator("#workspace-content").locator("h1, h2").first().waitFor({ state: "visible", timeout: 30_000 });
 const ms = (t0: number) => Math.round(performance.now() - t0);
+
+// The login form is server-rendered and then hydrated by React. A click on "Log in" before hydration
+// finishes is a native form submit (the form has no action, so it just reloads /login and clears the
+// fields): the page stays on /login with no error, which is what one flaky run recorded. Wait until React
+// has attached to the form, which is a real readiness condition, before typing and submitting.
+const formHydrated = (page: Page) => page.waitForFunction(() => {
+  const form = document.querySelector("form");
+  return Boolean(form && Object.keys(form).some((k) => k.startsWith("__reactProps$")));
+}, undefined, { timeout: 30_000 });
 
 const results: Record<string, unknown>[] = [];
 
@@ -60,7 +78,8 @@ for (const role of roles) {
   test(`${role}: login to dashboard, sidebar navigation, back/forward`, async ({ page }) => {
     const creds = credentialsFor(role)!;
     const requests: { host: string; path: string; type: string }[] = [];
-    const failed: string[] = [];
+    const failed: string[] = []; // first-party network failures: must be none
+    const thirdPartyFailed: string[] = []; // recorded, not asserted
     let cancelled = 0; // ERR_ABORTED: the browser cancelling a link prefetch it no longer needs
     const jsErrors: string[] = [];
     page.on("request", (r) => {
@@ -69,19 +88,24 @@ for (const role of roles) {
     });
     page.on("requestfailed", (r) => {
       if (/ERR_ABORTED/.test(r.failure()?.errorText ?? "")) cancelled += 1;
-      else failed.push(`${r.method()} ${new URL(r.url()).pathname}: ${r.failure()?.errorText ?? "failed"}`);
+      else if (isFirstParty(r.url())) failed.push(`${r.method()} ${new URL(r.url()).pathname}: ${r.failure()?.errorText ?? "failed"}`);
+      else thirdPartyFailed.push(`${new URL(r.url()).host}: ${r.failure()?.errorText ?? "failed"}`);
     });
     page.on("pageerror", (e) => jsErrors.push(e.message.slice(0, 120)));
     await page.addInitScript(OBSERVERS);
+    // PERF_BLOCK_THIRD_PARTY=1 makes every non-first-party request fail, simulating an outage of the
+    // publishers whose images the news panel shows. The journey must still pass: the app is not at fault.
+    if (process.env.PERF_BLOCK_THIRD_PARTY === "1") await page.route((url) => !isFirstParty(url.href), (route) => route.abort("connectionfailed"));
     let step = "open login page";
     // If anything below fails, record where and what the page had done so far, so a flaky
     // run can be diagnosed instead of just re-run. (No values from the page are recorded.)
     const recordFailure = (error: unknown) => {
-      results.push({ role, failedAtStep: step, error: String((error as Error)?.message ?? error).split("\n")[0].slice(0, 200), url: new URL(page.url()).pathname, failedRequests: failed.slice(0, 5), jsErrors: jsErrors.slice(0, 3), cancelledPrefetches: cancelled });
+      results.push({ role, failedAtStep: step, error: String((error as Error)?.message ?? error).split("\n")[0].slice(0, 200), url: new URL(page.url()).pathname, failedRequests: failed.slice(0, 5), thirdPartyFailed: thirdPartyFailed.slice(0, 5), jsErrors: jsErrors.slice(0, 3), cancelledPrefetches: cancelled });
     };
     try {
     // --- login page, then sign in through the form -------------------------------
     await page.goto("/login", { waitUntil: "domcontentloaded" });
+    await formHydrated(page);
     await page.getByLabel("Email").fill(creds.email);
     await page.getByLabel("Password", { exact: true }).fill(creds.password);
     const beforeLogin = requests.length;
@@ -163,6 +187,8 @@ for (const role of roles) {
       history,
       requestsByHost: byHost,
       failedRequests: failed.length,
+      thirdPartyFailedRequests: thirdPartyFailed.length,
+      thirdPartyHosts: [...new Set(requests.map((r) => r.host).filter((h) => !firstPartyHosts.has(h)))],
       cancelledPrefetches: cancelled,
       jsErrors: jsErrors.length,
       note: "Requests are those the BROWSER makes; the server's own Supabase calls are not visible here.",
@@ -170,7 +196,9 @@ for (const role of roles) {
 
     // Functional guarantees of the journey. Vitals are recorded, not asserted as a pass.
     expect(page.url()).toContain(home);
-    expect(failed, "failed network requests").toEqual([]);
+    expect(failed, "failed first-party network requests (the app or its Supabase)").toEqual([]);
+    // PERF_STRICT_THIRD_PARTY=1 also fails on third-party network errors (the previous behaviour).
+    if (process.env.PERF_STRICT_THIRD_PARTY === "1") expect(thirdPartyFailed, "failed third-party network requests").toEqual([]);
     expect(jsErrors, "uncaught JavaScript errors").toEqual([]);
     expect(navigation.length).toBeGreaterThan(0);
     } catch (error) {
@@ -189,6 +217,7 @@ for (const [role, route] of Object.entries(chartPages)) {
     const creds = credentialsFor(role)!;
     await page.addInitScript(OBSERVERS);
     await page.goto("/login", { waitUntil: "domcontentloaded" });
+    await formHydrated(page);
     await page.getByLabel("Email").fill(creds.email);
     await page.getByLabel("Password", { exact: true }).fill(creds.password);
     await page.getByRole("button", { name: /^log in$/i }).click();
