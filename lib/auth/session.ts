@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { describeLookupFailure, lookupFailure } from "@/lib/auth/account";
+import { getVerifiedUser } from "@/lib/supabase/claims";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/auth";
 
@@ -18,9 +19,7 @@ export const getCurrentUserAndProfile = cache(async function getCurrentUserAndPr
   profileError: boolean;
 }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     return { user: null, profile: null, profileError: false };
@@ -37,7 +36,7 @@ export const getCurrentUserAndProfile = cache(async function getCurrentUserAndPr
   }
 
   return {
-    user: { id: user.id, email: user.email ?? null },
+    user,
     profileError: Boolean(error),
     profile: profile
       ? { id: profile.id, role: profile.role, fullName: profile.full_name, academyId: profile.academy_id, status: profile.status ?? "active" }

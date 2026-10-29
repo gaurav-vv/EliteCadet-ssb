@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { describeLookupFailure, loadAccountAccess } from "@/lib/auth/account";
 import { roleForPath } from "@/lib/auth/redirect";
+import { getVerifiedUser } from "@/lib/supabase/claims";
 import { publicSupabaseEnv } from "@/lib/supabase/env";
 
 // Re-exported for the existing unit tests (tests/unit/lib/middleware-role.test.ts);
@@ -29,7 +30,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // A public page with no auth cookie has no session to refresh and nothing to
-  // authorize, so skip the Supabase round trip (`auth.getUser()` is a network
+  // authorize, so skip the Supabase round trip (auth verification can be a network
   // call). This must stay AFTER the email-link redirect above: a new user
   // opening a confirmation/reset link has no cookie yet. Protected routes and
   // anyone carrying a cookie take the full path.
@@ -57,9 +58,9 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Verified locally from the token's signature (no Auth round trip); the
+  // profile lookup below stays authoritative for role and account status.
+  const user = await getVerifiedUser(supabase);
 
   if (!requiredRole) {
     return response;
