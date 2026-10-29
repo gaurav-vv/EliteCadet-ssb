@@ -110,3 +110,54 @@ describe("student", () => {
     expect((await service.saveFeedback(T, {}, false)).error?.code).toBe("unauthorized");
   });
 });
+
+describe("single-assessment pages read the assessment and its attempts together", () => {
+  const attemptRow = { id: T, assessment_id: A, student_id: ME, answers: [], status: "submitted", submitted_at: "t", student: null, feedback: [] };
+  const tables = () => db.from.mock.calls.map((c) => c[0]);
+
+  it("mentor: both queries are started before either returns", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor"));
+    db.queue.push({ data: assessmentRow(), error: null }, { data: [attemptRow], error: null });
+    const res = await service.getMentorAssessment(A);
+    expect(tables()).toEqual(["assessments", "assessment_attempts"]);
+    expect(res.ok).toBe(true);
+    expect(res.data?.attempts).toHaveLength(1);
+  });
+
+  it("mentor: an unknown assessment is not found even if the attempts query also failed", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor"));
+    db.queue.push({ data: null, error: null }, { data: null, error: { code: "XX000", message: "boom" } });
+    expect((await service.getMentorAssessment(A)).error?.code).toBe("not_found");
+  });
+
+  it("mentor: a failed attempts query is reported when the assessment exists", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor"));
+    db.queue.push({ data: assessmentRow(), error: null }, { data: null, error: { code: "XX000", message: "boom" } });
+    expect((await service.getMentorAssessment(A)).ok).toBe(false);
+  });
+
+  it("student: returns the assessment with their own attempt and whether it is open", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student"));
+    db.queue.push({ data: assessmentRow(), error: null }, { data: attemptRow, error: null });
+    const res = await service.getStudentAssessment(A, NOW);
+    expect(tables()).toEqual(["assessments", "assessment_attempts"]);
+    expect(res.data?.open).toBe(true);
+    expect(res.data?.attempt?.id).toBe(T);
+    // The attempt lookup stays scoped to the signed-in student.
+    expect(db.calls.some((c) => c.table === "assessment_attempts" && c.method === "eq" && c.args[0] === "student_id" && c.args[1] === ME)).toBe(true);
+  });
+
+  it("student: a draft or missing assessment is not found and exposes no attempt", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student"));
+    db.queue.push({ data: null, error: null }, { data: attemptRow, error: null });
+    const res = await service.getStudentAssessment(A, NOW);
+    expect(res.error?.code).toBe("not_found");
+    expect(res.data).toBeUndefined();
+  });
+
+  it("student: the wrong role is refused before any query", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("mentor"));
+    expect((await service.getStudentAssessment(A, NOW)).error?.code).toBe("unauthorized");
+    expect(db.from).not.toHaveBeenCalled();
+  });
+});
