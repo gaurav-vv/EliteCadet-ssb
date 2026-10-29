@@ -6,7 +6,7 @@ vi.mock("@/components/student/latest-news-panel", () => ({ LatestNewsPanel: ({ a
 import { DashboardNewsPanel, DashboardNewsTicker } from "@/components/dashboards/dashboard-news";
 import type { DashboardNews } from "@/lib/api/news";
 
-const news = { importantUpdates: [{}, {}], latestArticles: [{}] } as unknown as DashboardNews;
+const news = { importantUpdates: [{}, {}], latestArticles: [{}], totalCount: 7, failedSources: ["mod"], fetchedAt: "2026-10-29T00:00:00.000Z" } as unknown as DashboardNews;
 
 describe("dashboard news slots", () => {
   it("wait for the shared news request and render each part from it", async () => {
@@ -15,6 +15,8 @@ describe("dashboard news slots", () => {
     const panel = await DashboardNewsPanel({ news: request });
     expect(ticker?.props.articles).toHaveLength(2);
     expect(panel?.props.articles).toHaveLength(1);
+    // The panel still receives the fields the news reader added on main.
+    expect(panel?.props).toMatchObject({ totalCount: 7, unavailable: true, fetchedAt: "2026-10-29T00:00:00.000Z" });
   });
 
   it("render nothing, and do not throw, when the news request fails", async () => {

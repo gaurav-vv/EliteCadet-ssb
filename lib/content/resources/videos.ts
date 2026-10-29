@@ -1,0 +1,28 @@
+// Curated SSB preparation videos by independent YouTube creators. Verified
+// 2026-10-25 via https://www.youtube.com/oembed (each returned 200: public and
+// embeddable); titles and channel names are as YouTube lists them. EliteCadet
+// doesn't produce or endorse these channels — they're a starting point.
+
+import type { ResourceVideo } from "@/types/resources";
+
+export const VIDEOS_VERIFIED_ON = "2026-10-25";
+
+export const VIDEOS: ResourceVideo[] = [
+  { youtubeId: "mHaXwjuc3gs", title: "5 Days SSB Interview Explained", channel: "SSBCrackExams", duration: "8:56", category: "Tips & Strategies", note: "A short day-by-day overview of the SSB: screening, psychology, GTO, interview and conference.", relatedSlug: "ssb-preparation-schedule" },
+  { youtubeId: "XQQq5eFqXbA", title: "SSB Interview Process: A 5 Days Complete Procedure", channel: "Defence Direct Education", duration: "26:42", category: "Tips & Strategies", note: "A longer walkthrough of the five-day procedure, useful before your first SSB.", relatedSlug: "staying-consistent-across-tests" },
+  { youtubeId: "018iOnvq3kY", title: "What is TAT? Thematic Apperception Test Explained for SSB Interview", channel: "LWS SSB Interview", duration: "5:36", category: "Psychology Tests", note: "A brief introduction to the TAT format before you start writing practice stories.", relatedSlug: "understanding-tat" },
+  { youtubeId: "Piy-jivlUeI", title: "Follow These Points While Writing WAT Sentences at SSB", channel: "Col Nehru (No Frills Academy)", duration: "3:06", category: "Psychology Tests", note: "Quick pointers on writing WAT sentences within the 15-second window.", relatedSlug: "wat-response-habits" },
+  { youtubeId: "Z1q4XC-mTiM", title: "Master Word Association Test (WAT) – How to Write Quality Sentences?", channel: "SSB Sure Shot Plus", duration: "10:44", category: "Psychology Tests", note: "Examples of turning a stimulus word into a natural, constructive sentence.", relatedSlug: "wat-practice-and-improvement" },
+  { youtubeId: "E8v3zxWqbFw", title: "Situation Reaction Test | SRT at SSB Interview", channel: "Defence Direct Education", duration: "6:50", category: "Psychology Tests", note: "How the SRT runs and what a practical, action-focused response looks like.", relatedSlug: "srt-decisiveness" },
+  { youtubeId: "nc_cSVWKwPo", title: "Correct Approach to Writing SRT", channel: "Olive Greens NDA CDS SSB AFCAT Preparation", duration: "4:18", category: "Psychology Tests", note: "A compact take on structuring SRT responses — pair it with the practice set.", relatedSlug: "srt-practice-situations" },
+  { youtubeId: "qiRjUAZ3uAI", title: "Best Ways to Write Self Description Test | SDT", channel: "SSB Interview by SSBCrackExams", duration: "21:01", category: "Psychology Tests", note: "Approaches to the five SDT paragraphs; keep your own answers honest and consistent.", relatedSlug: "sdt-honest-self-description" },
+  { youtubeId: "ZiWmr7QM2wA", title: "9 GTO Tasks in SSB Interview [Explained]", channel: "SSBCrackExams", duration: "10:10", category: "Group Tasks", note: "An overview of the GTO series so each task's purpose is clear before Day 3.", relatedSlug: "gto-tasks-effective-participation" },
+  { youtubeId: "SAf_cENxH1w", title: "SSB GTO Command Task Explained with Live Demo", channel: "LWS SSB Interview", duration: "13:27", category: "Group Tasks", note: "A demonstration of the command task: briefing subordinates and adapting a plan.", relatedSlug: "obstacles-and-command-task" },
+  { youtubeId: "VpfJLlSBpgE", title: "Group Planning Exercise (GPE) Live Demo & Tips", channel: "SSB Sure Shot Plus", duration: "32:29", category: "Group Tasks", note: "A full GPE run-through with a debrief — useful alongside the step-by-step method.", relatedSlug: "group-planning-exercise" },
+  { youtubeId: "LgTSAPw0BNM", title: "Golden Tips for SSB Group Discussion", channel: "Maj Gen Yash Mor", duration: "7:58", category: "Group Tasks", note: "Practical advice on contributing to a group discussion without dominating it.", relatedSlug: "group-discussion-skills" },
+  { youtubeId: "yt95k8K1eEs", title: "How to Ace Lecturette in SSB (Complete Guide 2026)", channel: "Ansh Mishra [Ex-OTA]", duration: "29:44", category: "Group Tasks", note: "Preparing and delivering a three-minute lecturette, with structure ideas.", relatedSlug: "lecturette-preparation" },
+  { youtubeId: "_0id4UHSxhM", title: "How to Introduce Yourself in SSB Interview | “Tell Me About Yourself”", channel: "Olive Greens NDA CDS SSB AFCAT Preparation", duration: "3:33", category: "Interview Preparation", note: "Framing a clear, honest self-introduction for the personal interview.", relatedSlug: "personal-interview-question-themes" },
+  { youtubeId: "M2JPZeyXfzQ", title: "SSB Personal Interview: Do's and Don'ts", channel: "Defence Direct Education", duration: "4:22", category: "Interview Preparation", note: "A short checklist-style video to watch the night before your interview.", relatedSlug: "interview-day-checklist" },
+  { youtubeId: "yPOqZHFpzCE", title: "How to Inculcate Officer Like Qualities in Your Daily Life | 15 OLQs", channel: "Defence Direct Education", duration: "7:54", category: "Tips & Strategies", note: "Everyday habits linked to Officer Like Qualities — practice, not performance.", relatedSlug: "officer-like-qualities" },
+  { youtubeId: "8eBSNaQd8GE", title: "How to Crack NDA Exam in First Attempt (Understanding NDA Exam)", channel: "Defence Direct Education", duration: "14:05", category: "Exam Guidance", note: "An orientation to the NDA written exam; confirm all details in UPSC's notification.", relatedSlug: "nda-preparation-roadmap" },
+];

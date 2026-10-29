@@ -23,7 +23,7 @@ export async function DashboardNewsTicker({ news }: { news: Promise<DashboardNew
 
 export async function DashboardNewsPanel({ news }: { news: Promise<DashboardNews> }) {
   const resolved = await resolveNews(news);
-  return resolved ? <LatestNewsPanel articles={resolved.latestArticles} /> : null;
+  return resolved ? <LatestNewsPanel articles={resolved.latestArticles} totalCount={resolved.totalCount} unavailable={resolved.failedSources.length > 0} fetchedAt={resolved.fetchedAt} /> : null;
 }
 
 export function DashboardNewsPanelFallback() {

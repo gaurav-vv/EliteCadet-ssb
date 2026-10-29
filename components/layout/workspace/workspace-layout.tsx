@@ -18,6 +18,10 @@ interface WorkspaceLayoutProps {
   contextName: string;
   searchPlaceholder: string;
   searchLabel: string;
+  // Where the header search submits (GET ?q=); omitted → the field is inert.
+  searchAction?: string;
+  // Title the header shows instead of its search on searchAction's own page.
+  searchPageTitle?: string;
   profileHref: string;
   profileLabel: string;
   // Unread badge on the bell (the role layout reads it server-side).
@@ -38,6 +42,8 @@ export function WorkspaceLayout({
   contextName,
   searchPlaceholder,
   searchLabel,
+  searchAction,
+  searchPageTitle,
   profileHref,
   profileLabel,
   unreadCount = 0,
@@ -78,6 +84,8 @@ export function WorkspaceLayout({
             roleLabel={roleLabel}
             searchPlaceholder={searchPlaceholder}
             searchLabel={searchLabel}
+            searchAction={searchAction}
+            searchPageTitle={searchPageTitle}
             profileHref={profileHref}
             profileLabel={profileLabel}
             unreadCount={unreadCount}
