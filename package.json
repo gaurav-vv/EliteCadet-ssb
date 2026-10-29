@@ -14,7 +14,12 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "perf:public": "node tests/performance/run.mjs --scenario public",
+    "perf:boundary": "node tests/performance/run.mjs --scenario boundary",
+    "perf:auth": "node tests/performance/run.mjs --scenario authenticated",
+    "perf:supabase": "node tests/performance/run.mjs --scenario supabase-latency",
+    "perf:browser": "playwright test -c tests/performance/browser/playwright.perf.config.ts"
   },
   "dependencies": {
     "@livekit/components-react": "2.9.24",
