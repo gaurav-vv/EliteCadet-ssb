@@ -35,6 +35,11 @@ export function toScorePoint(row: unknown): ScorePoint | null {
   };
 }
 
+// The columns progressRow() and toScorePoint() actually read. The views carry more
+// (avg_score_pct, practice_tests, ...), so name what is needed instead of select("*").
+export const PROGRESS_SUMMARY_COLUMNS = "reviewed_count, sessions_present, sessions_absent, content_completed, last_submission_at";
+export const SCORE_POINT_COLUMNS = "assessment_id, title, category, score, max_score, score_pct, reviewed_at, improvement_areas, strengths";
+
 function progressRow(r: Record<string, unknown> | null | undefined) {
   return {
     reviewedCount: Number(r?.reviewed_count) || 0,
@@ -48,8 +53,8 @@ function progressRow(r: Record<string, unknown> | null | undefined) {
 async function loadStudent(studentId: string): Promise<ServiceResult<StudentProgress>> {
   const supabase = await createClient();
   const [row, scores] = await Promise.all([
-    supabase.from("student_progress").select("*").eq("student_id", studentId).maybeSingle(),
-    supabase.from("student_scores").select("*").eq("student_id", studentId).order("reviewed_at", { ascending: true }).limit(500),
+    supabase.from("student_progress").select(PROGRESS_SUMMARY_COLUMNS).eq("student_id", studentId).maybeSingle(),
+    supabase.from("student_scores").select(SCORE_POINT_COLUMNS).eq("student_id", studentId).order("reviewed_at", { ascending: true }).limit(500),
   ]);
   if (row.error) return mapDbError(row.error, "We couldn't load progress. Please try again.");
   if (scores.error) return mapDbError(scores.error, "We couldn't load progress. Please try again.");
@@ -155,7 +160,7 @@ export async function getMenteeSummaries(studentIds: string[]): Promise<Map<stri
   if (studentIds.length === 0) return map;
   const supabase = await createClient();
   const [rows, scores] = await Promise.all([
-    supabase.from("student_progress").select("*").in("student_id", studentIds),
+    supabase.from("student_progress").select(`student_id, ${PROGRESS_SUMMARY_COLUMNS}`).in("student_id", studentIds),
     supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at").in("student_id", studentIds),
   ]);
   const byStudent = new Map<string, ScorePoint[]>();
@@ -233,7 +238,7 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
   const supabase = await createClient();
   const [batches, rows, scores, students, open] = await Promise.all([
     supabase.from("batches").select("id, name").eq("academy_id", academyId).eq("status", "active").order("name"),
-    supabase.from("student_progress").select("*").eq("academy_id", academyId),
+    supabase.from("student_progress").select(`student_id, batch_id, practice_done, ${PROGRESS_SUMMARY_COLUMNS}`).eq("academy_id", academyId),
     supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at, batch_id"),
     supabase.from("academy_students").select("id, full_name, email, batch_id, batch_name").eq("academy_id", academyId),
     supabase.from("assessments").select("batch_id").eq("academy_id", academyId).eq("status", "published"),

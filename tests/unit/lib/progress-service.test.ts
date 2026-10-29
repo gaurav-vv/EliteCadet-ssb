@@ -79,6 +79,41 @@ describe("getMyProgress", () => {
   });
 });
 
+describe("progress reads name the columns they need (no select *)", () => {
+  const selected = () => db.calls.map((c) => ({ table: c.table, cols: c.q.select.mock.calls[0]?.[0] as string }));
+  const needed = ["reviewed_count", "sessions_present", "sessions_absent", "content_completed", "last_submission_at"];
+
+  it("a student's own progress selects only what the summary and score points read", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student"));
+    db.queue.push({ data: null, error: null }, { data: [], error: null });
+    await service.getMyProgress(NOW);
+    const [progress, scores] = selected();
+    expect(progress).toEqual({ table: "student_progress", cols: service.PROGRESS_SUMMARY_COLUMNS });
+    expect(scores).toEqual({ table: "student_scores", cols: service.SCORE_POINT_COLUMNS });
+    for (const col of needed) expect(progress.cols).toContain(col);
+    for (const col of ["assessment_id", "category", "score_pct", "reviewed_at", "improvement_areas", "strengths"]) expect(scores.cols).toContain(col);
+    for (const { cols } of selected()) expect(cols).not.toContain("*");
+  });
+
+  it("the academy view also selects student_id, batch_id and practice_done, still no select *", async () => {
+    vi.mocked(getActor).mockResolvedValue({ ...actor("academy_admin"), profile: { ...actor("academy_admin").profile, academyId: "acad" } });
+    await service.getAcademyPerformance(NOW);
+    const progress = selected().find((c) => c.table === "student_progress");
+    expect(progress?.cols).toContain("student_id");
+    expect(progress?.cols).toContain("batch_id");
+    expect(progress?.cols).toContain("practice_done");
+    for (const col of needed) expect(progress?.cols).toContain(col);
+    expect(progress?.cols).not.toContain("*");
+  });
+
+  it("mentee summaries need student_id to group rows by student", async () => {
+    await service.getMenteeSummaries([STUDENT]);
+    const progress = selected().find((c) => c.table === "student_progress");
+    expect(progress?.cols).toContain("student_id");
+    expect(progress?.cols).not.toContain("*");
+  });
+});
+
 describe("getMyProgress: assessments and sessions are read once, and together", () => {
   const openAssessment = { id: "a9", title: "Mock GD", status: "published", dueAt: null, attempt: null };
   const nextSession = { id: "s9", title: "Group Discussion", startsAt: "2026-10-09T06:00:00Z" };

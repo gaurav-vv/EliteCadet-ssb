@@ -17,7 +17,7 @@ import { getMyReadiness } from "@/lib/server/readiness/service";
 import { getMyDiagnosticOverview } from "@/lib/server/diagnostic/service";
 import { buildRoadmap } from "@/lib/server/roadmap/compute";
 import { getMyPreferences } from "@/lib/server/student/preferences";
-import { getAcademyPerformance, getMyProgress, toScorePoint } from "@/lib/server/progress/service";
+import { getAcademyPerformance, getMyProgress, PROGRESS_SUMMARY_COLUMNS, toScorePoint } from "@/lib/server/progress/service";
 import { getAcademySessions, getMySessions, getMyStudentSessions } from "@/lib/server/sessions/service";
 import { createClient } from "@/lib/supabase/server";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
@@ -92,7 +92,7 @@ export async function getMentorDashboard(nowIso: string): Promise<ServiceResult<
     const ids = (students.data ?? []).map((s) => s.id as string);
     const [rows, scores] = ids.length
       ? await Promise.all([
-          supabase.from("student_progress").select("*").in("student_id", ids),
+          supabase.from("student_progress").select(`student_id, ${PROGRESS_SUMMARY_COLUMNS}`).in("student_id", ids),
           supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at").in("student_id", ids),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];
