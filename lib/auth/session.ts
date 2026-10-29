@@ -4,6 +4,14 @@ import { getVerifiedUser } from "@/lib/supabase/claims";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/auth";
 
+// Who is signed in, and nothing else: no database read. Verified locally from the
+// token (lib/supabase/claims.ts) and memoised per request like the helper below. Use
+// it for reads that only need the user's id and are scoped by RLS, so they can start
+// at the same time as the profile read instead of waiting for it.
+export const getSessionUser = cache(async function getSessionUser() {
+  return getVerifiedUser(await createClient());
+});
+
 // `profileError` is true when the profile query itself failed (database
 // unreachable, or a column this code expects is missing because a migration
 // hasn't been applied) — distinct from `profile: null` with no error, which
@@ -19,7 +27,7 @@ export const getCurrentUserAndProfile = cache(async function getCurrentUserAndPr
   profileError: boolean;
 }> {
   const supabase = await createClient();
-  const user = await getVerifiedUser(supabase);
+  const user = await getSessionUser();
 
   if (!user) {
     return { user: null, profile: null, profileError: false };

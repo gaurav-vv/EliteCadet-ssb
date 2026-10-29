@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({ from: vi.fn(), queue: [] as unknown[], calls: [] as { table: string; q: Record<string, ReturnType<typeof vi.fn>> }[] }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: db.from }) }));
 vi.mock("@/lib/server/auth/guard", () => ({ getActor: vi.fn() }));
+vi.mock("@/lib/auth/session", () => ({ getSessionUser: vi.fn() }));
 
+import { getSessionUser } from "@/lib/auth/session";
 import { getActor } from "@/lib/server/auth/guard";
 import { getMyNotifications, getMyUnreadCount, markRead, safeHref, toNotification } from "@/lib/server/notifications/service";
 
@@ -24,6 +26,8 @@ function builder(table: string) {
 
 beforeEach(() => {
   vi.mocked(getActor).mockReset();
+  vi.mocked(getSessionUser).mockReset();
+  vi.mocked(getSessionUser).mockResolvedValue(null);
   db.queue = [];
   db.calls = [];
   db.from.mockReset();
