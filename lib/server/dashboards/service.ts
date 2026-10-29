@@ -33,7 +33,11 @@ const ACTIVITY_LIMIT = 5;
 export async function getStudentDashboard(nowIso: string): Promise<ServiceResult<StudentDashboard>> {
   const me = await getActor();
   if (!me || me.profile.role !== "student") return fail("Only a student has this dashboard.");
-  const [progress, sessions, assessments, journey, streakDays, readiness, preferences, diagnostic] = await Promise.all([getMyProgress(nowIso), getMyStudentSessions("upcoming", nowIso), getStudentAssessments(), getMyJourneyProgress(), getMyStreak(nowIso), getMyReadiness(nowIso), getMyPreferences(), getMyDiagnosticOverview(nowIso)]);
+  // Assessments and sessions are read once here and shared with getMyProgress
+  // (its recommendations use them), instead of being fetched again inside it.
+  const assessmentsRequest = getStudentAssessments();
+  const sessionsRequest = getMyStudentSessions("upcoming", nowIso);
+  const [progress, sessions, assessments, journey, streakDays, readiness, preferences, diagnostic] = await Promise.all([getMyProgress(nowIso, { assessments: assessmentsRequest, sessions: sessionsRequest }), sessionsRequest, assessmentsRequest, getMyJourneyProgress(), getMyStreak(nowIso), getMyReadiness(nowIso), getMyPreferences(), getMyDiagnosticOverview(nowIso)]);
   if (!progress.ok || !progress.data) return progress as ServiceResult<never>;
 
   const activity: ActivityEntry[] = [];

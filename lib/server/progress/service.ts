@@ -71,25 +71,42 @@ async function loadStudent(studentId: string): Promise<ServiceResult<StudentProg
 
 // ---- Student: My Progress --------------------------------------------------------
 
-export async function getMyProgress(nowIso: string): Promise<ServiceResult<StudentProgress & { recommendations: Recommendation[] }>> {
+type AssessmentsResult = Awaited<ReturnType<typeof getStudentAssessments>>;
+type SessionsResult = Awaited<ReturnType<typeof getMyStudentSessions>>;
+
+// Data a caller has already started loading. A page that also shows the student's
+// assessments or upcoming sessions passes its own in-flight requests here, so each
+// dataset is read once per page instead of once by the page and again by the
+// recommendations. Anything not supplied is fetched here.
+export interface ProgressInputs {
+  assessments?: Promise<AssessmentsResult>;
+  sessions?: Promise<SessionsResult>;
+}
+
+export async function getMyProgress(nowIso: string, inputs: ProgressInputs = {}): Promise<ServiceResult<StudentProgress & { recommendations: Recommendation[] }>> {
   const me = await getActor();
   if (!me || me.profile.role !== "student") return fail("unauthorized", "Only a student has My Progress.");
-  const progress = await loadStudent(me.id);
+  // The three reads don't depend on each other, so they run together. (They used
+  // to run one after another: progress, then assessments, then sessions.)
+  const [progress, assessments, sessions] = await Promise.all([
+    loadStudent(me.id),
+    inputs.assessments ?? getStudentAssessments(),
+    inputs.sessions ?? getMyStudentSessions("upcoming", nowIso),
+  ]);
   if (!progress.ok || !progress.data) return progress as ServiceResult<never>;
-  const recommendations = await recommend(me, progress.data, nowIso);
+  const recommendations = await recommend(me, progress.data, nowIso, assessments, sessions);
   return { ok: true, data: { ...progress.data, recommendations } };
 }
 
-// Rule-based and explainable (specs.md §6.3): each item says why.
-async function recommend(me: Actor, p: StudentProgress, nowIso: string): Promise<Recommendation[]> {
+// Rule-based and explainable (specs.md §6.3): each item says why. Only the Library
+// suggestion needs a further read, because it depends on the weakest area.
+async function recommend(me: Actor, p: StudentProgress, nowIso: string, assessments: AssessmentsResult, sessions: SessionsResult): Promise<Recommendation[]> {
   const out: Recommendation[] = [];
-  const assessments = await getStudentAssessments();
   for (const a of assessments.data ?? []) {
     const open = a.status === "published" && (!a.dueAt || Date.parse(a.dueAt) >= Date.parse(nowIso));
     if (open && a.attempt?.status !== "submitted") out.push({ title: `Complete "${a.title}"`, reason: a.dueAt ? "It's open and due soon." : "It's open and you haven't submitted yet.", href: `/student/assessments/${a.id}` });
     if (out.length >= 2) break;
   }
-  const sessions = await getMyStudentSessions("upcoming", nowIso);
   const next = sessions.data?.[0];
   if (next) out.push({ title: `Attend "${next.title}"`, reason: "Your next scheduled session.", href: "/student/sessions" });
   if (p.weakArea) {
