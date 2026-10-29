@@ -84,6 +84,15 @@ async function main() {
   note("after global sign-out: getUser() on the old token", afterUser.error ? "rejected" : "ACCEPTED", afterUser.error?.code ?? "");
   note("after global sign-out: getClaims() on the old token", afterClaims.error ? "rejected" : "ACCEPTED", alg.startsWith("HS") ? "falls back to getUser, so it sees revocation here" : "verified locally; revocation not visible until the token expires");
 
+  // 3b: the user's OWN sign-out (what the Log out button does) and a token copied earlier
+  const own = await newSession(email, password);
+  const copied = own.session.access_token;
+  await own.client.auth.signOut();
+  const copiedUser = await c2.auth.getUser(copied);
+  const copiedClaims = await c2.auth.getClaims(copied);
+  note("after the user's own log out: getUser() on a token copied earlier", copiedUser.error ? "rejected" : "ACCEPTED", copiedUser.error?.code ?? "");
+  note("after the user's own log out: getClaims() on a token copied earlier", copiedClaims.error ? "rejected" : "ACCEPTED", "verified locally; usable until the token expires");
+
   // 5: suspension is read from the database, not the token
   const sess = await newSession(email, password);
   const uid = sess.session.user.id;

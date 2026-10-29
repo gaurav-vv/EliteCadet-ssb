@@ -187,6 +187,31 @@ describe("updateSession — session verification", () => {
   });
 });
 
+describe("updateSession — role and status come from the database, never from the token", () => {
+  it("enforces a role change on the very next request, even though the token still says the old role", async () => {
+    // The token was issued while this account was an academy admin; the profile now says student.
+    const { getClaims } = fakeSupabase({ id: "u1" }, "student");
+    getClaims.mockResolvedValue({ data: { claims: { sub: "u1", role: "authenticated", app_metadata: { role: "academy_admin" }, user_metadata: { role: "academy_admin" } } }, error: null });
+    expect(redirectTarget(await updateSession(request("/academy")))?.pathname).toBe("/forbidden");
+    expect(redirectTarget(await updateSession(request("/student")))).toBeNull();
+  });
+
+  it("enforces a suspension on the very next request while the token is still valid", async () => {
+    const { getClaims, signOut } = fakeSupabase({ id: "u1" }, "mentor", "suspended");
+    getClaims.mockResolvedValue({ data: { claims: { sub: "u1", exp: Math.floor(Date.now() / 1000) + 3000 } }, error: null });
+    const target = redirectTarget(await updateSession(request("/mentor")));
+    expect(target?.searchParams.get("reason")).toBe("account_suspended");
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it("treats a deleted account (valid token, no profile row) as signed out", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, null);
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(target?.searchParams.get("reason")).toBe("profile_missing");
+    expect(signOut).toHaveBeenCalled();
+  });
+});
+
 describe("updateSession — /admin (super_admin workspace) and account status", () => {
   it("redirects a logged-out visitor to /login", async () => {
     fakeSupabase(null, null);
