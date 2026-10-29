@@ -36,6 +36,33 @@ Production low-rate smoke (only after approval):
 PERF_ALLOW_PRODUCTION=smoke npm run perf:public -- --env production --base https://<site> --levels 1 --duration 30
 ```
 
+## Local authenticated workflow (recommended; no real accounts, no hosted data)
+
+```bash
+# 1. Docker running, then the local Supabase (applies pending migrations; never resets):
+npx supabase start -x edge-runtime,logflare,vector,imgproxy,realtime,storage-api,supavisor
+npx supabase migration up
+
+# 2. Seed one account per role + a second academy (for isolation checks) + realistic data.
+#    Writes tests/performance/.env.perf (git-ignored). Refuses any non-local Supabase.
+npm run perf:seed-local
+
+# 3. Build and serve a PRODUCTION build against the local stack (port 3100), in its own terminal:
+npm run perf:serve-local
+
+# 4. Measure
+npm run perf:supabase -- --env local --base http://127.0.0.1:3100
+npm run perf:auth     -- --env local --base http://127.0.0.1:3100 --levels 1,5,10,25 --duration 20 --ramp 5 --max-rps 150
+PERF_TARGET=local PERF_BASE_URL=http://127.0.0.1:3100 npm run perf:browser
+npm run perf:security
+```
+
+Notes: each role signs in once per run and its virtual users share that session (otherwise the
+ramp would measure the Auth sign-in rate limit). Everything runs on one machine, so the app, the
+database and the client compete for the same CPU: use the results to compare releases, not as a
+capacity figure. Isolation is checked against names that exist only in the second academy, and
+against a student's classmates; seeing your own mentor, mentees or academy is legitimate.
+
 ## Test accounts (never real users)
 
 Create dedicated accounts, one per role, in a **local or staging** Supabase. Put the values in
@@ -64,7 +91,16 @@ page shows another account's name, and that each role is refused on the other wo
 Request counts and the critical path of the student dashboard are guarded by the unit test
 `tests/unit/lib/dashboard-request-budget.test.ts`.
 
+## Browser journeys and session security
+
+`perf:browser` signs in through the real form and records, per role: login-to-dashboard time,
+a hard dashboard load (TTFB, JS KB on the wire), sidebar navigation and back/forward times, LCP,
+CLS, interaction duration (INP-style), long tasks, failed requests and JS errors. Readiness is the
+workspace `<h1>`, never the load event. Vitals are recorded, not asserted: one lab run on one
+machine is not a Core Web Vitals pass. `perf:security` tries, against the local stack, what
+`getClaims()` does and does not protect (see docs/PERFORMANCE.md).
+
 ## Not covered yet
 
-Browser-level LCP/CLS/INP and route-transition timing, logout from the UI, mutations (use local/staging
-only), and concurrency levels above 10 against anything but a local build.
+Logout from the UI, mutations (use local/staging only), field (real-user) data, any hosted or
+production authenticated run, and capacity on production-like hardware.
