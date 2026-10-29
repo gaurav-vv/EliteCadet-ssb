@@ -39,6 +39,23 @@ row-level security (RLS), so the wrong cache leaks one user's data to another.
   contexts and nothing safe can be passed between them (no headers, query strings or unsigned cookies), and the
   proxy lookup is the route-level role check. Do not remove it to save a round trip.
 
+### Revocation window, measured (local stack, ES256)
+
+`npm run perf:security` signs a user in, signs every session out server-side, and then asks both
+ways: `getUser()` rejects the old token, `getClaims()` still accepts it until it expires
+(`jwt_expiry` is 3600 s locally). Altered payloads and corrupted signatures are rejected, and a
+suspended account is seen on the very next profile read. The app has no feature that revokes
+server-side sessions (every sign-out is local scope, mentor-invite revocation deletes the account and
+its profile), so today this only matters for a stolen token or a future "sign out everywhere".
+If that feature is added, check the session with `getUser()` on that path or shorten `jwt_expiry`.
+
+## Charts load on demand
+
+recharts (about 350 KB) is split out: `components/progress/score-trend-chart-lazy.tsx` and
+`student-performance-line.tsx` load it with `next/dynamic` (`ssr: false`; the charts only draw
+after the browser measures them) and a placeholder of identical height. Add any new chart the same
+way. The meeting room is not lazy-loaded: its chunk is already only on the three `/room` routes.
+
 ## Dashboards: one owner per dataset
 
 A page that shows data another service also needs starts that read once and passes the in-flight promise down
