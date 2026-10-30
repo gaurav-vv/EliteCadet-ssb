@@ -62,6 +62,7 @@ describe("ResetPasswordForm", () => {
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
     await user.type(await screen.findByLabelText(/new password/i), "brandnewpass");
+    await user.type(screen.getByLabelText(/confirm password/i), "brandnewpass");
     await user.click(screen.getByRole("button", { name: /save new password/i }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/login?reason=password_updated"));
   });
@@ -72,6 +73,7 @@ describe("ResetPasswordForm", () => {
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
     await user.type(await screen.findByLabelText(/new password/i), "brandnewpass");
+    await user.type(screen.getByLabelText(/confirm password/i), "brandnewpass");
     await user.click(screen.getByRole("button", { name: /save new password/i }));
     expect(await screen.findByRole("link", { name: /request a new link/i })).toBeInTheDocument();
   });
