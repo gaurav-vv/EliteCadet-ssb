@@ -3,6 +3,7 @@
 // read. RLS limits every query to recipient_id = auth.uid(); the explicit
 // filter below keeps the intent visible and the query indexed.
 
+import { getSessionUser } from "@/lib/auth/session";
 import { getActor } from "@/lib/server/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
@@ -50,8 +51,12 @@ export async function getMyNotifications(limit = FEED_LIMIT): Promise<ServiceRes
   return { ok: true, data: { items: (list.data ?? []).map(toNotification).filter((n): n is NotificationRecord => n !== null), unread: unread.count ?? 0 } };
 }
 
+// Read by every workspace layout (the bell badge). It needs only the user's id, so it
+// starts straight after local token verification, alongside the layout's profile read,
+// instead of waiting for it. Rows are the caller's own: RLS limits notifications to
+// recipient_id = auth.uid(), and an inactive account never reaches a layout (proxy).
 export async function getMyUnreadCount(): Promise<number> {
-  const me = await getActor();
+  const me = await getSessionUser();
   if (!me) return 0;
   const supabase = await createClient();
   const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("recipient_id", me.id).is("read_at", null);

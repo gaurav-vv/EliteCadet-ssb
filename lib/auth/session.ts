@@ -1,7 +1,16 @@
 import { cache } from "react";
 import { describeLookupFailure, lookupFailure } from "@/lib/auth/account";
+import { getVerifiedUser } from "@/lib/supabase/claims";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/auth";
+
+// Who is signed in, and nothing else: no database read. Verified locally from the
+// token (lib/supabase/claims.ts) and memoised per request like the helper below. Use
+// it for reads that only need the user's id and are scoped by RLS, so they can start
+// at the same time as the profile read instead of waiting for it.
+export const getSessionUser = cache(async function getSessionUser() {
+  return getVerifiedUser(await createClient());
+});
 
 // `profileError` is true when the profile query itself failed (database
 // unreachable, or a column this code expects is missing because a migration
@@ -18,9 +27,7 @@ export const getCurrentUserAndProfile = cache(async function getCurrentUserAndPr
   profileError: boolean;
 }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   if (!user) {
     return { user: null, profile: null, profileError: false };
@@ -37,7 +44,7 @@ export const getCurrentUserAndProfile = cache(async function getCurrentUserAndPr
   }
 
   return {
-    user: { id: user.id, email: user.email ?? null },
+    user,
     profileError: Boolean(error),
     profile: profile
       ? { id: profile.id, role: profile.role, fullName: profile.full_name, academyId: profile.academy_id, status: profile.status ?? "active" }

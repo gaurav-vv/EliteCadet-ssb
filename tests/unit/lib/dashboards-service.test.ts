@@ -85,6 +85,53 @@ describe("getStudentDashboard", () => {
   });
 });
 
+describe("getStudentDashboard: no duplicate reads", () => {
+  it("reads assessments and sessions once and shares them with getMyProgress", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student") as never);
+    vi.mocked(getMyProgress).mockResolvedValue(ok({ summary, trend: [], categories: [], strength: null, weakArea: null, recentFeedback: [], recommendations: [] }) as never);
+    vi.mocked(getMyStudentSessions).mockResolvedValue(ok([]) as never);
+    vi.mocked(getStudentAssessments).mockResolvedValue(ok([]) as never);
+    await service.getStudentDashboard(NOW);
+    expect(getStudentAssessments).toHaveBeenCalledTimes(1);
+    expect(getMyStudentSessions).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(getMyProgress).mock.calls[0][1];
+    expect(inputs?.assessments).toBeInstanceOf(Promise);
+    expect(inputs?.sessions).toBeInstanceOf(Promise);
+    expect(await inputs?.assessments).toEqual(ok([]));
+    expect(await inputs?.sessions).toEqual(ok([]));
+  });
+
+  it("starts every independent read before any of them finishes", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student") as never);
+    const gate = new Promise<void>((r) => setTimeout(r, 20));
+    const slow = <T,>(v: T) => gate.then(() => v);
+    vi.mocked(getMyProgress).mockImplementation((() => slow(ok({ summary, trend: [], categories: [], strength: null, weakArea: null, recentFeedback: [], recommendations: [] }))) as never);
+    vi.mocked(getMyStudentSessions).mockImplementation((() => slow(ok([]))) as never);
+    vi.mocked(getStudentAssessments).mockImplementation((() => slow(ok([]))) as never);
+    const pending = service.getStudentDashboard(NOW);
+    await Promise.resolve();
+    await Promise.resolve();
+    for (const fn of [getMyProgress, getMyStudentSessions, getStudentAssessments]) expect(fn).toHaveBeenCalledTimes(1);
+    expect((await pending).ok).toBe(true);
+  });
+
+  it("keeps the dashboard when a noncritical read (journey, readiness) fails", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student") as never);
+    vi.mocked(getMyProgress).mockResolvedValue(ok({ summary, trend: [], categories: [], strength: null, weakArea: null, recentFeedback: [], recommendations: [] }) as never);
+    vi.mocked(getMyStudentSessions).mockResolvedValue(ok([]) as never);
+    vi.mocked(getStudentAssessments).mockResolvedValue({ ok: false, error: { code: "server_error", message: "x" } } as never);
+    const { getMyJourneyProgress } = await import("@/lib/server/practice/journey-progress");
+    vi.mocked(getMyJourneyProgress).mockResolvedValueOnce({ ok: false, error: { code: "server_error", message: "x" } } as never);
+    const { getMyReadiness } = await import("@/lib/server/readiness/service");
+    vi.mocked(getMyReadiness).mockResolvedValueOnce({ ok: false, error: { code: "server_error", message: "x" } } as never);
+    const res = await service.getStudentDashboard(NOW);
+    expect(res.ok).toBe(true);
+    expect(res.data?.mission).toBeNull();
+    expect(res.data?.readiness).toBeNull();
+    expect(res.data?.recentActivity).toEqual([]);
+  });
+});
+
 describe("getMentorDashboard", () => {
   beforeEach(() => vi.mocked(getActor).mockResolvedValue(actor("mentor") as never));
 

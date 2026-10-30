@@ -17,7 +17,7 @@ import { getMyReadiness } from "@/lib/server/readiness/service";
 import { getMyDiagnosticOverview } from "@/lib/server/diagnostic/service";
 import { buildRoadmap } from "@/lib/server/roadmap/compute";
 import { getMyPreferences } from "@/lib/server/student/preferences";
-import { getAcademyPerformance, getMyProgress, toScorePoint } from "@/lib/server/progress/service";
+import { getAcademyPerformance, getMyProgress, PROGRESS_SUMMARY_COLUMNS, toScorePoint } from "@/lib/server/progress/service";
 import { getAcademySessions, getMySessions, getMyStudentSessions } from "@/lib/server/sessions/service";
 import { createClient } from "@/lib/supabase/server";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
@@ -33,7 +33,11 @@ const ACTIVITY_LIMIT = 5;
 export async function getStudentDashboard(nowIso: string): Promise<ServiceResult<StudentDashboard>> {
   const me = await getActor();
   if (!me || me.profile.role !== "student") return fail("Only a student has this dashboard.");
-  const [progress, sessions, assessments, journey, streakDays, readiness, preferences, diagnostic] = await Promise.all([getMyProgress(nowIso), getMyStudentSessions("upcoming", nowIso), getStudentAssessments(), getMyJourneyProgress(), getMyStreak(nowIso), getMyReadiness(nowIso), getMyPreferences(), getMyDiagnosticOverview(nowIso)]);
+  // Assessments and sessions are read once here and shared with getMyProgress
+  // (its recommendations use them), instead of being fetched again inside it.
+  const assessmentsRequest = getStudentAssessments();
+  const sessionsRequest = getMyStudentSessions("upcoming", nowIso);
+  const [progress, sessions, assessments, journey, streakDays, readiness, preferences, diagnostic] = await Promise.all([getMyProgress(nowIso, { assessments: assessmentsRequest, sessions: sessionsRequest }), sessionsRequest, assessmentsRequest, getMyJourneyProgress(), getMyStreak(nowIso), getMyReadiness(nowIso), getMyPreferences(), getMyDiagnosticOverview(nowIso)]);
   if (!progress.ok || !progress.data) return progress as ServiceResult<never>;
 
   const activity: ActivityEntry[] = [];
@@ -88,7 +92,7 @@ export async function getMentorDashboard(nowIso: string): Promise<ServiceResult<
     const ids = (students.data ?? []).map((s) => s.id as string);
     const [rows, scores] = ids.length
       ? await Promise.all([
-          supabase.from("student_progress").select("*").in("student_id", ids),
+          supabase.from("student_progress").select(`student_id, ${PROGRESS_SUMMARY_COLUMNS}`).in("student_id", ids),
           supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at").in("student_id", ids),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];

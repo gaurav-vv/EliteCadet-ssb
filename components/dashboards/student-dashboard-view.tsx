@@ -7,10 +7,7 @@ import { ReadinessStrip } from "@/components/progress/readiness-profile";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPanel, ListRow } from "@/components/ui/list-panel";
-import { LatestNewsPanel } from "@/components/student/latest-news-panel";
-import { NewsTicker } from "@/components/student/news-ticker";
 import { formatIstDay, formatIstTimeRange } from "@/lib/server/sessions/validation";
-import type { DashboardNews } from "@/lib/api/news";
 import type { StudentDashboard } from "@/types/dashboards";
 
 function Section({ title, link, children }: { title: string; link?: { href: string; label: string }; children: React.ReactNode }) {
@@ -30,10 +27,12 @@ function Section({ title, link, children }: { title: string; link?: { href: stri
 // Defence/SSB news (#7): the Important News ticker on top and the Latest
 // Articles panel beside the dashboard on wide screens.
 
-export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: DashboardNews }) {
+// The news ticker and panel arrive as slots, so the page can stream them in
+// (<Suspense>) after the dashboard's own data instead of waiting on external sites.
+export function StudentDashboardView({ d, newsTicker, newsPanel }: { d: StudentDashboard; newsTicker?: React.ReactNode; newsPanel?: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-6 pb-10">
-      {news && <NewsTicker articles={news.importantUpdates} />}
+      {newsTicker}
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         <div className="flex min-w-0 flex-col gap-8">
           <div>
@@ -112,7 +111,7 @@ export function StudentDashboardView({ d, news }: { d: StudentDashboard; news?: 
         )}
       </Section>
         </div>
-        {news && <LatestNewsPanel articles={news.latestArticles} totalCount={news.totalCount} unavailable={news.failedSources.length > 0} fetchedAt={news.fetchedAt} />}
+        {newsPanel}
       </div>
     </div>
   );

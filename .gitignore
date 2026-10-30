@@ -38,6 +38,10 @@ yarn-error.log*
 dev-local.log
 dev-server.log
 
+# performance run output (sanitised, but local by default)
+/tests/performance/reports/*
+!/tests/performance/reports/.gitkeep
+
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example

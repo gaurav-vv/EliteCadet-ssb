@@ -31,7 +31,8 @@ interface WorkspaceLayoutProps {
 
 // The one shell for every signed-in workspace (Student, Mentor, Academy,
 // Super Admin): navy sidebar (icon rail on tablet, drawer on mobile), sticky
-// header, then the page content. Pages render only their own content.
+// header, then the page content. The footer sits under the whole shell so it
+// spans the full width, like the public footer. Pages render only their own content.
 export function WorkspaceLayout({
   workspaceLabel,
   roleLabel,
@@ -51,44 +52,66 @@ export function WorkspaceLayout({
   const homeHref = items[0]?.href ?? "/";
 
   return (
-    <div className="workspace-app flex min-h-screen">
-      <aside
-        aria-label={`${workspaceLabel} sidebar`}
-        className="workspace-sidebar sticky top-0 hidden h-screen w-[76px] shrink-0 flex-col gap-6 overflow-y-auto p-3 md:flex lg:w-[260px] lg:p-4 [@media(max-height:820px)]:gap-3 [@media(max-height:820px)]:py-3"
-      >
-        <WorkspaceBrand href={homeHref} workspaceLabel={workspaceLabel} collapsible />
-        <div className="flex-1">
-          <WorkspaceNavigation items={items} label={workspaceLabel} variant="rail" />
-        </div>
-        <WorkspaceSidebarFooter userName={userName} contextName={contextName} collapsible />
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <WorkspaceHeader
-          displayName={displayName}
-          userName={userName}
-          roleLabel={roleLabel}
-          searchPlaceholder={searchPlaceholder}
-          searchLabel={searchLabel}
-          searchAction={searchAction}
-          searchPageTitle={searchPageTitle}
-          profileHref={profileHref}
-          profileLabel={profileLabel}
-          unreadCount={unreadCount}
-          notificationsHref={`${homeHref}/notifications`}
-          mobileNav={
-            <WorkspaceMobileNav
+    <div className="workspace-app flex min-h-screen flex-col">
+      <div className="flex flex-1">
+        <aside
+          aria-label={`${workspaceLabel} sidebar`}
+          className="workspace-sidebar sticky top-0 hidden h-screen w-[76px] shrink-0 flex-col gap-6 overflow-y-auto p-3 md:flex lg:w-[260px] lg:p-4 [@media(max-height:820px)]:gap-3 [@media(max-height:820px)]:py-3"
+        >
+          <WorkspaceBrand
+            href={homeHref}
+            workspaceLabel={workspaceLabel}
+            collapsible
+          />
+          <div className="flex-1">
+            <WorkspaceNavigation
               items={items}
-              workspaceLabel={workspaceLabel}
-              footer={<WorkspaceSidebarFooter userName={userName} contextName={contextName} />}
+              label={workspaceLabel}
+              variant="rail"
             />
-          }
-        />
-        <main id="workspace-content" className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
-        </main>
-        <WorkspaceFooter workspaceLabel={workspaceLabel} />
+          </div>
+          <WorkspaceSidebarFooter
+            userName={userName}
+            contextName={contextName}
+            collapsible
+          />
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <WorkspaceHeader
+            displayName={displayName}
+            userName={userName}
+            roleLabel={roleLabel}
+            searchPlaceholder={searchPlaceholder}
+            searchLabel={searchLabel}
+            searchAction={searchAction}
+            searchPageTitle={searchPageTitle}
+            profileHref={profileHref}
+            profileLabel={profileLabel}
+            unreadCount={unreadCount}
+            notificationsHref={`${homeHref}/notifications`}
+            mobileNav={
+              <WorkspaceMobileNav
+                items={items}
+                workspaceLabel={workspaceLabel}
+                footer={
+                  <WorkspaceSidebarFooter
+                    userName={userName}
+                    contextName={contextName}
+                  />
+                }
+              />
+            }
+          />
+          <main
+            id="workspace-content"
+            className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+          >
+            {children}
+          </main>
+        </div>
       </div>
+      <WorkspaceFooter workspaceLabel={workspaceLabel} />
     </div>
   );
 }
