@@ -4,6 +4,7 @@ import { SearchX, Users } from "lucide-react";
 import { Pagination } from "@/components/academy/shared/pagination";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { AddStudentDialog } from "@/components/academy/students/add-student-dialog";
+import { ImportStudentsDialog } from "@/components/academy/students/import-students-dialog";
 import { StudentStats } from "@/components/academy/students/student-stats";
 import { StudentTable } from "@/components/academy/students/student-table";
 import { StudentToolbar } from "@/components/academy/students/student-toolbar";
@@ -33,7 +34,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <PageHeader title="Students" subtitle="Your academy's students and their batches." primaryAction={<AddStudentDialog />} />
+      <PageHeader title="Students" subtitle="Your academy's students and their batches." secondaryActions={<ImportStudentsDialog />} primaryAction={<AddStudentDialog />} />
 
       <StudentStats summary={summary} />
 
@@ -43,7 +44,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
             icon={<Users aria-hidden="true" size={22} />}
             title="No students yet"
             description="Add your first student by email; new people get an invite."
-            action={<AddStudentDialog variant="inline" />}
+            action={<div className="flex flex-wrap justify-center gap-2"><AddStudentDialog variant="inline" /><ImportStudentsDialog variant="inline" /></div>}
           />
         </div>
       ) : (

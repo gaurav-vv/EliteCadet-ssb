@@ -1,3 +1,4 @@
+import { FlashToast } from "@/components/shared/flash-toast";
 import { WorkspaceBrand } from "@/components/layout/workspace/workspace-brand";
 import { WorkspaceFooter } from "@/components/layout/workspace/workspace-footer";
 import { WorkspaceHeader } from "@/components/layout/workspace/workspace-header";
@@ -112,6 +113,7 @@ export function WorkspaceLayout({
         </div>
       </div>
       <WorkspaceFooter workspaceLabel={workspaceLabel} />
+      <FlashToast />
     </div>
   );
 }

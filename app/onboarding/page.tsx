@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { MinimalFooter } from "@/components/layout/minimal-footer";
+import { FlashToast } from "@/components/shared/flash-toast";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { PreferencesForm } from "@/components/student/preferences-form";
 import { getMyPreferences } from "@/lib/server/student/preferences";
@@ -22,6 +23,7 @@ export default async function OnboardingPage() {
         {!prefs.ok || !prefs.data ? <RetryErrorState message={prefs.error?.message ?? "We couldn't load your details. Please try again."} /> : <PreferencesForm initial={prefs.data} mode="onboarding" next="/student/diagnostic" />}
       </div>
       <MinimalFooter />
+      <FlashToast />
     </>
   );
 }

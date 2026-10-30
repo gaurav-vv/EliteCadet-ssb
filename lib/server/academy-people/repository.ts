@@ -89,6 +89,17 @@ export async function addExistingStudent(email: string): Promise<DbResult<{ id: 
   return { data: { id: row.id, fullName: typeof row.full_name === "string" ? row.full_name : "" }, error: null };
 }
 
+// Which of these emails already belong to a student of this academy. RLS-scoped (the admin's own
+// session), so it can only ever see their own academy. Used by the CSV import to skip people who are
+// already members, which is what makes a retried import safe.
+export async function findMemberEmails(academyId: string, emails: string[]): Promise<DbResult<Set<string>>> {
+  if (emails.length === 0) return { data: new Set(), error: null };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("academy_students").select("email").eq("academy_id", academyId).in("email", emails);
+  if (error) return { data: null, error };
+  return { data: new Set((data ?? []).flatMap((r) => (typeof r.email === "string" ? [r.email.toLowerCase()] : []))), error: null };
+}
+
 export async function removeStudent(id: string): Promise<DbResult<null>> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("academy_remove_student", { p_student: id });

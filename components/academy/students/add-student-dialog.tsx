@@ -10,9 +10,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addAcademyStudentAction } from "@/lib/actions/academy-people";
+import { checkPersonInput } from "@/lib/server/academy-people/validation";
 import { localMailboxUrl } from "@/lib/supabase/env";
 
 const TOAST_MS = 5000;
+
+export const STUDENT_ADDED_MESSAGE = "Student added successfully!";
 
 // Add by email: an existing student account (with no academy) joins yours;
 // anyone without an account gets an email invite (their name is needed then).
@@ -26,6 +29,8 @@ export function AddStudentDialog({ variant = "primary" }: { variant?: "primary" 
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A ref, not state: a second click in the same tick must not add the student twice.
+  const submitting = useRef(false);
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
@@ -38,9 +43,27 @@ export function AddStudentDialog({ variant = "primary" }: { variant?: "primary" 
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setSaving(true);
+    if (submitting.current) return;
     setFieldError(null);
     setFormError(null);
+
+    // Quick, specific answers before anything is sent (the server checks again). A name is only
+    // required for someone with no account yet, so it is only checked here when one was typed.
+    const emailCheck = checkPersonInput({ email, fullName }, false);
+    if (!emailCheck.ok) {
+      setFieldError({ field: emailCheck.field, message: emailCheck.message });
+      return;
+    }
+    if (fullName.trim()) {
+      const nameCheck = checkPersonInput({ email, fullName }, true);
+      if (!nameCheck.ok) {
+        setFieldError({ field: nameCheck.field, message: nameCheck.message });
+        return;
+      }
+    }
+
+    submitting.current = true;
+    setSaving(true);
     try {
       const result = await addAcademyStudentAction({ email, fullName });
       if (!result.ok) {
@@ -51,13 +74,18 @@ export function AddStudentDialog({ variant = "primary" }: { variant?: "primary" 
       setOpen(false);
       reset();
       const captured = localMailboxUrl() ? ` Local development: the email is in Mailpit (${localMailboxUrl()}), not a real inbox.` : "";
-      setToast(result.data?.invited ? `Invite sent to ${result.data.name}.${captured}` : `${result.data?.name ?? "The student"} joined your academy.`);
+      setToast(
+        result.data?.invited
+          ? `${STUDENT_ADDED_MESSAGE} An invitation email was sent to ${result.data.name}.${captured}`
+          : `${STUDENT_ADDED_MESSAGE} ${result.data?.name ?? "The student"} joined your academy.`,
+      );
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setToast(null), TOAST_MS);
       router.refresh();
     } catch {
       setFormError("We couldn't reach the server. Check your connection and try again.");
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   }
@@ -90,11 +118,13 @@ export function AddStudentDialog({ variant = "primary" }: { variant?: "primary" 
               </Alert>
             )}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="student-email">Email</Label>
+              <Label htmlFor="student-email">Email *</Label>
               <Input
                 id="student-email"
                 type="email"
                 autoComplete="off"
+                required
+                aria-required="true"
                 className="h-11"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
