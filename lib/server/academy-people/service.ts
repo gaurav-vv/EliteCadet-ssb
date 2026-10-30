@@ -84,7 +84,7 @@ export async function addAcademyStudent(input: { email?: unknown; fullName?: unk
       const named = checkPersonInput(input, true);
       if (!named.ok) return { ...fail("validation_error", "No account uses that email yet. Add their name and we'll email them an invite."), field: "fullName" };
       const invited = await repo.inviteByEmail({ email: named.email, fullName: named.fullName, role: "student", academyId: admin.academyId, redirectTo: `${origin}/reset-password` });
-      if (invited.error) return fail("validation_error", "We couldn't send the invite. Check the email address and try again.");
+      if (invited.error) return inviteSendFailure(invited.error.code);
       return { ok: true, data: { id: invited.data.id, name: named.fullName, invited: true } };
     }
     case "23505":
@@ -141,9 +141,11 @@ export const MANUAL_UNAVAILABLE = "Adding mentors needs the server's SUPABASE_SE
 
 // The email service's own refusal, in words an admin can act on. Never a
 // false "sent": every one of these is a failure.
+export const EMAIL_RATE_LIMIT_MESSAGE = "Too many emails were sent recently. Wait a few minutes and try again.";
+
 function inviteSendFailure(code: string | undefined): ServiceResult<never> & Field<"email"> {
   if (code === "admin_unavailable") return fail<never>("not_set_up", INVITE_UNAVAILABLE);
-  if (code === "over_email_send_rate_limit" || code === "over_request_rate_limit") return { ...fail<never>("validation_error", "Too many emails were sent recently. Wait a few minutes and try again."), field: "email" };
+  if (code === "over_email_send_rate_limit" || code === "over_request_rate_limit") return { ...fail<never>("validation_error", EMAIL_RATE_LIMIT_MESSAGE), field: "email" };
   if (code === "email_address_not_authorized") {
     return { ...fail<never>("not_set_up", "The email service refused this address: Supabase's built-in email only sends to members of the Supabase organization. Set up custom SMTP (docs/email.md), or add the mentor manually for now."), field: "email" };
   }
