@@ -5,6 +5,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { describeLookupFailure, loadAccountAccess } from "@/lib/auth/account";
 import { isPasswordSetupSession } from "@/lib/auth/redirect";
+import { validateEmail, validateLoginInput, validatePassword, validateSignupInput } from "@/lib/auth/validation";
 import type { AuthResult, LoginInput, SignupInput } from "@/types/auth";
 
 export const SUSPENDED_MESSAGE = "This account has been suspended. Contact your academy or the platform team for help.";
@@ -16,40 +17,9 @@ export const ACCOUNT_UNAVAILABLE_MESSAGE = "We couldn't load your account right 
 export const PROFILE_MISSING_MESSAGE =
   "Your sign-in worked, but your account isn't fully set up. Contact your academy or the platform team for help.";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function validateEmail(email: string): string | null {
-  if (!email.trim()) return "Email is required.";
-  if (!EMAIL_RE.test(email)) return "Enter a valid email address.";
-  return null;
-}
-
-export function validatePassword(password: string): string | null {
-  if (!password) return "Password is required.";
-  if (password.length < 8) return "Password must be at least 8 characters.";
-  return null;
-}
-
-export function validateSignupInput(input: SignupInput): Record<string, string> {
-  const errors: Record<string, string> = {};
-  const emailError = validateEmail(input.email);
-  if (emailError) errors.email = emailError;
-  const passwordError = validatePassword(input.password);
-  if (passwordError) errors.password = passwordError;
-  if (!input.fullName.trim()) errors.fullName = "Name is required.";
-  if (input.role === "academy_admin" && !input.academyName?.trim()) {
-    errors.academyName = "Academy name is required.";
-  }
-  return errors;
-}
-
-export function validateLoginInput(input: LoginInput): Record<string, string> {
-  const errors: Record<string, string> = {};
-  const emailError = validateEmail(input.email);
-  if (emailError) errors.email = emailError;
-  if (!input.password) errors.password = "Password is required.";
-  return errors;
-}
+// The pure field checks live in lib/auth/validation.ts (shared with the forms); re-exported here so
+// existing imports keep working.
+export { validateEmail, validatePassword, validateSignupInput, validateLoginInput };
 
 // Every email link comes back through /auth/callback on the SAME origin the
 // request was made from: the PKCE code verifier is a cookie on that origin,

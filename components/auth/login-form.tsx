@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { logIn } from "@/lib/api/auth";
+import { validateLoginInput } from "@/lib/auth/validation";
 import { postLoginPath } from "@/lib/auth/redirect";
 
 const REASON_MESSAGES: Record<string, string> = {
@@ -31,24 +32,44 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  // A ref, not state: a second click in the same tick must not start a second login.
+  const submitting = useRef(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setStatus("loading");
+    if (submitting.current) return;
     setErrorMessage(null);
 
-    const result = await logIn({ email, password });
-
-    if (!result.ok) {
-      setStatus("error");
-      setErrorMessage(result.error?.message ?? "Something went wrong. Please try again.");
+    // Quick, specific answers next to the fields. The password is only checked for being present: the
+    // real rule is whatever Supabase Auth says about the account.
+    const problems = validateLoginInput({ email: email.trim(), password });
+    if (Object.keys(problems).length > 0) {
+      setFieldErrors(problems);
+      setStatus("idle");
+      document.getElementById(problems.email ? "email" : "password")?.focus();
       return;
     }
+    setFieldErrors({});
 
-    // A `next` the role can't open (or an unsafe one) falls back to the
-    // role's dashboard, so login never bounces straight to /forbidden.
-    router.push(postLoginPath(result.data!.role, redirectTo));
-    router.refresh();
+    submitting.current = true;
+    setStatus("loading");
+    try {
+      const result = await logIn({ email: email.trim(), password });
+
+      if (!result.ok) {
+        setStatus("error");
+        setErrorMessage(result.error?.message ?? "Something went wrong. Please try again.");
+        return;
+      }
+
+      // A `next` the role can't open (or an unsafe one) falls back to the
+      // role's dashboard, so login never bounces straight to /forbidden.
+      router.push(postLoginPath(result.data!.role, redirectTo));
+      router.refresh();
+    } finally {
+      submitting.current = false;
+    }
   }
 
   return (
@@ -70,6 +91,8 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
         </Alert>
       )}
 
+      <p className="text-center text-[12px] text-ink-secondary">Email and password are both required.</p>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>
@@ -78,10 +101,21 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
             type="email"
             autoComplete="email"
             required
+            aria-required="true"
+            aria-invalid={fieldErrors.email ? true : undefined}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+            }}
             disabled={status === "loading"}
           />
+          {fieldErrors.email && (
+            <p id="email-error" role="alert" className="text-[12px] text-danger">
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
@@ -95,12 +129,23 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
             type="password"
             autoComplete="current-password"
             required
+            aria-required="true"
+            aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password ? "password-error" : undefined}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+            }}
             disabled={status === "loading"}
           />
+          {fieldErrors.password && (
+            <p id="password-error" role="alert" className="text-[12px] text-danger">
+              {fieldErrors.password}
+            </p>
+          )}
         </div>
-        <Button type="submit" disabled={status === "loading"}>
+        <Button type="submit" disabled={status === "loading"} aria-busy={status === "loading"}>
           {status === "loading" ? "Logging in…" : "Log in"}
         </Button>
       </form>
