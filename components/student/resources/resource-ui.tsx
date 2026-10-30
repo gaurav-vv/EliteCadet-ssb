@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "cn";
 import { ResourcePhotoImage } from "@/components/student/resources/resource-photo";
 import { ResourceReadBadge } from "@/components/student/resource-read-badge";
+import { resourcesBase, type ResourceAudience } from "@/lib/resources/paths";
 import { formatDay } from "@/lib/utils/format-date";
 import type { ResourceCategory, ResourceSummary } from "@/types/resources";
 
@@ -58,7 +59,8 @@ export function ResourceMeta({ resource, className }: { resource: Pick<ResourceS
   );
 }
 
-const href = (slug: string) => `/student/resources/${slug}`;
+// Links stay inside the viewer's own workspace. "Read" state is a student's own progress, so it is only shown to students.
+const href = (slug: string, audience: ResourceAudience) => `${resourcesBase(audience)}/${slug}`;
 
 function GoArrow() {
   return (
@@ -69,9 +71,9 @@ function GoArrow() {
 }
 
 // Featured Resources: tall card with the cover on top.
-export function FeaturedResourceCard({ resource }: { resource: ResourceSummary }) {
+export function FeaturedResourceCard({ resource, audience = "student" }: { resource: ResourceSummary; audience?: ResourceAudience }) {
   return (
-    <Link href={href(resource.slug)} className="glass-regular glass-hover-lift group flex h-full flex-col overflow-hidden rounded-card no-underline">
+    <Link href={href(resource.slug, audience)} className="glass-regular glass-hover-lift group flex h-full flex-col overflow-hidden rounded-card no-underline">
       <span className="relative block aspect-[16/9] overflow-hidden">
         <ResourcePhotoImage
           photo={resource.photo}
@@ -89,7 +91,7 @@ export function FeaturedResourceCard({ resource }: { resource: ResourceSummary }
               <Clock aria-hidden="true" size={13} />
               {resource.readingMinutes} min
             </span>
-            <ResourceReadBadge slug={resource.slug} />
+            {audience === "student" && <ResourceReadBadge slug={resource.slug} />}
           </span>
           <GoArrow />
         </span>
@@ -99,9 +101,9 @@ export function FeaturedResourceCard({ resource }: { resource: ResourceSummary }
 }
 
 // All Resources / category pages: horizontal card, thumbnail on the left.
-export function ResourceListCard({ resource }: { resource: ResourceSummary }) {
+export function ResourceListCard({ resource, audience = "student" }: { resource: ResourceSummary; audience?: ResourceAudience }) {
   return (
-    <Link href={href(resource.slug)} className="glass-regular glass-hover-lift group flex h-full gap-4 overflow-hidden rounded-card p-3 no-underline">
+    <Link href={href(resource.slug, audience)} className="glass-regular glass-hover-lift group flex h-full gap-4 overflow-hidden rounded-card p-3 no-underline">
       <span className="relative block aspect-[4/3] w-28 shrink-0 overflow-hidden rounded-xl sm:w-36">
         <ResourcePhotoImage photo={resource.photo} sizes="144px" />
       </span>
@@ -112,7 +114,7 @@ export function ResourceListCard({ resource }: { resource: ResourceSummary }) {
         <span className="mt-auto flex items-end justify-between gap-2 pt-1">
           <span className="flex flex-col gap-1">
             <ResourceMeta resource={resource} />
-            <ResourceReadBadge slug={resource.slug} />
+            {audience === "student" && <ResourceReadBadge slug={resource.slug} />}
           </span>
           <GoArrow />
         </span>

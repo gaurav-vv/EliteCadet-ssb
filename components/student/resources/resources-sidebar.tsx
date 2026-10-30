@@ -4,23 +4,33 @@ import { BookMarked, ChevronRight, FileDown, Layers, Newspaper, PlayCircle } fro
 import { CATEGORY_ICON, CATEGORY_ICON_TONE, SidePanel } from "@/components/student/resources/resource-ui";
 import { ResourcePhotoImage } from "@/components/student/resources/resource-photo";
 import { CATEGORY_SLUGS, getCategoryCounts, getEditorsPicks } from "@/lib/api/resources";
+import { resourcesBase, type ResourceAudience } from "@/lib/resources/paths";
 import { RESOURCE_CATEGORIES } from "@/types/resources";
 
-const QUICK_LINKS = [
-  { href: "/student/resources/downloads", label: "Downloadable PDFs", hint: "Checklists, worksheets and study guides", Icon: FileDown },
-  { href: "/student/resources/videos", label: "SSB Preparation Videos", hint: "Curated video content", Icon: PlayCircle },
-  { href: "/student/resources/reading", label: "Recommended Reading", hint: "Books, official guides and articles", Icon: BookMarked },
-  { href: "/student/resources/current-affairs", label: "Daily Current Affairs", hint: "Dated official defence releases", Icon: Newspaper },
-  { href: "/student/resources/day-2", label: "Day 2 Study Library", hint: "Psychology & GTO by test", Icon: Layers },
-];
+// Day 2 and Daily Current Affairs open student-only areas (practice guides, the in-app news reader), so an
+// academy admin's shortcuts leave them out.
+function quickLinks(audience: ResourceAudience) {
+  const base = resourcesBase(audience);
+  return [
+    { href: `${base}/downloads`, label: "Downloadable PDFs", hint: "Checklists, worksheets and study guides", Icon: FileDown },
+    { href: `${base}/videos`, label: "SSB Preparation Videos", hint: "Curated video content", Icon: PlayCircle },
+    { href: `${base}/reading`, label: "Recommended Reading", hint: "Books, official guides and articles", Icon: BookMarked },
+    ...(audience === "student"
+      ? [
+          { href: `${base}/current-affairs`, label: "Daily Current Affairs", hint: "Dated official defence releases", Icon: Newspaper },
+          { href: `${base}/day-2`, label: "Day 2 Study Library", hint: "Psychology & GTO by test", Icon: Layers },
+        ]
+      : []),
+  ];
+}
 
 const rowClass = "row-hover-tint flex min-h-11 items-center gap-3 rounded-xl px-2 py-2 no-underline";
 
-export function QuickLinksPanel() {
+export function QuickLinksPanel({ audience = "student" }: { audience?: ResourceAudience }) {
   return (
     <SidePanel title="Quick Links" titleId="quick-links-title">
       <ul className="flex flex-col gap-1.5">
-        {QUICK_LINKS.map(({ href, label, hint, Icon }) => (
+        {quickLinks(audience).map(({ href, label, hint, Icon }) => (
           <li key={href}>
             <Link href={href} className={`${rowClass} border border-hairline`}>
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent/10 text-brand-accent">
@@ -39,14 +49,14 @@ export function QuickLinksPanel() {
   );
 }
 
-export function PopularResourcesPanel() {
+export function PopularResourcesPanel({ audience = "student" }: { audience?: ResourceAudience }) {
   const picks = getEditorsPicks();
   return (
     <SidePanel title="Popular Resources" titleId="popular-title" footnote="Editor's picks — good places to start.">
       <ol className="flex flex-col gap-1">
         {picks.map((r, i) => (
           <li key={r.slug}>
-            <Link href={`/student/resources/${r.slug}`} className={rowClass}>
+            <Link href={`${resourcesBase(audience)}/${r.slug}`} className={rowClass}>
               <span aria-hidden="true" className="w-5 shrink-0 text-center text-[15px] font-semibold text-ink">
                 {i + 1}
               </span>
@@ -65,7 +75,7 @@ export function PopularResourcesPanel() {
   );
 }
 
-export function ResourceCategoriesPanel() {
+export function ResourceCategoriesPanel({ audience = "student" }: { audience?: ResourceAudience }) {
   const counts = getCategoryCounts();
   return (
     <SidePanel title="Resource Categories" titleId="categories-title">
@@ -74,7 +84,7 @@ export function ResourceCategoriesPanel() {
           const Icon = CATEGORY_ICON[c];
           return (
             <li key={c}>
-              <Link href={`/student/resources/category/${CATEGORY_SLUGS[c]}`} className={rowClass}>
+              <Link href={`${resourcesBase(audience)}/category/${CATEGORY_SLUGS[c]}`} className={rowClass}>
                 <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICON_TONE[c]}`}>
                   <Icon aria-hidden="true" size={18} />
                 </span>
@@ -93,12 +103,12 @@ export function ResourceCategoriesPanel() {
   );
 }
 
-export function ResourcesSidebar({ className }: { className?: string }) {
+export function ResourcesSidebar({ className, audience = "student" }: { className?: string; audience?: ResourceAudience }) {
   return (
     <aside aria-label="Resource shortcuts" className={cn("flex flex-col gap-5", className)}>
-      <QuickLinksPanel />
-      <PopularResourcesPanel />
-      <ResourceCategoriesPanel />
+      <QuickLinksPanel audience={audience} />
+      <PopularResourcesPanel audience={audience} />
+      <ResourceCategoriesPanel audience={audience} />
     </aside>
   );
 }
