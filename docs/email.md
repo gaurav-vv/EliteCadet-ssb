@@ -148,6 +148,30 @@ The app already handles this link (`/auth/callback` verifies the token on the se
 Verified on the local stack (2026-10-25): a PKCE reset's `pkce_…` token hash verifies from a
 different browser with no verifier cookie, and that session can set the new password.
 
+### If the reset email opens the home page instead of the "Set a new password" form
+
+That is a Supabase URL setting, not the app. The link must come back to `/auth/callback` on the site the
+person asked from, and Supabase only does that for addresses on its allow-list; for any other address it
+silently uses the **Site URL** (the home page). Check, in **Authentication → URL Configuration**:
+
+| Setting | Value |
+|---|---|
+| **Site URL** | the production site, `https://<your-production-domain>` (not `localhost`, not a preview URL) |
+| **Redirect URLs** | `https://<your-production-domain>/**` |
+| | `http://localhost:3000/**` (local development) |
+| | `https://*-<your-vercel-team-or-account>.vercel.app/**` if you test on Vercel preview deployments |
+
+Use the address people really type: `www.` and the bare domain are different origins, and each must be listed
+(or pick one and redirect the other). Then, in **Emails → Templates → Reset Password**, use the Step 4 template so the
+link works from any device.
+
+The app also protects against the fallback landing on the wrong page: a link that arrives as `/?code=…` or
+`/?token_hash=…&type=recovery` is forwarded by the proxy to `/auth/callback`; a link whose result arrives in
+the URL hash (`#access_token=…&type=recovery`, or `#error=…&error_code=otp_expired`) is forwarded in the browser to
+`/reset-password` or `/forgot-password?reason=link_invalid` (`lib/auth/recovery-hash.ts`). Nothing is trusted on the
+way: `/reset-password` still turns the hash into a session through Supabase, which rejects a forged or expired token,
+and only a session that came from a reset or invite email may set a password.
+
 ### Step 5: rate limits
 
 **Authentication → Rate Limits → "Rate limit for sending emails"**: the built-in service allows

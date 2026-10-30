@@ -78,6 +78,31 @@ describe("/auth/callback", () => {
     expect(target.pathname).toBe("/onboarding");
   });
 
+  it("refuses an invalid or tampered recovery token, never creating a session, and offers a new link", async () => {
+    const auth = fake({ verifyError: { code: "otp_expired", status: 403 } });
+    const target = await call("?token_hash=tampered&type=recovery&next=%2Freset-password");
+    expect(auth.verifyOtp).toHaveBeenCalledWith({ type: "recovery", token_hash: "tampered" });
+    expect(target.pathname).toBe("/forgot-password");
+    expect(target.searchParams.get("reason")).toBe("link_invalid");
+  });
+
+  it("sends a reset link that carries no code or token at all back to the request form", async () => {
+    const auth = fake();
+    const target = await call("?type=recovery");
+    expect(auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(auth.verifyOtp).not.toHaveBeenCalled();
+    expect(target.pathname).toBe("/forgot-password");
+  });
+
+  it("tries the token when a code also fails, never trusting either on its own", async () => {
+    const auth = fake({ exchangeError: { code: "flow_state_not_found", status: 400 } });
+    auth.verifyOtp.mockResolvedValueOnce({ data: { session: { access_token: tokenWith("otp") } }, error: null });
+    const target = await call("?code=stale&token_hash=th&type=recovery&next=%2Freset-password");
+    expect(auth.exchangeCodeForSession).toHaveBeenCalledWith("stale");
+    expect(auth.verifyOtp).toHaveBeenCalledWith({ type: "recovery", token_hash: "th" });
+    expect(target.pathname).toBe("/reset-password");
+  });
+
   it("sends other failed links to login", async () => {
     fake({ exchangeError: { code: "bad_code", status: 400 } });
     const target = await call("?code=bad&next=%2Fonboarding");

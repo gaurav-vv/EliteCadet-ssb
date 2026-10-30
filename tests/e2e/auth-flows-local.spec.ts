@@ -28,8 +28,19 @@ async function emailLink(to: string): Promise<string> {
   throw new Error(`no email with a verify link arrived for ${to}`);
 }
 
+// The auth forms are server-rendered and then hydrated by React. A click before hydration finishes is a
+// native form submit that just reloads the page, so wait until React has attached to the form (a real
+// readiness condition, not a sleep) before typing and submitting.
+async function formHydrated(page: Page) {
+  await page.waitForFunction(() => {
+    const form = document.querySelector("form");
+    return Boolean(form && Object.keys(form).some((key) => key.startsWith("__reactProps$")));
+  });
+}
+
 async function signUp(page: Page, email: string, opts: { academy?: string } = {}) {
   await page.goto("/signup");
+  await formHydrated(page);
   if (opts.academy) await page.getByRole("button", { name: /i run an academy/i }).click();
   await page.getByLabel("Full name").fill("E2E Cadet");
   if (opts.academy) await page.getByLabel("Academy name").fill(opts.academy);
@@ -40,6 +51,7 @@ async function signUp(page: Page, email: string, opts: { academy?: string } = {}
 
 async function logIn(page: Page, email: string, password: string) {
   await page.goto("/login");
+  await formHydrated(page);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /^log in$/i }).click();
@@ -67,6 +79,7 @@ test.describe("auth flows on a local Supabase stack", () => {
     // A next= from another role's workspace never lands on /forbidden.
     const other = await browser.newPage();
     await other.goto("/login?next=%2Fmentor");
+    await formHydrated(other);
     await other.getByLabel("Email").fill(email);
     await other.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await other.getByRole("button", { name: /^log in$/i }).click();
@@ -112,6 +125,7 @@ test.describe("auth flows on a local Supabase stack", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/forgot-password");
+    await formHydrated(page);
     await page.getByLabel("Email").fill(email);
     await page.getByRole("button", { name: /send reset link/i }).click();
     await expect(page.getByText(/check your email/i)).toBeVisible();
@@ -123,9 +137,33 @@ test.describe("auth flows on a local Supabase stack", () => {
     // URL can abort while the dev server compiles the next route.
     await page.goto(link, { waitUntil: "commit" });
     await expect(page).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
+
+    // Refreshing the reset page keeps the recovery session: the form is still there, no new link needed.
+    await page.reload();
+    await expect(page.getByLabel("New password")).toBeVisible({ timeout: 20_000 });
+
+    // Validation happens before anything is sent: weak, then mismatched.
+    const save = page.getByRole("button", { name: /save new password/i });
+    await page.getByLabel("New password").fill("short1");
+    await page.getByLabel("Confirm password").fill("short1");
+    await save.click();
+    await expect(page.getByText("Password must be at least 8 characters.")).toBeVisible();
     await page.getByLabel("New password").fill(NEW_PASSWORD);
-    await page.getByRole("button", { name: /save new password/i }).click();
+    await page.getByLabel("Confirm password").fill(`${NEW_PASSWORD}-different`);
+    await save.click();
+    await expect(page.getByText("The passwords don't match.")).toBeVisible();
+    await expect(page).toHaveURL(/\/reset-password$/);
+
+    // Show / hide.
+    await expect(page.getByLabel("New password")).toHaveAttribute("type", "password");
+    await page.getByRole("button", { name: /show password/i }).first().click();
+    await expect(page.getByLabel("New password")).toHaveAttribute("type", "text");
+
+    await page.getByLabel("Confirm password").fill(NEW_PASSWORD);
+    await save.click();
     await expect(page).toHaveURL(/\/login\?reason=password_updated$/);
+    // The success message appears as a popup (and as a notice above the form) on the login page.
+    await expect(page.getByRole("status").filter({ hasText: "Your password has been updated successfully." })).toBeVisible();
 
     await logIn(page, email, NEW_PASSWORD);
     await expect(page).toHaveURL(/\/student$/, { timeout: 20_000 });
@@ -173,6 +211,7 @@ test.describe("auth flows on a local Supabase stack", () => {
     await mentor.goto(link, { waitUntil: "commit" });
     await expect(mentor).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
     await mentor.getByLabel("New password").fill(NEW_PASSWORD);
+    await mentor.getByLabel("Confirm password").fill(NEW_PASSWORD);
     await mentor.getByRole("button", { name: /save new password/i }).click();
     await expect(mentor).toHaveURL(/\/login\?reason=password_updated$/);
     await logIn(mentor, mentorEmail, NEW_PASSWORD);
@@ -225,6 +264,7 @@ test.describe("auth flows on a local Supabase stack", () => {
     await mentor.goto(link, { waitUntil: "commit" });
     await expect(mentor).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
     await mentor.getByLabel("New password").fill(NEW_PASSWORD);
+    await mentor.getByLabel("Confirm password").fill(NEW_PASSWORD);
     await mentor.getByRole("button", { name: /save new password/i }).click();
     await expect(mentor).toHaveURL(/\/login\?reason=password_updated$/, { timeout: 15_000 });
     await logIn(mentor, mentorEmail, NEW_PASSWORD);

@@ -132,6 +132,7 @@ test.describe("cross-role communication with real logins", () => {
     }
     await expect(newPassword).toBeVisible({ timeout: 15_000 });
     await newPassword.fill(MENTOR_PASSWORD);
+    await mentorSetupPage.getByLabel("Confirm password").fill(MENTOR_PASSWORD);
     await mentorSetupPage.getByRole("button", { name: /save new password/i }).click();
     await expect(mentorSetupPage).toHaveURL(/\/login\?reason=password_updated$/, { timeout: 15_000 });
     results.push("PATH 1 (invite) PASS: academy invited mentor; mentor accepted invite email and set a password.");

@@ -95,6 +95,7 @@ test.describe("Add Mentor on a local Supabase stack", () => {
     await mentor.goto(await inviteLink(email));
     await expect(mentor.getByRole("heading", { name: "Set a new password" })).toBeVisible({ timeout: 30_000 });
     await mentor.getByLabel("New password").fill(MENTOR_PASSWORD);
+    await mentor.getByLabel("Confirm password").fill(MENTOR_PASSWORD);
     await mentor.getByRole("button", { name: /save new password/i }).click();
     await expect(mentor).toHaveURL(/\/login\?reason=password_updated/);
     await logIn(mentor, email, MENTOR_PASSWORD);
