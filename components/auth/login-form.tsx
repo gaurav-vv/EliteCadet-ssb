@@ -14,7 +14,7 @@ import { postLoginPath } from "@/lib/auth/redirect";
 const REASON_MESSAGES: Record<string, string> = {
   login_required: "Please log in to continue.",
   link_invalid: "That link is invalid or has expired. Please log in again.",
-  password_updated: "Your password has been updated. Please log in.",
+  password_updated: "Your password has been updated successfully. Please log in with your new password.",
   account_suspended: "This account has been suspended. Contact your academy or the platform team for help.",
   academy_suspended: "Your academy's access is paused. Contact your academy or the platform team for help.",
   account_unavailable: "We couldn't load your account right now. Please try again in a few minutes.",

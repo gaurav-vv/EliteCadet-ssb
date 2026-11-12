@@ -86,6 +86,7 @@ test.describe("Option B — Preview Academy live sync", () => {
     }
     await expect(newPassword).toBeVisible({ timeout: 15_000 });
     await newPassword.fill(MENTOR_PASSWORD);
+    await mentorSetup.getByLabel("Confirm password").fill(MENTOR_PASSWORD);
     await mentorSetup.getByRole("button", { name: /save new password/i }).click();
     await expect(mentorSetup).toHaveURL(/\/login\?reason=password_updated$/, { timeout: 15_000 });
     results.push("PATH 1 (invite) PASS: admin invited a fresh mentor; mentor accepted the email and set a password.");

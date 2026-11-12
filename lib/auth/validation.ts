@@ -38,3 +38,14 @@ export function validateLoginInput(input: LoginInput): Record<string, string> {
   if (!input.password) errors.password = "Password is required.";
   return errors;
 }
+
+// The "set a new password" form: the new password has to meet the same rule as sign-up, and the
+// confirmation has to match it exactly. Supabase Auth applies its own password rules again on the server.
+export function validateNewPasswordForm(input: { password: string; confirm: string }): { password?: string; confirm?: string } {
+  const errors: { password?: string; confirm?: string } = {};
+  const passwordError = validatePassword(input.password);
+  if (passwordError) errors.password = passwordError;
+  if (!input.confirm) errors.confirm = "Confirm your new password.";
+  else if (input.confirm !== input.password) errors.confirm = "The passwords don't match.";
+  return errors;
+}
