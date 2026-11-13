@@ -38,7 +38,7 @@ tells people to paste SQL into the SQL Editor, which records nothing) is **unkno
 | `0028` | inserts a `profiles` row (and an academy for an academy admin) for any account without one | adds rows only; 0 accounts qualify today | yes |
 | `0029`-`0033` | `create index if not exists` on 10 foreign-key columns | none. A plain `create index` blocks writes to that table while it builds; the tables hold a handful to a few hundred rows, so the lock is milliseconds. Do not use `concurrently` in the SQL Editor transaction | yes |
 
-`supabase/catchup/production_catchup_0005_0034.sql` is **only** for a database that is still at `0004`.
+`supabase/catchup/production_catchup_0005_0035.sql` is **only** for a database that is still at `0004`.
 It refuses to run when `0005` is present. **Do not run it on this project.**
 
 ## Verify first (read-only, paste into the SQL Editor; nothing is changed)
@@ -103,8 +103,28 @@ stay batch-only.
 6. **Rollback** is the commented block at the top of the migration file. Dropping the table and view does not
    touch any other data, but restore `is_my_mentee` to its `0014` body first.
 
-If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0034.sql`
+If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0035.sql`
 (regenerated with `bash supabase/catchup/build.sh`) includes `0034`.
+
+## Migration 0035: academy admin notifications (new, NOT applied to the hosted project)
+
+`supabase/migrations/0035_academy_notifications.sql` is additive and forward-only, applied and tested **only on
+the local Supabase stack**. Run it on its own, once, after `0034` (the catch-up file is not for this project).
+
+It adds one enum value (`notification_kind` gets `invite_accepted`) and two triggers that write ordinary rows to
+`public.notifications` for the **active admins of the academy concerned only**: a mentor or student of the academy
+signing in for the first time, and a mentor scheduling a session in the academy's batches. No existing table,
+column, policy or function is changed. Existing notifications and the students' own session notice are untouched.
+
+1. **Before:** confirm it is not applied (expect no rows):
+   `select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'notification_kind' and e.enumlabel = 'invite_accepted';`
+2. Apply in the SQL Editor in a quiet period. The file is not idempotent (`create function`), so do not run it twice.
+3. **After (read-only):** the query above returns one row, and
+   `select tgname from pg_trigger where tgname in ('profiles_notify_invite_accepted', 'sessions_notify_academy_admins');` returns two.
+4. **Deploy the application after the migration.** Before it, the app simply shows no new notifications (the
+   triggers do not exist yet); after it, an old app build would drop the unknown kind safely at its boundary.
+5. **Rollback:** the commented block at the top of the migration file (drop the two triggers and functions).
+   A Postgres enum value cannot be dropped; the unused value is harmless.
 
 ## Rollback
 

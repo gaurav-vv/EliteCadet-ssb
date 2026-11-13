@@ -7,7 +7,8 @@ export type NotificationKind =
   | "batch_assigned"
   | "content_request_new"
   | "content_request_update"
-  | "ai_feedback_ready";
+  | "ai_feedback_ready"
+  | "invite_accepted";
 
 export interface NotificationRecord {
   id: string;
