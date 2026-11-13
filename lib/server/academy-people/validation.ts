@@ -92,7 +92,7 @@ export type ManualMentorCheck =
   | { ok: true; email: string; fullName: string; phone: string | null; qualifications: string | null; specialization: string[] }
   | { ok: false; field: "email" | "fullName" | "phone" | "qualifications" | "specialization"; message: string };
 
-const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;
+export const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;
 
 // Same name/email rules as an invite, plus the optional profile details.
 // Specialization is a comma-separated list stored in mentor_profiles.expertise.

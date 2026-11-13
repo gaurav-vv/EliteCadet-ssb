@@ -85,9 +85,13 @@ export async function getMentorDashboard(nowIso: string): Promise<ServiceResult<
   let mentees: MenteeRow[] = [];
   let attention: AttentionStudent[] = [];
   let allPoints: ScorePoint[] = [];
-  if (batchIds.length > 0) {
+  // An independent mentor (no academy) has no batches; their students are the directly assigned ones (0034).
+  const independent = !me.profile.academyId;
+  if (batchIds.length > 0 || independent) {
     const supabase = await createClient();
-    const students = await supabase.from("academy_students").select("id, full_name, email, batch_id, batch_name").in("batch_id", batchIds).order("full_name").limit(500);
+    const students = independent
+      ? await supabase.from("assigned_students").select("id, full_name, email, batch_id, batch_name").eq("mentor_id", me.id).order("full_name").limit(500)
+      : await supabase.from("academy_students").select("id, full_name, email, batch_id, batch_name").in("batch_id", batchIds).order("full_name").limit(500);
     if (students.error) return mapDbError(students.error, "We couldn't load your dashboard. Please try again.");
     const ids = (students.data ?? []).map((s) => s.id as string);
     const [rows, scores] = ids.length
