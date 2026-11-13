@@ -47,6 +47,8 @@ describe("boundary validation", () => {
   it("drops rows with an unknown kind or missing fields", () => {
     expect(toNotification(row())).toMatchObject({ id: N1, kind: "session_scheduled", readAt: null });
     expect(toNotification(row({ kind: "something_else" }))).toBeNull();
+    // Academy admins are told when an invited mentor or student signs in (0035): the kind must survive the boundary.
+    expect(toNotification(row({ kind: "invite_accepted", href: "/academy/mentors" }))).toMatchObject({ kind: "invite_accepted", href: "/academy/mentors" });
     expect(toNotification(row({ title: undefined }))).toBeNull();
     expect(toNotification(row({ href: "https://x.example" }))?.href).toBeNull();
   });

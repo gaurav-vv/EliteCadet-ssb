@@ -48,6 +48,31 @@ export async function findStudents(academyId: string, params: AcademyStudentList
   return { data: { rows: (data ?? []).map(toStudent).filter((s): s is AcademyStudentRecord => s !== null), total: count ?? 0 }, error: null };
 }
 
+// An independent mentor's own students: rows of mentor_students joined to the profile by the
+// assigned_students view (0034). The mentor's RLS applies, so only their assignments can come back.
+export async function findAssignedStudents(mentorId: string, params: AcademyStudentListParams, page: number): Promise<DbResult<{ rows: AcademyStudentRecord[]; total: number }>> {
+  const supabase = await createClient();
+  let query = supabase.from("assigned_students").select(STUDENT_COLUMNS, { count: "exact" }).eq("mentor_id", mentorId);
+  if (params.status !== "all") query = query.eq("status", params.status);
+  const q = sanitizeSearch(params.q);
+  if (q) query = query.or(`full_name.ilike.%${q}%,email.ilike.%${q}%`);
+  if (params.sort === "newest") query = query.order("created_at", { ascending: false });
+  else if (params.sort === "oldest") query = query.order("created_at", { ascending: true });
+  else if (params.sort === "last_login") query = query.order("last_login_at", { ascending: false, nullsFirst: false });
+  else query = query.order("full_name", { ascending: true });
+  const from = (page - 1) * STUDENT_PAGE_SIZE;
+  const { data, count, error } = await query.order("id", { ascending: true }).range(from, from + STUDENT_PAGE_SIZE - 1);
+  if (error) return { data: null, error };
+  return { data: { rows: (data ?? []).map(toStudent).filter((s): s is AcademyStudentRecord => s !== null), total: count ?? 0 }, error: null };
+}
+
+export async function findAssignedStudent(mentorId: string, id: string): Promise<DbResult<AcademyStudentRecord | null>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("assigned_students").select(STUDENT_COLUMNS).eq("mentor_id", mentorId).eq("id", id).maybeSingle();
+  if (error) return { data: null, error };
+  return { data: data ? toStudent(data) : null, error: null };
+}
+
 export async function countStudents(academyId: string): Promise<DbResult<AcademyStudentSummary>> {
   const supabase = await createClient();
   const base = () => supabase.from("academy_students").select("id", { count: "exact", head: true }).eq("academy_id", academyId);

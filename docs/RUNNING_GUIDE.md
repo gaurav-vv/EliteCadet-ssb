@@ -40,7 +40,7 @@ First run downloads Docker images and takes several minutes. Stop with `Ctrl+C`,
 | Check which are applied | `npx supabase migration list --local` | "Local" column filled = applied. |
 | Stop | `npx supabase stop` | Data is kept in a Docker volume. |
 
-Migrations live in `supabase/migrations/`, numbered `0001`…`0033`, **one file per number**. A test
+Migrations live in `supabase/migrations/`, numbered `0001`…`0035`, **one file per number**. A test
 (`tests/unit/lib/migrations-layout.test.ts`) fails if two files share a number or one is skipped.
 When two people add a migration at the same time, the second person renumbers theirs to the next
 free number **before merging**.
@@ -113,7 +113,7 @@ select
 
 | What you see | What to do |
 |---|---|
-| `has_profiles_status` is **false** (database is at `0004`) | Run `supabase/catchup/production_catchup_0005_0033.sql` once in the SQL Editor. It applies `0005`–`0033` in **one transaction** (all or nothing) and refuses to run if `0005` is already there. Then go to Step 3. |
+| `has_profiles_status` is **false** (database is at `0004`) | Run `supabase/catchup/production_catchup_0005_0035.sql` once in the SQL Editor. It applies `0005`–`0033` in **one transaction** (all or nothing) and refuses to run if `0005` is already there. Then go to Step 3. |
 | Some newer features missing, `0005` already applied | Apply only the missing numbered files from `supabase/migrations/`, in order, one at a time. `0026` and `0028`–`0033` are safe to re-run. |
 | Everything `true` | Nothing to apply. |
 

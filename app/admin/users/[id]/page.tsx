@@ -3,12 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
+import { MentorStudentsPanel } from "@/components/admin/users/mentor-students-panel";
 import { UserAcademyAction } from "@/components/admin/users/user-academy-action";
 import { UserAccountActions } from "@/components/admin/users/user-account-actions";
 import { RoleTag, UserStatusTag } from "@/components/admin/users/user-tags";
 import { DetailHeader } from "@/components/ui/detail-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getAcademyOptions } from "@/lib/server/academies/service";
+import { getMentorAssignments } from "@/lib/server/mentor-assignments/service";
 import { getUserDetail } from "@/lib/server/users/service";
 import { formatDay } from "@/lib/utils/format-date";
 
@@ -26,6 +28,9 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [result, academies] = await Promise.all([getUserDetail(id), getAcademyOptions()]);
+  // Only an independent mentor (a mentor with no academy) has directly assigned students.
+  const independentMentor = result.ok && result.data?.user.role === "mentor" && !result.data.user.academyId;
+  const assignments = independentMentor ? await getMentorAssignments(id) : null;
 
   if (!result.ok && result.error?.code === "not_found") notFound();
 
@@ -89,6 +94,14 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
               </section>
+
+              {independentMentor && (
+                assignments?.ok && assignments.data ? (
+                  <MentorStudentsPanel mentorId={user.id} mentorName={name} assigned={assignments.data} />
+                ) : (
+                  <RetryErrorState message={assignments?.error?.message ?? "We couldn't load this mentor's students. Please try again."} />
+                )
+              )}
 
               <section aria-labelledby="history-heading" className="flex flex-col gap-3">
                 <h2 id="history-heading" className="text-[18px] font-bold text-ink">

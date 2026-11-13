@@ -28,18 +28,25 @@ export default async function MenteesPage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const { list, batches } = result.data;
+  const { list, batches, independent } = result.data;
   const progress = await getMenteeSummaries(list.rows.map((r) => r.id));
-  const subtitle =
-    batches.length === 0 ? "Students in the batches you're assigned to." : `Your batches: ${batches.map((b) => b.name).join(", ")}.`;
+  const subtitle = independent
+    ? "Students the platform team has assigned to you."
+    : batches.length === 0
+      ? "Students in the batches you're assigned to."
+      : `Your batches: ${batches.map((b) => b.name).join(", ")}.`;
 
   return (
     <div className="flex flex-col gap-6 pb-10">
       <PageHeader title="Mentees" subtitle={subtitle} />
 
-      {batches.length === 0 ? (
+      {!independent && batches.length === 0 ? (
         <div className="glass-regular rounded-card">
           <EmptyState icon={<Users aria-hidden="true" size={22} />} title="You're not on a batch yet" description="Your academy admin assigns mentors to batches; their students will appear here." />
+        </div>
+      ) : list.total === 0 && !hasActiveStudentFilters(params) && independent ? (
+        <div className="glass-regular rounded-card">
+          <EmptyState icon={<Users aria-hidden="true" size={22} />} title="No students assigned yet" description="When the platform team assigns students to you, they appear here." />
         </div>
       ) : list.total === 0 && !hasActiveStudentFilters(params) ? (
         <div className="glass-regular rounded-card">

@@ -31,6 +31,12 @@ async function mentor(): Promise<(Actor & { academyId: string }) | null> {
   return { ...actor, academyId: actor.profile.academyId };
 }
 
+// A mentor with no academy: their students are the ones a super admin assigned directly (0034).
+async function independentMentor(): Promise<Actor | null> {
+  const actor = await getActor();
+  return actor && actor.profile.role === "mentor" && !actor.profile.academyId ? actor : null;
+}
+
 const ADMIN_ONLY = "Only an academy admin can manage students.";
 
 async function paged(academyId: string, params: AcademyStudentListParams, batchIds?: string[]): Promise<ServiceResult<AcademyStudentListResult>> {
@@ -274,21 +280,49 @@ export async function revokeMentorInvite(mentorId: unknown): Promise<ServiceResu
 
 // ---- Mentor: own assigned students only -----------------------------------
 
-export async function getMyMentees(params: AcademyStudentListParams): Promise<ServiceResult<{ list: AcademyStudentListResult; batches: { id: string; name: string }[] }>> {
+async function pagedAssigned(mentorId: string, params: AcademyStudentListParams): Promise<ServiceResult<AcademyStudentListResult>> {
+  let page = params.page;
+  let found = await repo.findAssignedStudents(mentorId, params, page);
+  if (found.error) return mapDbError(found.error, "We couldn't load your students. Please try again.");
+  const pageCount = Math.max(1, Math.ceil(found.data.total / STUDENT_PAGE_SIZE));
+  if (page > pageCount) {
+    page = pageCount;
+    found = await repo.findAssignedStudents(mentorId, params, page);
+    if (found.error) return mapDbError(found.error, "We couldn't load your students. Please try again.");
+  }
+  return { ok: true, data: { rows: found.data.rows, total: found.data.total, page, pageCount, pageSize: STUDENT_PAGE_SIZE } };
+}
+
+export async function getMyMentees(params: AcademyStudentListParams): Promise<ServiceResult<{ list: AcademyStudentListResult; batches: { id: string; name: string }[]; independent: boolean }>> {
   const me = await mentor();
-  if (!me) return fail("unauthorized", "Only a mentor can view mentees.");
+  if (!me) {
+    const solo = await independentMentor();
+    if (!solo) return fail("unauthorized", "Only a mentor can view mentees.");
+    const list = await pagedAssigned(solo.id, params);
+    if (!list.ok || !list.data) return list as ServiceResult<never>;
+    return { ok: true, data: { list: list.data, batches: [], independent: true } };
+  }
   const batches = await repo.findMyBatchIds(me.id);
   if (batches.error) return mapDbError(batches.error, "We couldn't load your batches. Please try again.");
   const ids = batches.data.map((b) => b.id);
   // A batch filter for a batch that isn't theirs simply returns nothing.
   const list = await paged(me.academyId, params, ids);
   if (!list.ok || !list.data) return list as ServiceResult<never>;
-  return { ok: true, data: { list: list.data, batches: batches.data } };
+  return { ok: true, data: { list: list.data, batches: batches.data, independent: false } };
 }
 
 export async function getMyMentee(id: string): Promise<ServiceResult<AcademyStudentDetail>> {
   const me = await mentor();
-  if (!me) return fail("unauthorized", "Only a mentor can view mentees.");
+  if (!me) {
+    const solo = await independentMentor();
+    if (!solo) return fail("unauthorized", "Only a mentor can view mentees.");
+    if (!isUuid(id)) return fail("not_found", "This student isn't one of your mentees.");
+    const assigned = await repo.findAssignedStudent(solo.id, id);
+    if (assigned.error) return mapDbError(assigned.error, "We couldn't load this student. Please try again.");
+    // Same answer whether the student doesn't exist or isn't assigned to them.
+    if (!assigned.data) return fail("not_found", "This student isn't one of your mentees.");
+    return { ok: true, data: { student: assigned.data, mentors: [] } };
+  }
   if (!isUuid(id)) return fail("not_found", "This student isn't one of your mentees.");
   const batches = await repo.findMyBatchIds(me.id);
   if (batches.error) return mapDbError(batches.error);

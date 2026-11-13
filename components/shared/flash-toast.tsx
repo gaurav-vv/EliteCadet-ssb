@@ -13,8 +13,11 @@ export function FlashToast() {
 
   useEffect(() => {
     // Read after mount: the server render has no storage, so reading earlier would not match it.
+    // takeFlash() clears what it reads. In development React StrictMode runs this effect twice, and the
+    // second run finds nothing, so only ever set a message that was found (never overwrite it with null).
+    const flash = takeFlash();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMessage(takeFlash());
+    if (flash) setMessage(flash);
   }, []);
 
   useEffect(() => {
