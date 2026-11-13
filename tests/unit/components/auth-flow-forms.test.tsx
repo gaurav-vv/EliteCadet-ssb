@@ -4,13 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { SignupForm } from "@/components/auth/signup-form";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
-import { establishRecoverySession, requestPasswordReset, signUp, updatePassword } from "@/lib/api/auth";
+import { establishRecoverySession, pendingInviteEmail, requestPasswordReset, signUp, updatePassword } from "@/lib/api/auth";
 
 vi.mock("@/lib/api/auth", () => ({
   signUp: vi.fn(),
   updatePassword: vi.fn(),
   requestPasswordReset: vi.fn(),
   establishRecoverySession: vi.fn(),
+  logIn: vi.fn(),
+  pendingInviteEmail: vi.fn(),
 }));
 
 const push = vi.fn();
@@ -21,6 +23,8 @@ beforeEach(() => {
   vi.mocked(updatePassword).mockReset();
   vi.mocked(requestPasswordReset).mockReset();
   vi.mocked(establishRecoverySession).mockReset();
+  vi.mocked(pendingInviteEmail).mockReset();
+  vi.mocked(pendingInviteEmail).mockResolvedValue(null);
   push.mockReset();
 });
 

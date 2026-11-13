@@ -43,7 +43,7 @@ Mailpit. It never appears against a hosted project.
 
 1. **Mentor invite:** sign in as an academy admin → Mentors → *Invite a mentor* → Send invite. In
    Mailpit, open "You've been invited" and click the link. You should land on **Set a new
-   password**. Save it, then log in with the new password; you arrive at `/mentor`.
+   password**. Save it and you are signed in and taken straight to `/mentor` (an invited person never has to log in separately).
 2. **Independent mentor:** sign in as a super admin → User Management → *Invite an independent
    mentor*. Same steps; the mentor dashboard says "You're an independent mentor".
 3. **Password reset:** `/forgot-password` → enter the account's email → in Mailpit open "Reset

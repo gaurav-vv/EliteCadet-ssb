@@ -5,21 +5,26 @@ import { ForgotPasswordForm, RESET_SENT_TOAST } from "@/components/auth/forgot-p
 import { ResetPasswordForm, PASSWORD_UPDATED_MESSAGE } from "@/components/auth/reset-password-form";
 import { LoginForm } from "@/components/auth/login-form";
 import { FlashToast } from "@/components/shared/flash-toast";
-import { establishRecoverySession, requestPasswordReset, updatePassword } from "@/lib/api/auth";
+import { establishRecoverySession, logIn, pendingInviteEmail, requestPasswordReset, updatePassword } from "@/lib/api/auth";
 import { takeFlash, setFlash } from "@/lib/flash";
 
-vi.mock("@/lib/api/auth", () => ({ requestPasswordReset: vi.fn(), establishRecoverySession: vi.fn(), updatePassword: vi.fn(), logIn: vi.fn() }));
+vi.mock("@/lib/api/auth", () => ({ requestPasswordReset: vi.fn(), establishRecoverySession: vi.fn(), updatePassword: vi.fn(), logIn: vi.fn(), pendingInviteEmail: vi.fn() }));
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
 
 const request = vi.mocked(requestPasswordReset);
 const establish = vi.mocked(establishRecoverySession);
 const update = vi.mocked(updatePassword);
+const signIn = vi.mocked(logIn);
+const invitee = vi.mocked(pendingInviteEmail);
 
 beforeEach(() => {
   request.mockReset();
   establish.mockReset();
   update.mockReset();
+  signIn.mockReset();
+  invitee.mockReset();
+  invitee.mockResolvedValue(null);
   push.mockReset();
   sessionStorage.clear();
 });
@@ -254,6 +259,36 @@ describe("Reset password: the form", () => {
     expect(update).toHaveBeenCalledWith("correcthorse");
     expect(takeFlash()).toBe("Your password has been updated successfully.");
     expect(PASSWORD_UPDATED_MESSAGE).toBe("Your password has been updated successfully.");
+  });
+
+  it("signs an invited mentor straight in to their dashboard after the first password", async () => {
+    update.mockResolvedValue({ ok: true, data: null });
+    invitee.mockResolvedValue("mentor@example.com");
+    signIn.mockResolvedValue({ ok: true, data: { role: "mentor" } });
+    const user = await ready();
+    await fill(user, "correcthorse", "correcthorse");
+    await save(user);
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/mentor"));
+    expect(signIn).toHaveBeenCalledWith({ email: "mentor@example.com", password: "correcthorse" });
+  });
+
+  it("falls back to the login page if signing the invited person in fails", async () => {
+    update.mockResolvedValue({ ok: true, data: null });
+    invitee.mockResolvedValue("mentor@example.com");
+    signIn.mockResolvedValue({ ok: false, error: { code: "unknown_error", message: "x" } });
+    const user = await ready();
+    await fill(user, "correcthorse", "correcthorse");
+    await save(user);
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/login?reason=password_updated"));
+  });
+
+  it("does not sign anyone in after an ordinary password reset", async () => {
+    update.mockResolvedValue({ ok: true, data: null });
+    const user = await ready();
+    await fill(user, "correcthorse", "correcthorse");
+    await save(user);
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/login?reason=password_updated"));
+    expect(signIn).not.toHaveBeenCalled();
   });
 
   it("shows no success message while the update is still running or when it fails", async () => {

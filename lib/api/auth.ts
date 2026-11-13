@@ -195,7 +195,9 @@ export async function updatePassword(password: string): Promise<AuthResult<null>
   const supabase = createClient();
 
   try {
-    const { error } = await supabase.auth.updateUser({ password });
+    // password_set marks the invite as accepted, so only the first password
+    // choice after an invite signs the person straight in (see pendingInviteEmail).
+    const { error } = await supabase.auth.updateUser({ password, data: { password_set: true } });
     if (error) {
       if (error.code === "same_password") {
         return { ok: false, error: { code: "same_password", message: "Choose a password different from your current one." } };
@@ -214,6 +216,21 @@ export async function updatePassword(password: string): Promise<AuthResult<null>
     return { ok: true, data: null };
   } catch {
     return { ok: false, error: { code: "network_error", message: "Network error. Check your connection and try again." } };
+  }
+}
+
+// The address of an invited person who is choosing their first password, or
+// null for an ordinary reset (or an invite that was already accepted). Read
+// before updatePassword, which ends the session. Invites carry `invited_at`;
+// `password_set` is written by updatePassword.
+export async function pendingInviteEmail(): Promise<string | null> {
+  try {
+    const { data } = await createClient().auth.getUser();
+    const user = data.user;
+    if (!user?.email || !user.invited_at || user.user_metadata?.password_set) return null;
+    return user.email;
+  } catch {
+    return null;
   }
 }
 
