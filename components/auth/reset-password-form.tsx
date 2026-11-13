@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/ui/password-input";
-import { establishRecoverySession, updatePassword } from "@/lib/api/auth";
+import { establishRecoverySession, logIn, pendingInviteEmail, updatePassword } from "@/lib/api/auth";
+import { postLoginPath } from "@/lib/auth/redirect";
 import { validateNewPasswordForm } from "@/lib/auth/validation";
 import { setFlash } from "@/lib/flash";
 
@@ -59,6 +60,7 @@ export function ResetPasswordForm() {
     submitting.current = true;
     setStatus("loading");
     try {
+      const inviteEmail = await pendingInviteEmail();
       const result = await updatePassword(password);
 
       if (!result.ok) {
@@ -76,6 +78,16 @@ export function ResetPasswordForm() {
           setErrorMessage(message);
         }
         return;
+      }
+
+      // An invited person (e.g. a mentor) goes straight to their dashboard: log them in with the password they just
+      // chose, through the same checks as the login page. If that fails they simply log in by hand.
+      if (inviteEmail) {
+        const signedIn = await logIn({ email: inviteEmail, password });
+        if (signedIn.ok && signedIn.data) {
+          router.push(postLoginPath(signedIn.data.role, null));
+          return;
+        }
       }
 
       // Only now that Supabase has changed the password: say so on the login page, where we are going.

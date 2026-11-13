@@ -172,7 +172,7 @@ describe("updatePassword", () => {
   it("updates the password, then signs out so the user logs in with it", async () => {
     const auth = fake({});
     expect(await updatePassword("brandnewpass")).toEqual({ ok: true, data: null });
-    expect(auth.updateUser).toHaveBeenCalledWith({ password: "brandnewpass" });
+    expect(auth.updateUser).toHaveBeenCalledWith({ password: "brandnewpass", data: { password_set: true } });
     expect(auth.signOut).toHaveBeenCalled();
   });
 

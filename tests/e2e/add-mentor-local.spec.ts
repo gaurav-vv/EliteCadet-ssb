@@ -42,7 +42,7 @@ async function logIn(page: Page, email: string, password: string) {
 async function academyAdmin(page: Page) {
   await page.goto("/signup");
   await page.getByRole("button", { name: /i run an academy/i }).click();
-  await page.getByLabel("Full name", { exact: true }).fill("E2E Admin");
+  await page.getByLabel("Full name").fill("E2E Admin");
   await page.getByLabel("Academy name").fill(`Mentor Test Academy ${Date.now()}`);
   await page.getByLabel("Email").fill(uniqueEmail("admin"));
   await page.getByLabel("Password").fill(PASSWORD);
@@ -97,8 +97,6 @@ test.describe("Add Mentor on a local Supabase stack", () => {
     await mentor.getByLabel("New password").fill(MENTOR_PASSWORD);
     await mentor.getByLabel("Confirm password").fill(MENTOR_PASSWORD);
     await mentor.getByRole("button", { name: /save new password/i }).click();
-    await expect(mentor).toHaveURL(/\/login\?reason=password_updated/);
-    await logIn(mentor, email, MENTOR_PASSWORD);
     await expect(mentor).toHaveURL(/\/mentor$/, { timeout: 30_000 });
 
     // Accepted: active, and no invite actions any more.
