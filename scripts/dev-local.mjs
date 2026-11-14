@@ -9,9 +9,11 @@ import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 
 const SUPABASE = ["-y", "supabase@2"];
+// On Windows npx is npx.cmd, which Node cannot spawn without a shell.
+const NPX = process.platform === "win32" ? "npx.cmd" : "npx";
 
 function run(args, opts = {}) {
-  return execFileSync("npx", [...SUPABASE, ...args], { encoding: "utf8", ...opts });
+  return execFileSync(NPX, [...SUPABASE, ...args], { encoding: "utf8", shell: process.platform === "win32", ...opts });
 }
 
 try {
@@ -60,5 +62,5 @@ console.log(`\nApp:    http://localhost:${port}   (local Supabase at ${url})`);
 console.log(`Emails: ${mail}`);
 console.log(`Studio: ${vars.STUDIO_URL ?? "http://127.0.0.1:54323"}\n`);
 
-const child = spawn("npx", ["next", "dev", "-p", port], { env, stdio: "inherit" });
+const child = spawn(NPX, ["next", "dev", "-p", port], { env, stdio: "inherit", shell: process.platform === "win32" });
 child.on("exit", (code) => process.exit(code ?? 0));

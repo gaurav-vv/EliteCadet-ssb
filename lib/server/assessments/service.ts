@@ -123,11 +123,15 @@ export async function getMentorAssessment(id: string): Promise<ServiceResult<{ a
   if (!me) return fail("unauthorized", "Only a mentor can view assessments.");
   if (!isUuid(id)) return fail("not_found", NOT_FOUND);
   const supabase = await createClient();
-  const { data, error } = await supabase.from("assessments").select(A_COLS).eq("id", id).maybeSingle();
-  if (error) return mapDbError(error);
-  const assessment = data ? toAssessment(data) : null;
+  // Both reads are keyed by the same id and independent, so they run together (RLS still
+  // decides what each returns). A missing or unreadable assessment is reported first, as before.
+  const [found, attempts] = await Promise.all([
+    supabase.from("assessments").select(A_COLS).eq("id", id).maybeSingle(),
+    supabase.from("assessment_attempts").select(T_COLS).eq("assessment_id", id).eq("status", "submitted").order("submitted_at", { ascending: true }),
+  ]);
+  if (found.error) return mapDbError(found.error);
+  const assessment = found.data ? toAssessment(found.data) : null;
   if (!assessment) return fail("not_found", NOT_FOUND);
-  const attempts = await supabase.from("assessment_attempts").select(T_COLS).eq("assessment_id", id).eq("status", "submitted").order("submitted_at", { ascending: true });
   if (attempts.error) return mapDbError(attempts.error);
   return { ok: true, data: { assessment, attempts: (attempts.data ?? []).map(toAttempt).filter((t): t is AttemptRecord => t !== null) } };
 }
@@ -251,11 +255,15 @@ export async function getStudentAssessment(id: string, nowIso: string): Promise<
   if (!me) return fail("unauthorized", "Only a student can open assessments.");
   if (!isUuid(id)) return fail("not_found", NOT_FOUND);
   const supabase = await createClient();
-  const { data, error } = await supabase.from("assessments").select(A_COLS).eq("id", id).neq("status", "draft").maybeSingle();
-  if (error) return mapDbError(error);
-  const assessment = data ? toAssessment(data) : null;
+  // Independent reads keyed by the same id: run together. A draft or unreadable assessment is
+  // reported first, as before; the attempt is only looked at once the assessment exists.
+  const [found, att] = await Promise.all([
+    supabase.from("assessments").select(A_COLS).eq("id", id).neq("status", "draft").maybeSingle(),
+    supabase.from("assessment_attempts").select(T_COLS).eq("assessment_id", id).eq("student_id", me.id).maybeSingle(),
+  ]);
+  if (found.error) return mapDbError(found.error);
+  const assessment = found.data ? toAssessment(found.data) : null;
   if (!assessment) return fail("not_found", NOT_FOUND);
-  const att = await supabase.from("assessment_attempts").select(T_COLS).eq("assessment_id", id).eq("student_id", me.id).maybeSingle();
   if (att.error) return mapDbError(att.error);
   const open = assessment.status === "published" && (!assessment.dueAt || Date.parse(assessment.dueAt) >= Date.parse(nowIso));
   return { ok: true, data: { assessment, attempt: att.data ? toAttempt(att.data) : null, open } };

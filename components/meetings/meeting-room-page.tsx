@@ -36,6 +36,7 @@ export async function MeetingRoomPage({ id, backHref }: { id: string; backHref: 
           title={s.title}
           role={viewer.role}
           viewerId={viewer.id}
+          viewerName={viewer.name}
           kind={s.meetingKind!}
           initialJoin={join}
           opensAtLabel={`${TIME.format(new Date(opensAt))} IST`}

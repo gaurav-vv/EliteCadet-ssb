@@ -77,7 +77,7 @@ export default async function ReportsPage() {
             getRowKey={(m) => m.mentorId}
             columns={[
               { key: "name", header: "Mentor", cell: (m) => m.name },
-              { key: "status", header: "Status", cell: (m) => <StatusBadge label={m.invited ? "Invite pending" : "Active"} tone={m.invited ? "warning" : "success"} /> },
+              { key: "status", header: "Status", cell: (m) => <StatusBadge label={m.invited ? "Not activated yet" : "Active"} tone={m.invited ? "warning" : "success"} /> },
               { key: "batches", header: "Batches", cell: (m) => m.batches },
               { key: "sessions", header: "Sessions, next 7 days", cell: (m) => m.sessionsNext7Days },
               { key: "reviews", header: "Waiting for review", cell: (m) => m.pendingReviews },

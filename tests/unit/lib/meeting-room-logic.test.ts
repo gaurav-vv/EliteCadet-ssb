@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { disconnectOutcome, formatClock, mergeMessages, orderForGrid, pageCount, parseRoomMessage, REASON, type ChatItem } from "@/lib/meetings/room-logic";
+import { disconnectOutcome, featuredIdentity, formatClock, handQueue, mergeMessages, orderForGrid, pageCount, parseRoomMessage, REASON, type ChatItem } from "@/lib/meetings/room-logic";
 
 const bytes = (v: unknown) => new TextEncoder().encode(typeof v === "string" ? v : JSON.stringify(v));
 
@@ -73,5 +73,31 @@ describe("grid order and paging", () => {
     expect(formatClock(65)).toBe("01:05");
     expect(formatClock(3725)).toBe("01:02:05");
     expect(formatClock(-3)).toBe("00:00");
+  });
+});
+
+describe("handQueue — the host's raise-hand order", () => {
+  const h = (identity: string, raisedAt: string | null, handRaised = true) => ({ identity, name: identity, handRaised, raisedAt });
+  it("lists only raised hands, first up first, unstamped ones last", () => {
+    const order = handQueue([h("late", "2026-10-25T10:05:00Z"), h("none", null), h("down", "2026-10-25T10:00:00Z", false), h("early", "2026-10-25T10:01:00Z")]).map((x) => x.identity);
+    expect(order).toEqual(["early", "late", "none"]);
+  });
+});
+
+describe("featuredIdentity — speaker view", () => {
+  const people = [
+    { identity: "me", isHost: false, isLocal: true },
+    { identity: "host", isHost: true, isLocal: false },
+    { identity: "amy", isHost: false, isLocal: false },
+  ];
+  it("prefers a pin, then a current remote speaker, then the last speaker, then the host", () => {
+    expect(featuredIdentity({ people, pinned: "amy", speaking: ["host"], lastSpeaker: null })).toBe("amy");
+    expect(featuredIdentity({ people, pinned: null, speaking: ["me", "amy"], lastSpeaker: null })).toBe("amy");
+    expect(featuredIdentity({ people, pinned: null, speaking: ["me"], lastSpeaker: "amy" })).toBe("amy");
+    expect(featuredIdentity({ people, pinned: null, speaking: [], lastSpeaker: null })).toBe("host");
+  });
+  it("ignores a pin or last speaker who has left, and falls back to yourself when alone", () => {
+    expect(featuredIdentity({ people, pinned: "gone", speaking: [], lastSpeaker: "gone" })).toBe("host");
+    expect(featuredIdentity({ people: [people[0]], pinned: null, speaking: [], lastSpeaker: null })).toBe("me");
   });
 });

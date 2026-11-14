@@ -96,6 +96,10 @@ test("mentor and students meet: media, chat, reactions, raised hands, leave vs e
 
   // ---- Host starts; student joins ----
   await mentor.goto(`/mentor/sessions/${sessionId}/room`);
+  // Join screen: the profile name and a live camera preview (Chromium's fake camera).
+  await expect(mentor.getByText(/you'll join as/i)).toContainText("Meet Mentor");
+  await expect(mentor.getByLabel("Your camera preview")).toBeVisible({ timeout: 15_000 });
+  await hasLiveVideo(mentor);
   await mentor.getByRole("button", { name: /start or rejoin meeting/i }).click();
   await expect(mentor.getByRole("tab", { name: /participants \(1\)/i })).toBeVisible({ timeout: 30_000 });
   await student.goto(`/student/sessions/${sessionId}`);
@@ -133,6 +137,12 @@ test("mentor and students meet: media, chat, reactions, raised hands, leave vs e
   await student.getByRole("button", { name: /^raise hand$/i }).click();
   await mentor.getByRole("tab", { name: /participants/i }).click();
   await expect(mentor.getByText(/1 hand raised/i)).toBeVisible({ timeout: 15_000 });
+  // The host's queue lowers one hand…
+  await mentor.getByRole("button", { name: "Lower Meet Student's hand" }).click();
+  await expect(student.getByRole("button", { name: /^raise hand$/i })).toBeVisible({ timeout: 15_000 });
+  // …and "lower all hands" clears the rest.
+  await student.getByRole("button", { name: /^raise hand$/i }).click();
+  await expect(mentor.getByText(/1 hand raised/i)).toBeVisible({ timeout: 15_000 });
   await mentor.getByRole("button", { name: /^more$/i }).click();
   await mentor.getByRole("menuitem", { name: /lower all hands/i }).click();
   await expect(student.getByRole("button", { name: /^raise hand$/i })).toBeVisible({ timeout: 15_000 });
@@ -144,6 +154,22 @@ test("mentor and students meet: media, chat, reactions, raised hands, leave vs e
   await student.getByRole("button", { name: /^unmute$/i }).click();
   await expect(student.getByRole("button", { name: /^mute$/i })).toBeVisible({ timeout: 30_000 }); // mic published
   await expect.poll(() => remoteAudioTracks(mentor), { timeout: 45_000 }).toBeGreaterThan(0);
+
+  // The host mutes the student → the student is told who did it.
+  await mentor.getByRole("button", { name: /actions for meet student/i }).click();
+  await mentor.getByRole("menuitem", { name: /^mute microphone$/i }).click();
+  await expect(student.getByText(/host muted your microphone/i)).toBeVisible({ timeout: 20_000 });
+  await expect(student.getByRole("button", { name: /^unmute$/i })).toBeVisible();
+
+  // Speaker view (pin a tile) and the in-room device settings.
+  await mentor.getByRole("button", { name: /^more$/i }).click();
+  await mentor.getByRole("menuitem", { name: /switch to speaker view/i }).click();
+  await mentor.getByRole("button", { name: "Pin Meet Student to the main view" }).click();
+  await expect(mentor.getByRole("button", { name: "Unpin Meet Student" })).toBeVisible();
+  await mentor.getByRole("button", { name: /^more$/i }).click();
+  await mentor.getByRole("menuitem", { name: /audio and video settings/i }).click();
+  await expect(mentor.getByRole("dialog")).toContainText("Microphone");
+  await mentor.keyboard.press("Escape");
 
   // Leaving is not ending: the student leaves, the meeting continues, they rejoin.
   await student.getByRole("button", { name: /^leave$/i }).click();

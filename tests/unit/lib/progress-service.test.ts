@@ -9,8 +9,10 @@ vi.mock("@/lib/server/assessments/service", () => ({ getStudentAssessments: vi.f
 vi.mock("@/lib/server/sessions/service", () => ({ getMyStudentSessions: vi.fn(async () => ({ ok: true, data: [] })) }));
 
 import { getMyMentee } from "@/lib/server/academy-people/service";
+import { getStudentAssessments } from "@/lib/server/assessments/service";
 import { getActor } from "@/lib/server/auth/guard";
 import * as service from "@/lib/server/progress/service";
+import { getMyStudentSessions } from "@/lib/server/sessions/service";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 const STUDENT = "44444444-4444-4444-8444-444444444444";
@@ -74,6 +76,105 @@ describe("getMyProgress", () => {
     const res = await service.getMyProgress(NOW);
     expect(res.data?.summary).toMatchObject({ avgScorePct: null, attendancePct: null, reviewedCount: 0 });
     expect(res.data?.trend).toEqual([]);
+  });
+});
+
+describe("progress reads name the columns they need (no select *)", () => {
+  const selected = () => db.calls.map((c) => ({ table: c.table, cols: c.q.select.mock.calls[0]?.[0] as string }));
+  const needed = ["reviewed_count", "sessions_present", "sessions_absent", "content_completed", "last_submission_at"];
+
+  it("a student's own progress selects only what the summary and score points read", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student"));
+    db.queue.push({ data: null, error: null }, { data: [], error: null });
+    await service.getMyProgress(NOW);
+    const [progress, scores] = selected();
+    expect(progress).toEqual({ table: "student_progress", cols: service.PROGRESS_SUMMARY_COLUMNS });
+    expect(scores).toEqual({ table: "student_scores", cols: service.SCORE_POINT_COLUMNS });
+    for (const col of needed) expect(progress.cols).toContain(col);
+    for (const col of ["assessment_id", "category", "score_pct", "reviewed_at", "improvement_areas", "strengths"]) expect(scores.cols).toContain(col);
+    for (const { cols } of selected()) expect(cols).not.toContain("*");
+  });
+
+  it("the academy view also selects student_id, batch_id and practice_done, still no select *", async () => {
+    vi.mocked(getActor).mockResolvedValue({ ...actor("academy_admin"), profile: { ...actor("academy_admin").profile, academyId: "acad" } });
+    await service.getAcademyPerformance(NOW);
+    const progress = selected().find((c) => c.table === "student_progress");
+    expect(progress?.cols).toContain("student_id");
+    expect(progress?.cols).toContain("batch_id");
+    expect(progress?.cols).toContain("practice_done");
+    for (const col of needed) expect(progress?.cols).toContain(col);
+    expect(progress?.cols).not.toContain("*");
+  });
+
+  it("mentee summaries need student_id to group rows by student", async () => {
+    await service.getMenteeSummaries([STUDENT]);
+    const progress = selected().find((c) => c.table === "student_progress");
+    expect(progress?.cols).toContain("student_id");
+    expect(progress?.cols).not.toContain("*");
+  });
+});
+
+describe("getMyProgress: assessments and sessions are read once, and together", () => {
+  const openAssessment = { id: "a9", title: "Mock GD", status: "published", dueAt: null, attempt: null };
+  const nextSession = { id: "s9", title: "Group Discussion", startsAt: "2026-10-09T06:00:00Z" };
+
+  beforeEach(() => {
+    vi.mocked(getActor).mockResolvedValue(actor("student"));
+    vi.mocked(getStudentAssessments).mockReset();
+    vi.mocked(getMyStudentSessions).mockReset();
+    vi.mocked(getStudentAssessments).mockResolvedValue({ ok: true, data: [openAssessment] } as never);
+    vi.mocked(getMyStudentSessions).mockResolvedValue({ ok: true, data: [nextSession] } as never);
+    db.queue.push({ data: null, error: null }, { data: [], error: null });
+  });
+
+  it("fetches each dataset exactly once and keeps the same recommendations", async () => {
+    const res = await service.getMyProgress(NOW);
+    expect(getStudentAssessments).toHaveBeenCalledTimes(1);
+    expect(getMyStudentSessions).toHaveBeenCalledTimes(1);
+    expect(getMyStudentSessions).toHaveBeenCalledWith("upcoming", NOW);
+    expect(res.data?.recommendations).toEqual([
+      { title: 'Complete "Mock GD"', reason: "It's open and you haven't submitted yet.", href: "/student/assessments/a9" },
+      { title: 'Attend "Group Discussion"', reason: "Your next scheduled session.", href: "/student/sessions" },
+    ]);
+  });
+
+  it("reuses requests the caller already started instead of fetching them again", async () => {
+    const assessments = Promise.resolve({ ok: true, data: [openAssessment] }) as never;
+    const sessions = Promise.resolve({ ok: true, data: [nextSession] }) as never;
+    const res = await service.getMyProgress(NOW, { assessments, sessions });
+    expect(getStudentAssessments).not.toHaveBeenCalled();
+    expect(getMyStudentSessions).not.toHaveBeenCalled();
+    expect(res.data?.recommendations).toHaveLength(2);
+  });
+
+  it("starts the progress, assessments and sessions reads together, not one after another", async () => {
+    let releaseAssessments!: (v: unknown) => void;
+    let releaseSessions!: (v: unknown) => void;
+    vi.mocked(getStudentAssessments).mockReturnValue(new Promise((r) => (releaseAssessments = r)) as never);
+    vi.mocked(getMyStudentSessions).mockReturnValue(new Promise((r) => (releaseSessions = r)) as never);
+    const pending = service.getMyProgress(NOW);
+    await vi.waitFor(() => expect(getStudentAssessments).toHaveBeenCalled());
+    // Both reads and the progress queries are already in flight while the first is unresolved.
+    expect(getMyStudentSessions).toHaveBeenCalled();
+    expect(db.from).toHaveBeenCalledWith("student_progress");
+    releaseAssessments({ ok: true, data: [] });
+    releaseSessions({ ok: true, data: [] });
+    expect((await pending).ok).toBe(true);
+  });
+
+  it("still returns progress, without those suggestions, when assessments or sessions fail", async () => {
+    vi.mocked(getStudentAssessments).mockResolvedValue({ ok: false, error: { code: "server_error", message: "x" } } as never);
+    vi.mocked(getMyStudentSessions).mockResolvedValue({ ok: false, error: { code: "server_error", message: "x" } } as never);
+    const res = await service.getMyProgress(NOW);
+    expect(res.ok).toBe(true);
+    expect(res.data?.recommendations).toEqual([]);
+    expect(res.data?.summary).toBeDefined();
+  });
+
+  it("fails when the progress itself cannot be read", async () => {
+    db.queue.length = 0;
+    db.queue.push({ data: null, error: { code: "XX000", message: "boom" } }, { data: [], error: null });
+    expect((await service.getMyProgress(NOW)).ok).toBe(false);
   });
 });
 

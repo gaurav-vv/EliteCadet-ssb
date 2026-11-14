@@ -82,6 +82,12 @@ interface MeetingToolbarProps {
   onLowerAll: () => void;
   onLeave: () => void;
   onEnd: () => void;
+  layout: "gallery" | "speaker";
+  onLayout: () => void;
+  fullscreen: boolean;
+  canFullscreen: boolean;
+  onFullscreen: () => void;
+  onDevices: () => void;
 }
 
 // session_ref.png bottom bar. Every control works; ones a person isn't allowed
@@ -146,6 +152,10 @@ export function MeetingToolbar(props: MeetingToolbarProps) {
                 <DropdownMenuSeparator />
               </>
             )}
+            <DropdownMenuItem onSelect={props.onDevices}>Audio and video settings</DropdownMenuItem>
+            <DropdownMenuItem onSelect={props.onLayout}>{props.layout === "gallery" ? "Switch to speaker view" : "Switch to gallery view"}</DropdownMenuItem>
+            {props.canFullscreen && <DropdownMenuItem onSelect={props.onFullscreen}>{props.fullscreen ? "Exit full screen" : "Full screen"}</DropdownMenuItem>}
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={props.onLeave}>Leave meeting</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-[12px] font-normal text-ink-secondary">Whiteboard, polls and breakout rooms aren&apos;t available yet.</DropdownMenuLabel>

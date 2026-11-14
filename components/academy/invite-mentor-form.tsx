@@ -17,10 +17,13 @@ export function InviteMentorForm({
   action = inviteAcademyMentorAction,
   title = "Invite a mentor",
   description,
+  embedded = false,
 }: {
   action?: typeof inviteAcademyMentorAction;
   title?: string;
   description?: string;
+  // Inside AddMentorPanel: no card or heading of its own.
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
@@ -42,7 +45,7 @@ export function InviteMentorForm({
         tone: "success",
         message: result.data?.resent
           ? `Invite re-sent to ${result.data.name}. They hadn't accepted the first one yet.`
-          : `Invite sent to ${result.data?.name ?? email}. They'll get an email to set their password.`,
+          : `Invite sent to ${result.data?.name ?? email}. They'll get an email to set their password. The link works once and expires in 1 hour; you can resend it from the list.`,
       });
       setFullName("");
       setEmail("");
@@ -55,11 +58,13 @@ export function InviteMentorForm({
   }
 
   return (
-    <div className="glass-regular flex flex-col gap-4 rounded-card px-6 py-6">
-      <div>
-        <h2 className="text-[18px] font-semibold text-ink">{title}</h2>
-        {description && <p className="mt-1 text-[14px] text-ink-secondary">{description}</p>}
-      </div>
+    <div className={embedded ? "flex flex-col gap-4" : "glass-regular flex flex-col gap-4 rounded-card px-6 py-6"}>
+      {!embedded && (
+        <div>
+          <h2 className="text-[18px] font-semibold text-ink">{title}</h2>
+          {description && <p className="mt-1 text-[14px] text-ink-secondary">{description}</p>}
+        </div>
+      )}
       {outcome && (
         <Alert variant={outcome.tone === "error" ? "destructive" : "default"} role={outcome.tone === "error" ? "alert" : "status"}>
           <AlertDescription>{outcome.message}</AlertDescription>

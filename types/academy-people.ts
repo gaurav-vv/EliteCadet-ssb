@@ -47,8 +47,16 @@ export interface AcademyMentorRecord {
   fullName: string;
   email: string | null;
   status: UserStatus;
-  // Never signed in yet = invite not accepted.
+  // Not activated yet (never signed in): added manually, invited, or the
+  // invite expired. `access` says which.
   invited: boolean;
+  // Set by the service from Supabase Auth (see mentorAccess); findMentors
+  // alone fills a provisional value.
+  access: "active" | "not_invited" | "invited" | "expired" | "suspended";
+  inviteSentAt: string | null;
+  qualifications: string | null;
+  specialization: string[];
+  lastLoginAt: string | null;
   batches: { id: string; name: string }[];
 }
 

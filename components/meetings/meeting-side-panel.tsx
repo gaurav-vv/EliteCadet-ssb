@@ -8,8 +8,8 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { allows, handRaised, initials, isHostRole, roleOf, SOURCE, type Perm } from "@/components/meetings/participant-utils";
-import { orderForGrid, type ChatItem } from "@/lib/meetings/room-logic";
+import { allows, handRaised, handRaisedAt, initials, isHostRole, roleOf, SOURCE, type Perm } from "@/components/meetings/participant-utils";
+import { handQueue, orderForGrid, type ChatItem } from "@/lib/meetings/room-logic";
 
 export type PanelTab = "participants" | "chat";
 export type HostAction = "allow_audio" | "allow_video" | "revoke" | "mute" | "remove" | "lower_hand";
@@ -118,7 +118,8 @@ export function MeetingSidePanel({ tab, onTab, participants, kind, canModerate, 
   )
     .filter((x) => !query.trim() || x.name.toLowerCase().includes(query.trim().toLowerCase()))
     .map((x) => x.p);
-  const hands = participants.filter(handRaised).length;
+  const queue = handQueue(participants.map((p) => ({ p, identity: p.identity, name: p.name || "Participant", handRaised: handRaised(p), raisedAt: handRaisedAt(p) })));
+  const hands = queue.length;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -152,7 +153,36 @@ export function MeetingSidePanel({ tab, onTab, participants, kind, canModerate, 
             <Search aria-hidden="true" size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-secondary" />
             <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search participants…" className="glass-thin h-10 w-full rounded-pill pr-3 pl-8 text-[14px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand-accent" />
           </label>
-          {hands > 0 && <p className="px-4 pt-1 text-[12px] font-medium text-ink">{hands === 1 ? "1 hand raised" : `${hands} hands raised`}</p>}
+          {hands > 0 && !canModerate && <p className="px-4 pt-1 text-[12px] font-medium text-ink">{hands === 1 ? "1 hand raised" : `${hands} hands raised`}</p>}
+          {hands > 0 && canModerate && (
+            <section aria-labelledby="hand-queue-heading" className="mx-4 mt-2 rounded-card border border-hairline">
+              <h3 id="hand-queue-heading" className="flex items-center gap-1.5 px-3 pt-2.5 text-[12px] font-semibold text-ink">
+                <Hand aria-hidden="true" size={14} className="text-warning" />
+                {hands === 1 ? "1 hand raised" : `${hands} hands raised`}
+                <span className="font-normal text-ink-secondary">· first up first</span>
+              </h3>
+              <ol className="divide-y divide-hairline">
+                {queue.map(({ p, name }, i) => {
+                  const canSpeak = allows(p.permissions as Perm, SOURCE.microphone);
+                  return (
+                    <li key={p.identity} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                        <span className="text-ink-secondary">{i + 1}.</span> {name}
+                      </span>
+                      {kind === "batch" && !canSpeak && (
+                        <Button type="button" variant="outline" size="sm" className="min-h-9" onClick={() => onHostAction(p.identity, name, "allow_audio")}>
+                          Let speak
+                        </Button>
+                      )}
+                      <Button type="button" variant="ghost" size="sm" className="min-h-9" onClick={() => onHostAction(p.identity, name, "lower_hand")} aria-label={`Lower ${name}'s hand`}>
+                        Lower
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          )}
           <ul className="flex-1 divide-y divide-hairline overflow-y-auto pb-2">
             {people.length === 0 ? <li className="px-4 py-6 text-center text-[13px] text-ink-secondary">No one matches “{query}”.</li> : people.map((p) => <PersonRow key={p.identity} p={p} kind={kind} canModerate={canModerate} onAction={onHostAction} />)}
           </ul>

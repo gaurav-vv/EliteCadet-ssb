@@ -54,7 +54,7 @@ async function signUpAcademy(page: Page, email: string, academy: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/academy$/);
+  await expect(page).toHaveURL(/\/academy$/, { timeout: 20_000 });
 }
 
 async function logIn(page: Page, email: string, password: string, expectUrl: RegExp) {
@@ -109,8 +109,8 @@ test.describe("cross-role communication with real logins", () => {
     // PATH 1 (part A) — INSTITUTE -> MENTOR: academy invites a mentor.
     // =====================================================================
     await adminPage.goto("/academy/mentors");
-    await adminPage.getByLabel("Full name").fill(mentorName);
-    await adminPage.getByLabel("Email").fill(mentorEmail);
+    await adminPage.getByLabel("Full name", { exact: true }).fill(mentorName);
+    await adminPage.getByLabel("Email", { exact: true }).fill(mentorEmail);
     await adminPage.getByRole("button", { name: /send invite/i }).click();
     await expect(adminPage.getByText(/invite sent to/i)).toBeVisible({ timeout: 15_000 });
 
@@ -126,14 +126,18 @@ test.describe("cross-role communication with real logins", () => {
     await mentorSetupPage.goto(inviteLink);
     await expect(mentorSetupPage).toHaveURL(/\/reset-password$/, { timeout: 15_000 });
     const newPassword = mentorSetupPage.getByLabel("New password");
+    // Wait for the page to settle (form or expired message) before deciding to reload: a reload while it is
+    // still "Checking your reset link…" throws away the session it is setting up.
+    await expect(newPassword.or(mentorSetupPage.getByRole("heading", { name: /link has expired/i }))).toBeVisible({ timeout: 20_000 });
     for (let attempt = 0; attempt < 5 && (await newPassword.count()) === 0; attempt++) {
       await mentorSetupPage.goto("/reset-password", { waitUntil: "domcontentloaded" });
       await mentorSetupPage.waitForTimeout(1500);
     }
     await expect(newPassword).toBeVisible({ timeout: 15_000 });
     await newPassword.fill(MENTOR_PASSWORD);
+    await mentorSetupPage.getByLabel("Confirm password").fill(MENTOR_PASSWORD);
     await mentorSetupPage.getByRole("button", { name: /save new password/i }).click();
-    await expect(mentorSetupPage).toHaveURL(/\/login\?reason=password_updated$/, { timeout: 15_000 });
+    await expect(mentorSetupPage).toHaveURL(/\/mentor$/, { timeout: 20_000 });
     results.push("PATH 1 (invite) PASS: academy invited mentor; mentor accepted invite email and set a password.");
 
     // =====================================================================

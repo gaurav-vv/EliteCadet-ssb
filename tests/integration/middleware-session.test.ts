@@ -27,11 +27,14 @@ function fakeSupabase(
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
   const signOut = vi.fn().mockResolvedValue({ error: null });
+  // The proxy verifies the token locally (getClaims); a network getUser() must never be needed.
+  const getClaims = vi.fn().mockResolvedValue(user ? { data: { claims: { sub: user.id } }, error: null } : { data: null, error: null });
+  const getUser = vi.fn();
   mockedCreateClient.mockReturnValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }), signOut },
+    auth: { getClaims, getUser, signOut },
     from,
   } as unknown as ReturnType<typeof createServerClient>);
-  return { from, eq, signOut };
+  return { from, eq, signOut, getClaims, getUser };
 }
 
 function request(path: string) {
@@ -55,6 +58,28 @@ describe("updateSession", () => {
     const res = await updateSession(request("/login"));
     expect(redirectTarget(res)).toBeNull();
     expect(from).not.toHaveBeenCalled();
+  });
+
+  it("skips Supabase entirely for a public page when the visitor has no auth cookie", async () => {
+    fakeSupabase(null, null);
+    const res = await updateSession(request("/"));
+    expect(redirectTarget(res)).toBeNull();
+    expect(mockedCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("still refreshes the session on a public page when an auth cookie is present", async () => {
+    const getClaims = vi.fn().mockResolvedValue({ data: { claims: { sub: "u1" } }, error: null });
+    mockedCreateClient.mockReturnValue({ auth: { getClaims } } as unknown as ReturnType<typeof createServerClient>);
+    const req = new NextRequest(new URL("/login", "http://localhost:3000"), { headers: { cookie: "sb-127-auth-token=abc" } });
+    await updateSession(req);
+    expect(getClaims).toHaveBeenCalled();
+  });
+
+  it("still sends a cookie-less visitor away from a protected route", async () => {
+    fakeSupabase(null, null);
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(target?.pathname).toBe("/login");
+    expect(mockedCreateClient).toHaveBeenCalled();
   });
 
   it("redirects a logged-out visitor to /login with next and reason", async () => {
@@ -130,6 +155,63 @@ describe("updateSession", () => {
   });
 });
 
+describe("updateSession — session verification", () => {
+  it("verifies the token locally and makes no Auth-server getUser() round trip", async () => {
+    const { getClaims, getUser } = fakeSupabase({ id: "u1" }, "student");
+    await updateSession(request("/student"));
+    expect(getClaims).toHaveBeenCalledTimes(1);
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("treats an invalid or expired token (claims verification fails) as logged out", async () => {
+    const { from, getClaims } = fakeSupabase({ id: "u1" }, "student");
+    getClaims.mockResolvedValue({ data: null, error: { message: "Invalid JWT signature" } });
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(target?.pathname).toBe("/login");
+    expect(target?.searchParams.get("reason")).toBe("login_required");
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("never trusts claims that carry no subject", async () => {
+    const { from, getClaims } = fakeSupabase({ id: "u1" }, "student");
+    getClaims.mockResolvedValue({ data: { claims: { role: "authenticated" } }, error: null });
+    expect(redirectTarget(await updateSession(request("/student")))?.pathname).toBe("/login");
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("still reads the profile for role and status on every request (claims are not trusted for them)", async () => {
+    const { eq } = fakeSupabase({ id: "u1" }, "student", "suspended");
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(eq).toHaveBeenCalledWith("id", "u1");
+    expect(target?.searchParams.get("reason")).toBe("account_suspended");
+  });
+});
+
+describe("updateSession — role and status come from the database, never from the token", () => {
+  it("enforces a role change on the very next request, even though the token still says the old role", async () => {
+    // The token was issued while this account was an academy admin; the profile now says student.
+    const { getClaims } = fakeSupabase({ id: "u1" }, "student");
+    getClaims.mockResolvedValue({ data: { claims: { sub: "u1", role: "authenticated", app_metadata: { role: "academy_admin" }, user_metadata: { role: "academy_admin" } } }, error: null });
+    expect(redirectTarget(await updateSession(request("/academy")))?.pathname).toBe("/forbidden");
+    expect(redirectTarget(await updateSession(request("/student")))).toBeNull();
+  });
+
+  it("enforces a suspension on the very next request while the token is still valid", async () => {
+    const { getClaims, signOut } = fakeSupabase({ id: "u1" }, "mentor", "suspended");
+    getClaims.mockResolvedValue({ data: { claims: { sub: "u1", exp: Math.floor(Date.now() / 1000) + 3000 } }, error: null });
+    const target = redirectTarget(await updateSession(request("/mentor")));
+    expect(target?.searchParams.get("reason")).toBe("account_suspended");
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it("treats a deleted account (valid token, no profile row) as signed out", async () => {
+    const { signOut } = fakeSupabase({ id: "u1" }, null);
+    const target = redirectTarget(await updateSession(request("/student")));
+    expect(target?.searchParams.get("reason")).toBe("profile_missing");
+    expect(signOut).toHaveBeenCalled();
+  });
+});
+
 describe("updateSession — /admin (super_admin workspace) and account status", () => {
   it("redirects a logged-out visitor to /login", async () => {
     fakeSupabase(null, null);
@@ -182,5 +264,23 @@ describe("updateSession — /admin (super_admin workspace) and account status", 
   it("does not block a super admin because of an academy's status", async () => {
     fakeSupabase({ id: "u1" }, "super_admin", "active", "suspended");
     expect(redirectTarget(await updateSession(request("/admin")))).toBeNull();
+  });
+});
+
+describe("updateSession — email links that fell back to the Site URL", () => {
+  it("forwards /?code=… to /auth/callback with the query intact", async () => {
+    fakeSupabase(null, null);
+    const target = redirectTarget(await updateSession(request("/?code=abc123")));
+    expect(target?.pathname).toBe("/auth/callback");
+    expect(target?.searchParams.get("code")).toBe("abc123");
+  });
+
+  it("forwards a token_hash link too, and leaves the plain home page alone", async () => {
+    fakeSupabase(null, null);
+    const target = redirectTarget(await updateSession(request("/?token_hash=th&type=recovery")));
+    expect(target?.pathname).toBe("/auth/callback");
+    expect(target?.searchParams.get("type")).toBe("recovery");
+    expect(redirectTarget(await updateSession(request("/")))).toBeNull();
+    expect(redirectTarget(await updateSession(request("/?token_hash=th")))).toBeNull();
   });
 });

@@ -74,17 +74,36 @@ Layout follows `session_ref.png`:
 - **Left:** session details (title, live/upcoming/ended/cancelled, date, time and duration, host,
   audience, "You are in this batch" for students). It becomes a compact strip on screens narrower
   than 1536px.
-- **Centre:** a dark video stage with Live, who's sharing, the time left and connection state.
-- **Grid:** a paged 3×3 grid (host first, raised hands next). Students who aren't publishing show
-  initials, so a batch room never streams 100 videos. A screen share takes the main area, with
-  cameras in a strip.
+- **Join screen:** camera preview (or the initials placeholder others will see), a live microphone
+  level, camera and microphone pickers, on/off toggles, and "You'll join as <name>". The name comes
+  from the profile and can't be changed here (it's the identity in the token). Listen-only batch
+  students don't get a preview; they don't need devices until the host lets them speak. A blocked
+  camera or microphone is explained and doesn't stop anyone joining.
+- **Centre:** a dark video stage with Live, who's sharing, the time since the meeting started, the
+  scheduled end (IST), the time left, connection state ("Reconnecting…" in words, not just colour)
+  and a full-screen button.
+- **Layouts:** **Gallery** (default for batch meetings) is a paged 3×3 grid (host first, raised
+  hands next). **Speaker** (default for one-to-one) puts the person speaking in the main tile, with
+  up to six others in a strip; select any tile to pin it (select again to unpin). Students who
+  aren't publishing show initials, so a batch room never streams 100 videos. A screen share takes
+  the main area in both layouts, with cameras in a strip.
+- **Full screen** makes the whole page full screen with the room covering it, so menus, the
+  reaction picker and dialogs still work. Esc exits.
 - **Toolbar:** mic, camera, share screen (host only; disabled with the reason for others), raise
   hand (students), chat with an unread badge, participants with a count, reactions, More (host:
-  mute all students, lower all hands; everyone: leave). Whiteboard, polls and breakout rooms are
-  listed there as not available yet.
+  mute all students, lower all hands; everyone: audio and video settings, speaker/gallery view,
+  full screen, leave). Audio and video settings switch the live microphone, camera and (in
+  browsers that support choosing one: Chrome, Edge) speaker. Whiteboard, polls and breakout rooms
+  are listed there as not available yet.
 - **Leave / End:** **Leave** for everyone; **End meeting** (red) for hosts.
 - **Right:** Participants (search; host, hand, mic, camera and connection state; host actions per
   student) and Chat (history, live messages, sending/failed/retry, empty state, emoji insert).
+  Hosts see a **raised-hand queue** at the top of Participants, in the order hands went up (the
+  server stamps the time in the participant attribute `hand_at`), with *Let speak* (batch) and
+  *Lower* per person.
+- **Feedback to students:** "The host let you speak" / "closed your microphone" when permissions
+  change, "The host muted your microphone" when a host mutes them, and a removed screen when
+  removed.
 - **Other states:** connecting, reconnecting, host not in the room, a 5-minute warning,
   camera/microphone permission denied, and connection errors.
 
@@ -114,6 +133,10 @@ Layout follows `session_ref.png`:
 
 **Known limits:**
 - A student's speaking permission and raised hand reset if they rejoin.
+- There's no private post-session notes or interview-evaluation record for a meeting. No table
+  holds one: `feedback` belongs to assessment attempts. Adding it needs a migration and a product
+  decision (who may read it, what it contains); it's tracked in `task.md` (T094).
+- The display name in the room is the profile name; it can't be changed per meeting.
 - There's no whiteboard, polls or breakout rooms (shown as not available). There's no recording
   (by decision).
 - Academy admins can't **edit** a meeting; they cancel and reschedule.
@@ -194,6 +217,37 @@ every Supabase key must come from `npx supabase status`, not from the hosted pro
 5. To try a meeting, use two browsers (or one normal and one private window): one signed in as a
    mentor of a batch, one as a student in that batch. Browsers allow camera and mic on
    `http://localhost` without HTTPS. Other devices on your LAN need HTTPS.
+
+## Troubleshooting
+
+### `[meetings] create room failed: invalid token`
+
+LiveKit rejected the JWT the server signed for its own API call. The signature is made with
+`LIVEKIT_API_SECRET`, so this means the key/secret pair isn't one LiveKit knows for that project.
+It is not a code or SDK problem. Check, in this order:
+
+1. **The secret is the real value.** LiveKit Cloud shows a new key's secret **once**, when you
+   create it; afterwards the dashboard shows it masked (`••••…`). Copying the masked text gives a
+   secret that can never work. The server now detects this (non-ASCII or one repeated character)
+   and treats LiveKit as not set up, logging
+   `[meetings] LiveKit is not usable: LIVEKIT_API_SECRET has spaces or non-ASCII characters…`.
+   If you no longer have the secret, create a new key (LiveKit Cloud → Settings → API Keys →
+   *Create key*), copy both values immediately, and put them in `.env.local` (or your host's
+   environment variables).
+2. **Key and secret are a pair from the same project** as `LIVEKIT_URL`
+   (`wss://<project>.livekit.cloud`). A key from project A with the URL of project B fails the same way.
+3. **No stray characters:** no quotes copied from the dashboard, no trailing spaces, one variable
+   per line.
+4. **The server clock is correct** (tokens carry not-before/expiry times).
+5. **Restart `npm run dev`** after changing `.env.local`. Next.js reads env files only at startup.
+
+Any 401 from LiveKit is now logged as a credential mismatch, naming the variables (never their values).
+
+### Camera or microphone blocked
+
+The join screen and the room explain it and still let the person join and listen. To allow it
+again: the camera icon / site settings in the address bar → Allow → turn the device back on.
+Browsers only allow camera and microphone on `https://` or `http://localhost`.
 
 ## Production / deployment
 

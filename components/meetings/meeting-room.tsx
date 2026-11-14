@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LiveKitRoom } from "@livekit/components-react";
-import { MediaDeviceFailure, type DisconnectReason } from "livekit-client";
-import { CalendarClock, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { MediaDeviceFailure, type DisconnectReason, type RoomOptions } from "livekit-client";
+import { CalendarClock } from "lucide-react";
+import { PrejoinPreview, type DeviceChoice } from "@/components/meetings/prejoin-preview";
 import { RoomStage } from "@/components/meetings/room-stage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ interface MeetingRoomProps {
   title: string;
   role: "mentor" | "admin" | "student";
   viewerId: string;
+  viewerName: string;
   kind: "one_to_one" | "batch";
   initialJoin: JoinState;
   opensAtLabel: string;
@@ -49,16 +51,26 @@ const OUTCOME: Record<RoomOutcome, { title: string; description: string; rejoin:
 // Errors from turning on the camera/mic (browser or LiveKit publish), never a lost connection.
 const DEVICE_ERRORS = new Set(["NotReadableError", "NotFoundError", "OverconstrainedError", "AbortError", "TrackInvalidError", "DeviceUnsupportedError", "PublishTrackError"]);
 
-export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoin, opensAtLabel, backHref, hostName }: MeetingRoomProps) {
+export function MeetingRoom({ sessionId, title, role, viewerId, viewerName, kind, initialJoin, opensAtLabel, backHref, hostName }: MeetingRoomProps) {
   const [join, setJoin] = useState<JoinState>(initialJoin);
   const [phase, setPhase] = useState<Phase>({ name: "lobby" });
   const [pending, setPending] = useState(false);
   const [deviceWarning, setDeviceWarning] = useState<string | null>(null);
   const isHost = role !== "student";
-  // Everyone may use their camera and mic. In a batch, students start muted so
-  // a full room isn't noisy; they unmute themselves when they want to speak.
-  const [camera, setCamera] = useState(true);
-  const [mic, setMic] = useState(isHost || kind === "one_to_one");
+  // Everyone may use their camera and mic (owner decision 2026-11-14). In a
+  // batch, students start muted so a full room isn't noisy; they unmute to speak.
+  const [devices, setDevices] = useState<DeviceChoice>({ camera: true, mic: isHost || kind === "one_to_one", cameraId: "", micId: "" });
+  // Stable, so LiveKitRoom never rebuilds the room on a re-render. Later
+  // toggles in the room reuse the devices chosen on the join screen.
+  const roomOptions = useMemo<RoomOptions>(
+    () => ({
+      adaptiveStream: true,
+      dynacast: true,
+      audioCaptureDefaults: devices.micId ? { deviceId: devices.micId } : undefined,
+      videoCaptureDefaults: devices.cameraId ? { deviceId: devices.cameraId } : undefined,
+    }),
+    [devices.cameraId, devices.micId],
+  );
   // Set BEFORE this client disconnects whenever the meeting is over for
   // everyone, so the outcome can't depend on which disconnect reason wins.
   const endedHere = useRef(false);
@@ -142,9 +154,9 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
         serverUrl={grant.serverUrl}
         token={grant.token}
         connect
-        audio={mic}
-        video={camera}
-        options={{ adaptiveStream: true, dynacast: true }}
+        audio={devices.mic}
+        video={devices.camera}
+        options={roomOptions}
         onDisconnected={onDisconnected}
         onConnected={() => {
           signalUp.current = true;
@@ -158,7 +170,7 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
             <AlertDescription>{deviceWarning}</AlertDescription>
           </Alert>
         )}
-        <RoomStage sessionId={sessionId} title={title} role={grant.role} viewerId={viewerId} kind={grant.kind} endsAt={grant.endsAt} hostName={hostName} onMeetingOver={markEnded} />
+        <RoomStage sessionId={sessionId} title={title} role={grant.role} viewerId={viewerId} kind={grant.kind} endsAt={grant.endsAt} startedAt={grant.startedAt} hostName={hostName} onMeetingOver={markEnded} />
       </LiveKitRoom>
     );
   }
@@ -222,19 +234,15 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
                 : "Everyone in the batch can see and hear you when your camera and microphone are on. You can unmute any time to speak. Meetings aren't recorded."}
         </p>
       </div>
-      <fieldset className="flex flex-wrap gap-3">
-        <legend className="sr-only">Devices on joining</legend>
-        <Button type="button" variant="outline" className="min-h-11" aria-pressed={camera} onClick={() => setCamera((v) => !v)}>
-          {camera ? <Video aria-hidden="true" size={16} /> : <VideoOff aria-hidden="true" size={16} />}
-          {camera ? "Camera on" : "Camera off"}
-        </Button>
-        <Button type="button" variant="outline" className="min-h-11" aria-pressed={mic} onClick={() => setMic((v) => !v)}>
-          {mic ? <Mic aria-hidden="true" size={16} /> : <MicOff aria-hidden="true" size={16} />}
-          {mic ? "Microphone on" : "Microphone off"}
-        </Button>
-      </fieldset>
-      <p className="text-[13px] text-ink-secondary">Your browser will ask to use your camera and microphone. You can still join if you say no.</p>
-      <div className="flex justify-end">
+      <PrejoinPreview name={viewerName} choice={devices} onChange={setDevices} />
+      <p className="text-[13px] text-ink-secondary">
+        Your browser will ask to use your camera and microphone. You can still join if you say no.
+      </p>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[14px] text-ink">
+          You&apos;ll join as <strong className="font-semibold">{viewerName}</strong>
+          <span className="block text-[12px] text-ink-secondary">The name on your profile is what everyone in the room sees.</span>
+        </p>
         <Button type="button" className="min-h-11" onClick={enter} disabled={pending}>
           {pending ? "Connecting…" : isHost ? "Start or rejoin meeting" : "Join meeting"}
         </Button>

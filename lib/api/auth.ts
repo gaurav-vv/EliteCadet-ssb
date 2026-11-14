@@ -4,8 +4,9 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { describeLookupFailure, loadAccountAccess } from "@/lib/auth/account";
+import { isPasswordSetupSession } from "@/lib/auth/redirect";
+import { validateEmail, validateLoginInput, validatePassword, validateSignupInput } from "@/lib/auth/validation";
 import type { AuthResult, LoginInput, SignupInput } from "@/types/auth";
-import { isValidEmail } from "@/lib/utils/email";
 
 export const SUSPENDED_MESSAGE = "This account has been suspended. Contact your academy or the platform team for help.";
 
@@ -16,43 +17,12 @@ export const ACCOUNT_UNAVAILABLE_MESSAGE = "We couldn't load your account right 
 export const PROFILE_MISSING_MESSAGE =
   "Your sign-in worked, but your account isn't fully set up. Contact your academy or the platform team for help.";
 
+// The pure field checks live in lib/auth/validation.ts (shared with the forms); re-exported here so
+// existing imports keep working.
+export { validateEmail, validatePassword, validateSignupInput, validateLoginInput };
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
-}
-
-export function validateEmail(email: string): string | null {
-  if (!email.trim()) return "Email is required.";
-  if (!isValidEmail(email)) return "Enter a valid email address.";
-  return null;
-}
-
-export function validatePassword(password: string): string | null {
-  if (!password) return "Password is required.";
-  // Supabase Auth's own minimum; no other rules (AGENTS.md: owner decision 2026-11-14).
-  if (password.length < 6) return "Password must be at least 6 characters.";
-  return null;
-}
-
-export function validateSignupInput(input: SignupInput): Record<string, string> {
-  const errors: Record<string, string> = {};
-  const emailError = validateEmail(input.email);
-  if (emailError) errors.email = emailError;
-  const passwordError = validatePassword(input.password);
-  if (passwordError) errors.password = passwordError;
-  if (!input.fullName.trim()) errors.fullName = "Name is required.";
-  if (input.role === "academy_admin" && !input.academyName?.trim()) {
-    errors.academyName = "Academy name is required.";
-  }
-  return errors;
-}
-
-export function validateLoginInput(input: LoginInput): Record<string, string> {
-  const errors: Record<string, string> = {};
-  const emailError = validateEmail(input.email);
-  if (emailError) errors.email = emailError;
-  if (!input.password) errors.password = "Password is required.";
-  return errors;
 }
 
 // Every email link comes back through /auth/callback on the SAME origin the
@@ -61,6 +31,21 @@ export function validateLoginInput(input: LoginInput): Record<string, string> {
 // Each origin used must be in Supabase → Auth → URL Configuration → Redirect URLs.
 function callbackUrl(next: string): string {
   return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+}
+
+// For the console only (never shown to the user, so the page can't reveal
+// which addresses have accounts): what the Supabase project needs.
+function resetFailureHint(error: { status?: number; code?: string; message?: string }): string {
+  if (error.code === "email_address_not_authorized") {
+    return "Supabase's built-in email only sends to members of the Supabase organization. Set up custom SMTP (docs/email.md).";
+  }
+  if (error.status === 500 || /sending .*email/i.test(error.message ?? "")) {
+    return "Supabase couldn't hand the email to its SMTP server. Check Authentication → Emails → SMTP Settings and the provider's logs (docs/email.md).";
+  }
+  if (/redirect/i.test(error.message ?? "")) {
+    return "Add this site's origin to Authentication → URL Configuration → Redirect URLs (docs/email.md).";
+  }
+  return "See docs/email.md → Troubleshooting.";
 }
 
 function isRateLimited(error: { status?: number; code?: string }): boolean {
@@ -200,7 +185,7 @@ export async function requestPasswordReset(rawEmail: string): Promise<AuthResult
       if (isRateLimited(error)) {
         return { ok: false, error: { code: "rate_limited", message: "Too many reset requests. Please wait a few minutes and try again." } };
       }
-      console.error("[auth] password reset request failed", { code: error.code, status: error.status });
+      console.error("[auth] password reset request failed", { code: error.code, status: error.status, hint: resetFailureHint(error) });
       return { ok: false, error: { code: "unknown_error", message: "We couldn't send the reset email right now. Please try again shortly." } };
     }
   } catch {
@@ -219,9 +204,11 @@ export async function updatePassword(password: string): Promise<AuthResult<null>
   const supabase = createClient();
 
   try {
-    const { error } = await supabase.auth.updateUser({ password });
-    // Re-using the current password is allowed: the account already has
-    // exactly the password the user asked for, so that counts as success.
+    // password_set marks the invite as accepted, so only the first password
+    // choice after an invite signs the person straight in (see pendingInviteEmail).
+    const { error } = await supabase.auth.updateUser({ password, data: { password_set: true } });
+    // Re-using the current password is allowed (owner decision 2026-11-14): the
+    // account already has exactly the password the user asked for.
     if (error && error.code !== "same_password") {
       if (error.code === "weak_password") {
         return { ok: false, error: { code: "weak_password", message: "Choose a stronger password." } };
@@ -237,6 +224,21 @@ export async function updatePassword(password: string): Promise<AuthResult<null>
     return { ok: true, data: null };
   } catch {
     return { ok: false, error: { code: "network_error", message: "Network error. Check your connection and try again." } };
+  }
+}
+
+// The address of an invited person who is choosing their first password, or
+// null for an ordinary reset (or an invite that was already accepted). Read
+// before updatePassword, which ends the session. Invites carry `invited_at`;
+// `password_set` is written by updatePassword.
+export async function pendingInviteEmail(): Promise<string | null> {
+  try {
+    const { data } = await createClient().auth.getUser();
+    const user = data.user;
+    if (!user?.email || !user.invited_at || user.user_metadata?.password_set) return null;
+    return user.email;
+  } catch {
+    return null;
   }
 }
 
@@ -280,5 +282,13 @@ async function readRecoverySession(): Promise<"ready" | "invalid"> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user ? "ready" : "invalid";
+  if (!user) return "invalid";
+  // Only a session that came from a reset or invite email may set a new
+  // password here — not an ordinary signed-in session that happens to open
+  // /reset-password. (Server-side, Supabase's "Secure password change"
+  // setting is the matching control; see docs/email.md.)
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return isPasswordSetupSession(session?.access_token) ? "ready" : "invalid";
 }

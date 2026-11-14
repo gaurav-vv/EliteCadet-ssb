@@ -1,5 +1,5 @@
 import { LineChart as LineChartIcon } from "lucide-react";
-import { ScoreTrendChart } from "@/components/progress/score-trend-chart";
+import { ScoreTrendChart } from "@/components/progress/score-trend-chart-lazy";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/ui/stat-card";
 import { formatIstDay } from "@/lib/server/sessions/validation";

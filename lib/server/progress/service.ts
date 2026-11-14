@@ -35,6 +35,11 @@ export function toScorePoint(row: unknown): ScorePoint | null {
   };
 }
 
+// The columns progressRow() and toScorePoint() actually read. The views carry more
+// (avg_score_pct, practice_tests, ...), so name what is needed instead of select("*").
+export const PROGRESS_SUMMARY_COLUMNS = "reviewed_count, sessions_present, sessions_absent, content_completed, last_submission_at";
+export const SCORE_POINT_COLUMNS = "assessment_id, title, category, score, max_score, score_pct, reviewed_at, improvement_areas, strengths";
+
 function progressRow(r: Record<string, unknown> | null | undefined) {
   return {
     reviewedCount: Number(r?.reviewed_count) || 0,
@@ -48,8 +53,8 @@ function progressRow(r: Record<string, unknown> | null | undefined) {
 async function loadStudent(studentId: string): Promise<ServiceResult<StudentProgress>> {
   const supabase = await createClient();
   const [row, scores] = await Promise.all([
-    supabase.from("student_progress").select("*").eq("student_id", studentId).maybeSingle(),
-    supabase.from("student_scores").select("*").eq("student_id", studentId).order("reviewed_at", { ascending: true }).limit(500),
+    supabase.from("student_progress").select(PROGRESS_SUMMARY_COLUMNS).eq("student_id", studentId).maybeSingle(),
+    supabase.from("student_scores").select(SCORE_POINT_COLUMNS).eq("student_id", studentId).order("reviewed_at", { ascending: true }).limit(500),
   ]);
   if (row.error) return mapDbError(row.error, "We couldn't load progress. Please try again.");
   if (scores.error) return mapDbError(scores.error, "We couldn't load progress. Please try again.");
@@ -71,25 +76,42 @@ async function loadStudent(studentId: string): Promise<ServiceResult<StudentProg
 
 // ---- Student: My Progress --------------------------------------------------------
 
-export async function getMyProgress(nowIso: string): Promise<ServiceResult<StudentProgress & { recommendations: Recommendation[] }>> {
+type AssessmentsResult = Awaited<ReturnType<typeof getStudentAssessments>>;
+type SessionsResult = Awaited<ReturnType<typeof getMyStudentSessions>>;
+
+// Data a caller has already started loading. A page that also shows the student's
+// assessments or upcoming sessions passes its own in-flight requests here, so each
+// dataset is read once per page instead of once by the page and again by the
+// recommendations. Anything not supplied is fetched here.
+export interface ProgressInputs {
+  assessments?: Promise<AssessmentsResult>;
+  sessions?: Promise<SessionsResult>;
+}
+
+export async function getMyProgress(nowIso: string, inputs: ProgressInputs = {}): Promise<ServiceResult<StudentProgress & { recommendations: Recommendation[] }>> {
   const me = await getActor();
   if (!me || me.profile.role !== "student") return fail("unauthorized", "Only a student has My Progress.");
-  const progress = await loadStudent(me.id);
+  // The three reads don't depend on each other, so they run together. (They used
+  // to run one after another: progress, then assessments, then sessions.)
+  const [progress, assessments, sessions] = await Promise.all([
+    loadStudent(me.id),
+    inputs.assessments ?? getStudentAssessments(),
+    inputs.sessions ?? getMyStudentSessions("upcoming", nowIso),
+  ]);
   if (!progress.ok || !progress.data) return progress as ServiceResult<never>;
-  const recommendations = await recommend(me, progress.data, nowIso);
+  const recommendations = await recommend(me, progress.data, nowIso, assessments, sessions);
   return { ok: true, data: { ...progress.data, recommendations } };
 }
 
-// Rule-based and explainable (specs.md §6.3): each item says why.
-async function recommend(me: Actor, p: StudentProgress, nowIso: string): Promise<Recommendation[]> {
+// Rule-based and explainable (specs.md §6.3): each item says why. Only the Library
+// suggestion needs a further read, because it depends on the weakest area.
+async function recommend(me: Actor, p: StudentProgress, nowIso: string, assessments: AssessmentsResult, sessions: SessionsResult): Promise<Recommendation[]> {
   const out: Recommendation[] = [];
-  const assessments = await getStudentAssessments();
   for (const a of assessments.data ?? []) {
     const open = a.status === "published" && (!a.dueAt || Date.parse(a.dueAt) >= Date.parse(nowIso));
     if (open && a.attempt?.status !== "submitted") out.push({ title: `Complete "${a.title}"`, reason: a.dueAt ? "It's open and due soon." : "It's open and you haven't submitted yet.", href: `/student/assessments/${a.id}` });
     if (out.length >= 2) break;
   }
-  const sessions = await getMyStudentSessions("upcoming", nowIso);
   const next = sessions.data?.[0];
   if (next) out.push({ title: `Attend "${next.title}"`, reason: "Your next scheduled session.", href: "/student/sessions" });
   if (p.weakArea) {
@@ -138,7 +160,7 @@ export async function getMenteeSummaries(studentIds: string[]): Promise<Map<stri
   if (studentIds.length === 0) return map;
   const supabase = await createClient();
   const [rows, scores] = await Promise.all([
-    supabase.from("student_progress").select("*").in("student_id", studentIds),
+    supabase.from("student_progress").select(`student_id, ${PROGRESS_SUMMARY_COLUMNS}`).in("student_id", studentIds),
     supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at").in("student_id", studentIds),
   ]);
   const byStudent = new Map<string, ScorePoint[]>();
@@ -216,7 +238,7 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
   const supabase = await createClient();
   const [batches, rows, scores, students, open] = await Promise.all([
     supabase.from("batches").select("id, name").eq("academy_id", academyId).eq("status", "active").order("name"),
-    supabase.from("student_progress").select("*").eq("academy_id", academyId),
+    supabase.from("student_progress").select(`student_id, batch_id, practice_done, ${PROGRESS_SUMMARY_COLUMNS}`).eq("academy_id", academyId),
     supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at, batch_id"),
     supabase.from("academy_students").select("id, full_name, email, batch_id, batch_name").eq("academy_id", academyId),
     supabase.from("assessments").select("batch_id").eq("academy_id", academyId).eq("status", "published"),

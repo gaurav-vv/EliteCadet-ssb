@@ -28,8 +28,19 @@ async function emailLink(to: string): Promise<string> {
   throw new Error(`no email with a verify link arrived for ${to}`);
 }
 
+// The auth forms are server-rendered and then hydrated by React. A click before hydration finishes is a
+// native form submit that just reloads the page, so wait until React has attached to the form (a real
+// readiness condition, not a sleep) before typing and submitting.
+async function formHydrated(page: Page) {
+  await page.waitForFunction(() => {
+    const form = document.querySelector("form");
+    return Boolean(form && Object.keys(form).some((key) => key.startsWith("__reactProps$")));
+  });
+}
+
 async function signUp(page: Page, email: string, opts: { academy?: string } = {}) {
   await page.goto("/signup");
+  await formHydrated(page);
   if (opts.academy) await page.getByRole("button", { name: /i run an academy/i }).click();
   await page.getByLabel("Full name").fill("E2E Cadet");
   if (opts.academy) await page.getByLabel("Academy name").fill(opts.academy);
@@ -40,6 +51,7 @@ async function signUp(page: Page, email: string, opts: { academy?: string } = {}
 
 async function logIn(page: Page, email: string, password: string) {
   await page.goto("/login");
+  await formHydrated(page);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /^log in$/i }).click();
@@ -53,7 +65,7 @@ test.describe("auth flows on a local Supabase stack", () => {
   test("student: signup → onboarding, role boundary, logout/login", async ({ page, browser }) => {
     const email = uniqueEmail("student");
     await signUp(page, email);
-    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
     await expectHealthyPage(page);
 
     await page.goto("/academy");
@@ -61,22 +73,32 @@ test.describe("auth flows on a local Supabase stack", () => {
 
     const fresh = await browser.newPage();
     await logIn(fresh, email, PASSWORD);
-    await expect(fresh).toHaveURL(/\/student$/);
+    await expect(fresh).toHaveURL(/\/student$/, { timeout: 20_000 });
     await expectHealthyPage(fresh);
 
     // A next= from another role's workspace never lands on /forbidden.
     const other = await browser.newPage();
     await other.goto("/login?next=%2Fmentor");
+    await formHydrated(other);
     await other.getByLabel("Email").fill(email);
     await other.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await other.getByRole("button", { name: /^log in$/i }).click();
     await expect(other).toHaveURL(/\/student$/);
   });
 
+  test("a signed-in session can't change the password without a reset link", async ({ page }) => {
+    const email = uniqueEmail("nogate");
+    await signUp(page, email);
+    await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
+    await page.goto("/reset-password");
+    await expect(page.getByText(/this link has expired or was already used/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel("New password")).toHaveCount(0);
+  });
+
   test("wrong password shows a clear error", async ({ page }) => {
     const email = uniqueEmail("wrongpw");
     await signUp(page, email);
-    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
     const fresh = await page.context().browser()!.newPage();
     await logIn(fresh, email, "not-the-password");
     await expect(fresh.getByText("Incorrect email or password.")).toBeVisible();
@@ -84,7 +106,7 @@ test.describe("auth flows on a local Supabase stack", () => {
 
   test("academy admin: signup → academy dashboard", async ({ page }) => {
     await signUp(page, uniqueEmail("admin"), { academy: "E2E Academy" });
-    await expect(page).toHaveURL(/\/academy$/);
+    await expect(page).toHaveURL(/\/academy$/, { timeout: 20_000 });
     await expectHealthyPage(page);
     for (const path of ["/academy/students", "/academy/batches", "/academy/mentors"]) {
       await page.goto(path);
@@ -97,12 +119,13 @@ test.describe("auth flows on a local Supabase stack", () => {
     const email = uniqueEmail("reset");
     const signupPage = await browser.newPage();
     await signUp(signupPage, email);
-    await expect(signupPage).toHaveURL(/\/onboarding$/);
+    await expect(signupPage).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
     await signupPage.close();
 
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/forgot-password");
+    await formHydrated(page);
     await page.getByLabel("Email").fill(email);
     await page.getByRole("button", { name: /send reset link/i }).click();
     await expect(page.getByText(/check your email/i)).toBeVisible();
@@ -114,9 +137,33 @@ test.describe("auth flows on a local Supabase stack", () => {
     // URL can abort while the dev server compiles the next route.
     await page.goto(link, { waitUntil: "commit" });
     await expect(page).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
+
+    // Refreshing the reset page keeps the recovery session: the form is still there, no new link needed.
+    await page.reload();
+    await expect(page.getByLabel("New password")).toBeVisible({ timeout: 20_000 });
+
+    // Validation happens before anything is sent: weak, then mismatched.
+    const save = page.getByRole("button", { name: /save new password/i });
+    await page.getByLabel("New password").fill("short1");
+    await page.getByLabel("Confirm password").fill("short1");
+    await save.click();
+    await expect(page.getByText("Password must be at least 6 characters.")).toBeVisible();
     await page.getByLabel("New password").fill(NEW_PASSWORD);
-    await page.getByRole("button", { name: /save new password/i }).click();
+    await page.getByLabel("Confirm password").fill(`${NEW_PASSWORD}-different`);
+    await save.click();
+    await expect(page.getByText("The passwords don't match.")).toBeVisible();
+    await expect(page).toHaveURL(/\/reset-password$/);
+
+    // Show / hide.
+    await expect(page.getByLabel("New password")).toHaveAttribute("type", "password");
+    await page.getByRole("button", { name: /show password/i }).first().click();
+    await expect(page.getByLabel("New password")).toHaveAttribute("type", "text");
+
+    await page.getByLabel("Confirm password").fill(NEW_PASSWORD);
+    await save.click();
     await expect(page).toHaveURL(/\/login\?reason=password_updated$/);
+    // The success message appears as a popup (and as a notice above the form) on the login page.
+    await expect(page.getByRole("status").filter({ hasText: "Your password has been updated successfully." })).toBeVisible();
 
     await logIn(page, email, NEW_PASSWORD);
     await expect(page).toHaveURL(/\/student$/, { timeout: 20_000 });
@@ -135,16 +182,16 @@ test.describe("auth flows on a local Supabase stack", () => {
 
     const mentorEmail = uniqueEmail("mentor");
     await admin.goto("/academy/mentors");
-    await admin.getByLabel("Full name").fill("E2E Mentor");
-    await admin.getByLabel("Email").fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByLabel("Full name", { exact: true }).fill("E2E Mentor");
+    await admin.getByLabel("Email", { exact: true }).fill(mentorEmail);
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("status")).toContainText(/invite sent/i);
     await expect(admin.getByText(/not sent to a real inbox/i)).toBeVisible();
 
     // Inviting the same person again before they accept re-sends it (no duplicate account).
-    await admin.getByLabel("Full name").fill("E2E Mentor");
-    await admin.getByLabel("Email").fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByLabel("Full name", { exact: true }).fill("E2E Mentor");
+    await admin.getByLabel("Email", { exact: true }).fill(mentorEmail);
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("status").filter({ hasText: /re-sent/i })).toBeVisible({ timeout: 15_000 });
 
     // Captured by the local Mailpit inbox — proof an email was generated and
@@ -164,9 +211,9 @@ test.describe("auth flows on a local Supabase stack", () => {
     await mentor.goto(link, { waitUntil: "commit" });
     await expect(mentor).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
     await mentor.getByLabel("New password").fill(NEW_PASSWORD);
+    await mentor.getByLabel("Confirm password").fill(NEW_PASSWORD);
     await mentor.getByRole("button", { name: /save new password/i }).click();
-    await expect(mentor).toHaveURL(/\/login\?reason=password_updated$/);
-    await logIn(mentor, mentorEmail, NEW_PASSWORD);
+    // An invited mentor is signed straight in, no separate login step.
     await expect(mentor).toHaveURL(/\/mentor$/, { timeout: 20_000 });
     await expectHealthyPage(mentor);
 
@@ -180,10 +227,44 @@ test.describe("auth flows on a local Supabase stack", () => {
     await expect(again.getByText(/this link has expired or was already used/i)).toBeVisible();
 
     // Inviting them now (an active mentor of this academy) is refused with a clear message.
-    await admin.getByLabel("Full name").fill("E2E Mentor");
-    await admin.getByLabel("Email").fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByLabel("Full name", { exact: true }).fill("E2E Mentor");
+    await admin.getByLabel("Email", { exact: true }).fill(mentorEmail);
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("alert").filter({ hasText: /already a mentor in your academy/i })).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("student invite: academy admin adds a new student by email → email → set password → signed straight in to the student area", async ({ browser }) => {
+    test.setTimeout(90_000);
+    const admin = await (await browser.newContext()).newPage();
+    await signUp(admin, uniqueEmail("inviter"), { academy: `E2E Student Invite Academy ${Date.now()}` });
+    await expect(admin).toHaveURL(/\/academy$/, { timeout: 20_000 });
+
+    const studentEmail = uniqueEmail("student");
+    await admin.goto("/academy/students");
+    await admin.getByRole("button", { name: "Add student" }).first().click();
+    const dialog = admin.getByRole("dialog");
+    await dialog.getByLabel("Email").fill(studentEmail);
+    await dialog.getByLabel(/Full name/).fill("E2E Invited Student");
+    await dialog.getByRole("button", { name: "Add student" }).click();
+    await expect(admin.getByRole("status").filter({ hasText: /invite/i })).toBeVisible({ timeout: 15_000 });
+
+    const link = await emailLink(studentEmail);
+    expect(new URL(link).searchParams.get("type")).toBe("invite");
+
+    const student = await (await browser.newContext()).newPage();
+    await student.goto(link, { waitUntil: "commit" });
+    await expect(student).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
+    await student.getByLabel("New password").fill(NEW_PASSWORD);
+    await student.getByLabel("Confirm password").fill(NEW_PASSWORD);
+    await student.getByRole("button", { name: /save new password/i }).click();
+    // An invited student is signed straight in, no separate login step.
+    await expect(student).toHaveURL(/\/student/, { timeout: 20_000 });
+    await expectHealthyPage(student);
+
+    // The password they chose works for a normal login later.
+    const later = await (await browser.newContext()).newPage();
+    await logIn(later, studentEmail, NEW_PASSWORD);
+    await expect(later).toHaveURL(/\/student/, { timeout: 20_000 });
   });
 
   test("independent mentor: super admin invites (no academy) → set password → mentor workspace, academy-only areas empty", async ({ browser }) => {
@@ -208,7 +289,7 @@ test.describe("auth flows on a local Supabase stack", () => {
     await admin.goto("/admin/users");
     await admin.getByRole("textbox", { name: "Full name", exact: true }).fill("E2E Indie Mentor");
     await admin.getByRole("textbox", { name: "Email", exact: true }).fill(mentorEmail);
-    await admin.getByRole("button", { name: /send invite/i }).click();
+    await admin.getByRole("button", { name: "Send invite", exact: true }).click();
     await expect(admin.getByRole("status").filter({ hasText: /invite sent/i })).toBeVisible({ timeout: 15_000 });
 
     const link = await emailLink(mentorEmail);
@@ -216,9 +297,8 @@ test.describe("auth flows on a local Supabase stack", () => {
     await mentor.goto(link, { waitUntil: "commit" });
     await expect(mentor).toHaveURL(/\/reset-password$/, { timeout: 20_000 });
     await mentor.getByLabel("New password").fill(NEW_PASSWORD);
+    await mentor.getByLabel("Confirm password").fill(NEW_PASSWORD);
     await mentor.getByRole("button", { name: /save new password/i }).click();
-    await expect(mentor).toHaveURL(/\/login\?reason=password_updated$/, { timeout: 15_000 });
-    await logIn(mentor, mentorEmail, NEW_PASSWORD);
     await expect(mentor).toHaveURL(/\/mentor$/, { timeout: 20_000 });
     await expect(mentor.getByText(/independent mentor/i)).toBeVisible();
 

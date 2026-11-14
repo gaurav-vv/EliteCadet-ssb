@@ -913,6 +913,24 @@ students don't.
     - A test over a real network/TURN.
     - Applying 0022–0025 to hosted databases.
 
+- **2026-10-25, meeting experience pass:**
+  - Diagnosed `[meetings] create room failed: invalid token`: `LIVEKIT_API_SECRET` in `.env.local`
+    was the dashboard's masked value (32 × "•"), so every server-signed JWT was rejected. Config,
+    not code. The server now treats masked/placeholder/malformed credentials as "not set up" and
+    logs which variable is wrong (names only); 401s are logged as a credential mismatch.
+  - Built: join-screen camera preview, mic level, device pickers and "You'll join as <name>";
+    in-room audio/video/speaker settings; speaker view with pinning (default for one-to-one) next to
+    gallery; full screen; elapsed time and scheduled end on the stage; the host's raise-hand queue
+    in raise order (`hand_at` attribute); "the host muted your microphone" notice.
+  - Tests: `tests/unit/lib/livekit-config.test.ts` (credential checks, token scope: room, identity,
+    sources, no data, TTL), room-logic queue/speaker tests, service grant fields,
+    `tests/integration/meeting-prejoin.test.tsx` (permission denied, camera off, preview stopped).
+    The two-browser e2e (extended for the new UI) passes against a local livekit-server.
+  - [ ] **Owner:** create a new LiveKit Cloud API key and put the real key + secret in `.env.local`
+    (and the host's env), then run the two-browser check (`E2E_LIVEKIT=1`) against LiveKit Cloud.
+  - [ ] Product decision + migration: private post-session notes / interview evaluation for
+    meetings (no existing table fits; `feedback` is per assessment attempt).
+
 ## T106 — Email delivery + independent mentors — P0 — `[-]`
 **Spec:** `specs.md` §8a.1 (mentor types), `docs/email.md`.
 - [x] Diagnosed: local email goes to Mailpit (never real inboxes); Mailpit loses mail on restart;
@@ -929,7 +947,14 @@ students don't.
 - [x] 2026-10-20: re-inviting an address that has another pending role/academy no longer "succeeds"
   silently (`decideInvite`). Pending invites are re-sent; active or mismatched accounts are refused
   with a clear message.
+- [x] 2026-10-25: password reset hardened for real inboxes. A link that fell back to the Site URL
+  (`/?code=…`) is forwarded to `/auth/callback`. Reset/invite sessions (token `amr`) always land on
+  "Set a new password". Console hints for built-in-mailer refusals and SMTP failures (UI stays
+  generic). `docs/email.md`: provider values, dashboard steps, a cross-device Reset template
+  (`token_hash`), and a real-inbox test procedure. Tests: callback, proxy, helper, reset API.
 - [ ] **Owner:** custom SMTP and URL configuration on the hosted Supabase project (`docs/email.md`).
+  The app now uses the hosted project `ibdlhzdrchcggmtnwbyj`; its SMTP settings can't be read
+  without a dashboard login or access token. Real delivery is **not verified**.
   Optional: `[auth.email.smtp]` in `supabase/config.toml` for real mail from the local stack.
   Then send yourself a real invite and a real reset.
 - [ ] Apply 0022–0024 to hosted databases, after approval.
@@ -1093,6 +1118,66 @@ FR-AI-01/02.
 - Production environment with backups, monitoring and SMTP.
 - Privacy policy, terms and consent (students may be under 18).
 - Pilot with one academy.
+
+## T110 — Add Mentor: manual profile + invite by email — P1 — `[-]`
+**Spec:** `specs.md` §8a.3c (academy mentors), `docs/email.md` → Adding mentors. **Depends on:** T106.
+**Requirements:**
+- Academy → Mentors offers two methods: **Invite by email** (existing Supabase Auth invite) and
+  **Add manually** (name, email, optional phone, qualifications, specialization).
+- Manual add sends no email and works without SMTP. The account has no password, so there's no
+  login until the mentor accepts an invite (or a reset link) and chooses their own password.
+- One account per email: duplicates refused (this academy's mentor: "already one of your mentors";
+  any other account: generic refusal).
+- Status per mentor: active · added, not invited · invite pending · invite expired · suspended.
+  Send/Resend and Revoke/Remove for never-activated mentors only. Revoking deletes the
+  never-activated account, so the link stops working.
+- Server-side authorization (active academy admin of that academy); RLS for reads; service role
+  only after that check; every add/invite/resend/revoke audited.
+**Acceptance:** both paths work end to end; duplicate, unauthorized, expiry, reuse and revoke cases
+are refused safely; invite failures are reported, never shown as sent.
+**Progress 2026-10-25:**
+- [x] `0027_mentor_onboarding.sql` (mentor_profiles.qualifications + academy-admin read policy;
+  written as 0026, renumbered 2026-10-25).
+- [x] Service/repository/actions, `AddMentorPanel`, `MentorInviteActions`, list statuses.
+- [x] Tests: `tests/unit/lib/add-mentor.test.ts` (25); e2e `tests/e2e/add-mentor-local.spec.ts`
+  (manual → no login → invite → accept → active; invite → revoke → dead link) against local Supabase.
+- [ ] **Owner:** apply 0027 to the hosted database (after approval); custom SMTP for invites
+  (`docs/email.md`); confirm "Email OTP Expiration" is 3600 s or update `INVITE_LINK_TTL_SECONDS`.
+- [ ] Super admin's independent-mentor invite still has no manual path or revoke (not requested).
+
+## T111 — Student Resources redesign + dashboard news images, dates and sources — P1 — `[-]`
+**Spec:** user request 2026-10-25 (reference: `resources_ref.png`). **Depends on:** news feed work (2026-10-25).
+**Requirements:**
+- `/student/resources` to the reference: banner, category chips, Featured, All Resources (search via
+  header, category filter, sort, Load more), Quick Links, Popular Resources, Resource Categories.
+- Working Quick Link pages: Downloadable PDFs (real files), SSB Preparation Videos (embedded
+  playback), Recommended Reading, Daily Current Affairs (dated official releases).
+- Category pages for all six categories; article pages with breadcrumb, TOC, objectives, examples,
+  exercises, takeaways, related + previous/next. Existing six resource URLs preserved.
+- Dashboard news: per-article images with category fallbacks, publication dates, newest first,
+  more official sources, dedupe, independent source failures, caching.
+**Acceptance:** every link on the Resources pages opens a populated page; PDFs download; videos play;
+news shows real dated items with real images where the source provides one; nothing fabricated.
+**Progress 2026-10-25:**
+- [x] 24 articles + 6 printables + 17 verified videos + reading list (`lib/content/resources/`).
+- [x] Pages: main, `[slug]`, `category/[category]`, `downloads` (+ `downloads/[slug]` PDF route),
+  `videos`, `reading`, `current-affairs`. Header search submits to Resources (students only).
+- [x] News: PIB Ministry of Defence listing source, release photos (PIB image host only),
+  hourly in-memory cache with stale fallback, entity decoding, `#pibReleaseBody` parsing fix.
+- [x] Tests: `tests/unit/lib/resources.test.ts`, `tests/unit/components/resources-pages.test.tsx`,
+  news tests extended; opt-in live check `tests/integration/news-live.test.ts` (`NEWS_LIVE=1`).
+- [ ] Newspaper sources still excluded (licence terms, see Decisions); Army/IAF/NDA sites fail TLS
+  verification (incomplete certificate chain on their servers) — revisit if they fix it.
+- [ ] Reading progress ("Read" badge) is still per-browser localStorage (existing debt).
+- [x] Follow-up 2026-10-25: header simplified (no banner), real Commons photographs with
+  attribution, duplicates/repetition removed (see status.md update log).
+- [x] Follow-up 2026-10-25: full-width category tabs above both columns; thumbnails replaced
+  with people-free object/environment photos (attribution updated).
+- [x] Follow-up 2026-10-25: "Resources" title in the workspace header on /student/resources (no
+  duplicate header search there); in-page search above the tabs; sidebar aligned with the cards;
+  Tejas photo (pilots visible) replaced with binoculars.
+- [ ] Browser check of the 2026-10-25 header/search change against a local stack (not run: only
+  the hosted-DB dev server was available).
 
 # Phase 10 — PRD Phase 2 (P1), after the pilot
 

@@ -69,8 +69,8 @@ test.describe("Option B — Preview Academy live sync", () => {
 
     // ---- PATH 1a — admin invites a FRESH mentor by email ----
     await adminPage.goto("/academy/mentors");
-    await adminPage.getByLabel("Full name").fill(mentorName);
-    await adminPage.getByLabel("Email").fill(mentorEmail);
+    await adminPage.getByLabel("Full name", { exact: true }).fill(mentorName);
+    await adminPage.getByLabel("Email", { exact: true }).fill(mentorEmail);
     await adminPage.getByRole("button", { name: /send invite/i }).click();
     await expect(adminPage.getByText(/invite sent to/i)).toBeVisible({ timeout: 15_000 });
 
@@ -80,14 +80,18 @@ test.describe("Option B — Preview Academy live sync", () => {
     await mentorSetup.goto(inviteLink);
     await expect(mentorSetup).toHaveURL(/\/reset-password$/, { timeout: 15_000 });
     const newPassword = mentorSetup.getByLabel("New password");
+    // Wait for the page to settle (form or expired message) before deciding to reload: a reload while it is
+    // still "Checking your reset link…" throws away the session it is setting up.
+    await expect(newPassword.or(mentorSetup.getByRole("heading", { name: /link has expired/i }))).toBeVisible({ timeout: 20_000 });
     for (let attempt = 0; attempt < 5 && (await newPassword.count()) === 0; attempt++) {
       await mentorSetup.goto("/reset-password", { waitUntil: "domcontentloaded" });
       await mentorSetup.waitForTimeout(1500);
     }
     await expect(newPassword).toBeVisible({ timeout: 15_000 });
     await newPassword.fill(MENTOR_PASSWORD);
+    await mentorSetup.getByLabel("Confirm password").fill(MENTOR_PASSWORD);
     await mentorSetup.getByRole("button", { name: /save new password/i }).click();
-    await expect(mentorSetup).toHaveURL(/\/login\?reason=password_updated$/, { timeout: 15_000 });
+    await expect(mentorSetup).toHaveURL(/\/mentor$/, { timeout: 20_000 });
     results.push("PATH 1 (invite) PASS: admin invited a fresh mentor; mentor accepted the email and set a password.");
 
     // ---- PATH 1b — admin assigns the mentor to Alpha Batch ----
