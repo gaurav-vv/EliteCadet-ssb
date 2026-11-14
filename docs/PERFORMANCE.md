@@ -49,6 +49,18 @@ server-side sessions (every sign-out is local scope, mentor-invite revocation de
 its profile), so today this only matters for a stolen token or a future "sign out everywhere".
 If that feature is added, check the session with `getUser()` on that path or shorten `jwt_expiry`.
 
+## Links prefetch on intent, not on sight
+
+Workspace pages (`/student`, `/mentor`, `/academy`, `/admin`) are rendered per request, so Next's default
+prefetch of every visible link is a full server render each (proxy profile read, layout reads, page data).
+Measured locally per login, before this rule: 19 to 37 prefetch requests and 28 to 61 database calls.
+
+Use `IntentPrefetchLink` (`components/ui/intent-prefetch-link.tsx`) instead of `next/link` for links to
+workspace pages: it keeps `prefetch={false}` until the pointer, keyboard focus or a touch reaches the link,
+then uses the default. It is the pattern the Next.js docs give for hover prefetching and needs no router.
+Links to static public pages can keep plain `next/link`. The login form does one `router.push` and no
+`router.refresh()`: a refresh re-rendered the dashboard (every query twice) right after the push.
+
 ## Charts load on demand
 
 recharts (about 350 KB) is split out: `components/progress/score-trend-chart-lazy.tsx` and

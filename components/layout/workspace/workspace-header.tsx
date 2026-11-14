@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";

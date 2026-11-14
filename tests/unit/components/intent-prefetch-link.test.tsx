@@ -1,48 +1,56 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
-const prefetch = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch, push: vi.fn() }), usePathname: () => "/student" }));
+// Stand-in for next/link that exposes the `prefetch` prop it received, so the test can see the policy.
+vi.mock("next/link", () => ({
+  default: ({ prefetch, children, href, ...rest }: { prefetch?: boolean | null; children: React.ReactNode; href: string }) => (
+    <a href={href} data-prefetch={prefetch === false ? "off" : prefetch === null ? "default" : String(prefetch)} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+vi.mock("next/navigation", () => ({ usePathname: () => "/student" }));
 
 import { WorkspaceNavigation } from "@/components/layout/workspace/workspace-navigation";
 import { IntentPrefetchLink } from "@/components/ui/intent-prefetch-link";
 
-beforeEach(() => prefetch.mockReset());
-
 describe("IntentPrefetchLink", () => {
   it("does not prefetch just because it is on screen", () => {
     render(<IntentPrefetchLink href="/student/practice">Practice</IntentPrefetchLink>);
-    expect(screen.getByRole("link", { name: "Practice" })).toHaveAttribute("href", "/student/practice");
-    expect(prefetch).not.toHaveBeenCalled();
+    const link = screen.getByRole("link", { name: "Practice" });
+    expect(link).toHaveAttribute("href", "/student/practice");
+    expect(link).toHaveAttribute("data-prefetch", "off");
   });
 
   it.each([
     ["pointer over it", (el: HTMLElement) => fireEvent.mouseEnter(el)],
     ["keyboard focus", (el: HTMLElement) => fireEvent.focus(el)],
     ["a touch", (el: HTMLElement) => fireEvent.touchStart(el)],
-  ])("prefetches on %s, once", (_name, act) => {
+  ])("switches to normal prefetching on %s", (_name, act) => {
     render(<IntentPrefetchLink href="/student/practice">Practice</IntentPrefetchLink>);
     const link = screen.getByRole("link", { name: "Practice" });
+    expect(link).toHaveAttribute("data-prefetch", "off");
     act(link);
-    act(link);
-    fireEvent.mouseEnter(link);
-    expect(prefetch).toHaveBeenCalledTimes(1);
-    expect(prefetch).toHaveBeenCalledWith("/student/practice");
+    expect(link).toHaveAttribute("data-prefetch", "default");
   });
 
-  it("still runs the caller's own handlers", () => {
+  it("still runs the caller's own handlers and keeps the other props", () => {
     const onMouseEnter = vi.fn();
     const onFocus = vi.fn();
+    const onClick = vi.fn();
     render(
-      <IntentPrefetchLink href="/x" onMouseEnter={onMouseEnter} onFocus={onFocus}>
+      <IntentPrefetchLink href="/x" onMouseEnter={onMouseEnter} onFocus={onFocus} onClick={onClick} className="c" aria-label="Go X">
         X
       </IntentPrefetchLink>,
     );
-    const link = screen.getByRole("link", { name: "X" });
+    const link = screen.getByRole("link", { name: "Go X" });
     fireEvent.mouseEnter(link);
     fireEvent.focus(link);
+    fireEvent.click(link);
     expect(onMouseEnter).toHaveBeenCalledTimes(1);
     expect(onFocus).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(link).toHaveClass("c");
   });
 });
 
@@ -56,18 +64,19 @@ describe("WorkspaceNavigation", () => {
 
   it("renders every available item as a link, marks the current one, and prefetches none on render", () => {
     render(<WorkspaceNavigation items={items} label="Student" />);
-    const nav = screen.getByRole("navigation", { name: "Student" });
-    expect(nav).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Student" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Practice" })).not.toHaveAttribute("aria-current");
-    expect(prefetch).not.toHaveBeenCalled();
+    for (const name of ["Dashboard", "Practice", "Progress"]) {
+      expect(screen.getByRole("link", { name })).toHaveAttribute("data-prefetch", "off");
+    }
   });
 
   it("prefetches only the item the person points at", () => {
     render(<WorkspaceNavigation items={items} label="Student" />);
     fireEvent.mouseEnter(screen.getByRole("link", { name: "Progress" }));
-    expect(prefetch).toHaveBeenCalledTimes(1);
-    expect(prefetch).toHaveBeenCalledWith("/student/progress");
+    expect(screen.getByRole("link", { name: "Progress" })).toHaveAttribute("data-prefetch", "default");
+    expect(screen.getByRole("link", { name: "Practice" })).toHaveAttribute("data-prefetch", "off");
   });
 
   it("keeps a 'soon' item as a disabled, non-navigating entry", () => {
