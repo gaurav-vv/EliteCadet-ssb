@@ -21,6 +21,7 @@
     "perf:supabase": "node tests/performance/run.mjs --scenario supabase-latency",
     "perf:browser": "playwright test -c tests/performance/browser/playwright.perf.config.ts",
     "perf:seed-local": "node --no-deprecation tests/performance/scripts/seed-local.mjs",
+    "perf:seed-dashboards": "node --no-deprecation tests/performance/scripts/seed-dashboard-load.mjs",
     "perf:serve-local": "node --no-deprecation tests/performance/scripts/start-local-app.mjs",
     "perf:security": "node --no-deprecation tests/performance/scripts/verify-session-security.mjs"
   },
