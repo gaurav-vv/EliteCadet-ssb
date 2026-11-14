@@ -53,7 +53,7 @@ describe("validateNewPasswordForm", () => {
   });
 
   it("rejects a weak (too short) password", () => {
-    expect(validateNewPasswordForm({ password: "short", confirm: "short" })).toEqual({ password: "Password must be at least 8 characters." });
+    expect(validateNewPasswordForm({ password: "short", confirm: "short" })).toEqual({ password: "Password must be at least 6 characters." });
   });
 
   it("rejects a mismatch, and is case sensitive", () => {

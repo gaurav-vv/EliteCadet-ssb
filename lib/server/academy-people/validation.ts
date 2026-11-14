@@ -3,6 +3,7 @@
 
 import { isUuid } from "@/lib/server/users/validation";
 import type { AcademyStudentListParams, StudentSortOption, StudentStatusFilter } from "@/types/academy-people";
+import { isValidEmail } from "@/lib/utils/email";
 
 export const STUDENT_PAGE_SIZE = 20;
 
@@ -47,7 +48,6 @@ export function hasActiveStudentFilters(params: AcademyStudentListParams): boole
   return params.q !== "" || params.batch !== "all" || params.status !== "all";
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type PersonInviteCheck = { ok: true; email: string; fullName: string } | { ok: false; field: "email" | "fullName"; message: string };
 
@@ -55,7 +55,7 @@ export type PersonInviteCheck = { ok: true; email: string; fullName: string } | 
 export function checkPersonInput(input: { email?: unknown; fullName?: unknown }, needName: boolean): PersonInviteCheck {
   const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
   const fullName = typeof input.fullName === "string" ? input.fullName.trim().replace(/\s+/g, " ") : "";
-  if (!EMAIL_RE.test(email) || email.length > 254) return { ok: false, field: "email", message: "Enter a valid email address." };
+  if (!isValidEmail(email) || email.length > 254) return { ok: false, field: "email", message: "Enter a valid email address." };
   if (needName && (fullName.length < 2 || fullName.length > 80)) return { ok: false, field: "fullName", message: "Enter their full name (2–80 characters)." };
   return { ok: true, email, fullName };
 }

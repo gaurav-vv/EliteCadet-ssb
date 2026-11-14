@@ -322,6 +322,7 @@ Not required to validate the MVP. Pricing page shows information and CTAs only.
 | 2026-10-25 | Resources category tags use soft per-category tints (the text label is always present), as in resources_ref.png | User asked to reproduce the reference closely; status/category is never colour-only. Deviation from AGENTS.md §7.1 limited to these tags |
 | 2026-10-25 | ~~Resource covers are illustrations (SVG)~~ — superseded the same day: each article has its own real photograph from Wikimedia Commons (public domain, CC0, CC BY-SA or GODL-India) showing objects or environments only — no people, faces, hands or human figures (user request, 2026-10-25), stored in public/images/resources/ with attribution in lib/content/resources/photos.ts, shown on the article page and in "Photo credits" on /student/resources. "Popular Resources" stays an editor's-picks list | User asked for genuine photographs instead of illustrations. Commons gives machine-verifiable licence and author data; Unsplash was unreachable from this network and Pexels blocks automated access. No readership data, so no popularity claims |
 | 2026-10-25 | One appearance per resource per screen: Featured is excluded from the list below it, Popular picks never overlap Featured, Related skips previous/next, official-link blocks are not repeated across articles | User asked to remove duplicated entries and repeated information while keeping one canonical record and URL per resource |
+| 2026-11-14 | Students may publish mic + camera in every meeting; End meeting succeeds once the DB ends it, clients leave via a 10 s state check | Owner wants interactive batch sessions; End must not depend on the video service confirming the room delete |
 
 ---
 
@@ -726,6 +727,122 @@ Blocker:
 Next task:
 - T094 two-browser verification once credentials are fixed
 
+Date: 2026-11-14 (later)
+Task: Platform check-up + mentor profile to Postgres + workspace loading states
+Status: VERIFIED by unit tests, an RLS check on the local DB, typecheck, lint, build
+        (612 tests). Not click-tested in a browser.
+
+Checked (read-only, against the project in .env.local = the HOSTED Supabase project):
+- Hosted DB has the 0022–0025 meeting tables (live_meeting_messages/attendance/removals).
+- LiveKit Cloud credentials in .env.local are real now and authenticate (listRooms OK).
+- Hosted Auth: mailer_autoconfirm=true. Hosted SMTP settings could NOT be read from here
+  (no Supabase access token), so real invite/reset delivery from hosted is UNVERIFIED.
+- AI: no ANTHROPIC_API_KEY anywhere and the worker isn't deployed, so AI feedback/interview
+  are not live (T101–T105 waiting on the owner).
+
+What changed:
+- Mentor profile: bio + expertise now save to mentor_profiles (0005) via
+  lib/server/mentor/profile.ts + lib/actions/mentor.ts, not localStorage. Removed the invented
+  default bio/specialization (AGENTS.md §2.5). lib/mentor/profile-storage.ts deleted.
+  RLS verified on local DB: a mentor updates their own row, 0 rows for another mentor.
+- app/student/loading.tsx, app/mentor/loading.tsx: skeleton on navigation (student had none).
+
+What remains:
+- Owner: confirm hosted Auth → SMTP settings + URL configuration + templates (docs/email.md),
+  then send one real invite and one reset.
+- Owner: Anthropic key + worker deploy (T101).
+- Two-browser live meeting test against LiveKit Cloud (tests/e2e/live-meeting-local.spec.ts).
+- Academy "Activities" nav item is still a "Soon" placeholder with no spec.
+```
+
+```text
+Date: 2026-11-14
+Task: Email templates + meeting start diagnosis
+Status: Templates VERIFIED locally (reset + invite e2e); meetings BLOCKED on LiveKit secret
+
+What changed:
+- Branded invite/recovery/confirmation templates (supabase/templates), wired in config.toml.
+- Mentor "can't start meeting": every LiveKit call fails "invalid token" because
+  LIVEKIT_API_SECRET in .env.local is a masked "•••" value. missingLiveKitConfig now treats a
+  masked/quoted value as unset, so the room says "Video meetings aren't set up" (test added).
+
+What remains:
+- Owner: real LiveKit secret in .env.local and in Vercel.
+- Phone use = the Vercel deployment (https). Hosted Supabase is at 0004: needs 0005–0025,
+  Auth SMTP + URL config + templates, Vercel env vars (see chat checklist).
+```
+
+```text
+Date: 2026-11-14
+Task: T106 email — links work from other devices; reset + invite verified end to end
+Status: VERIFIED locally (browser test over the Wi-Fi address, real Gmail delivery)
+
+What changed:
+- Bug: app/auth/callback redirected to request.url's origin, which `next dev` reports as
+  localhost. Opening a reset/invite link at another address (phone on Wi-Fi) landed on
+  localhost → "site can't be reached" / "link expired". Now uses the Host header. Test added.
+- supabase/config.toml: site_url, auth external_url and one redirect pattern come from
+  supabase/.env (AUTH_SITE_URL / AUTH_EXTERNAL_URL / AUTH_REDIRECT_PATTERN; localhost defaults).
+- next.config.ts: allowedDevOrigins = the LAN host in NEXT_PUBLIC_SUPABASE_URL (dev only).
+- .env.local was missing SUPABASE_SERVICE_ROLE_KEY, so every invite failed ("Invites need the
+  server's SUPABASE_SERVICE_ROLE_KEY"); set to the local stack's key.
+- Verified (Playwright, http://<wifi-ip>:3000): reset → new password works, old refused;
+  academy admin invites mentor → link → set password → /mentor.
+
+What remains:
+- Other people's devices off this Wi-Fi need the hosted project + its SMTP settings.
+```
+
+```text
+Date: 2026-11-14
+Task: T106 email — real delivery from the local stack via Gmail SMTP (owner request)
+Status: PARTIAL — wiring done; real send UNVERIFIED until the owner adds a Gmail app password
+
+What changed:
+- supabase/config.toml [auth.email.smtp] reads SMTP_ENABLED/HOST/USER/PASS from supabase/.env
+  (gitignored); supabase/.env.example committed, defaults to Mailpit (SMTP_ENABLED=false).
+- NEXT_PUBLIC_LOCAL_EMAIL_DELIVERY=true hides the "sent to Mailpit" note (lib/supabase/env.ts).
+- docs/email.md: Gmail walkthrough, limits, rollback.
+
+What remains:
+- Owner fills supabase/.env, restarts the stack, sends a reset to a real inbox.
+- Email links point at 127.0.0.1/localhost, so they only work on the machine running the stack.
+
+Blocker:
+- Teammates must copy supabase/.env.example to supabase/.env, or `supabase start` refuses the
+  config ("env(SMTP_ENABLED)" is not true or false).
+```
+
+```text
+Date: 2026-11-14
+Task: T094 meetings — student media + End meeting fixes (owner request)
+Status: UNVERIFIED against real LiveKit (local .env.local secret is a masked placeholder);
+        typecheck, lint, all unit tests pass
+
+What changed:
+- Students can use their own mic and camera in every meeting (batch too). Batch students join
+  muted with camera on; the lobby shows camera/mic toggles to everyone. Hosts keep mute / turn
+  off mic+camera / give back / remove. (lib/server/meetings/livekit.ts sourcesFor, meeting-room,
+  room-stage, toolbar, side panel; specs.md updated.)
+- End meeting: success once the database marks the meeting completed; deleting the LiveKit
+  room is still tried 3x but a failure no longer traps the host in "Try again". Every client in
+  the room polls the server every 10 s and leaves when the meeting is ended/cancelled.
+- Found: LIVEKIT_API_SECRET in .env.local is 32 "•" characters (copied masked from the
+  dashboard). Every server→LiveKit call returns 401 "invalid token" and joins can't work with it.
+- Tests: new tests/unit/lib/livekit-grants.test.ts; end-meeting unit test and e2e expectation
+  updated.
+
+What remains:
+- Owner: paste the real LiveKit API secret into .env.local, restart, re-run
+  tests/e2e/live-meeting-local.spec.ts with two browsers.
+- A student whose mic/camera the host turned off gets them back by rejoining (the restriction
+  isn't stored). Track if it matters.
+
+Blocker:
+- None in code.
+```
+
+```text
 Date: 2026-10-20 (evening)
 Task: T094 meetings production pass + T106 invite fix
 Status: Meetings verified locally with two real browsers; email local-only (real delivery needs owner SMTP)
@@ -2348,3 +2465,17 @@ Next task:
 
 > **Build the smallest reliable web product that proves students prepare better with structured
 > practice, AI-assisted feedback, mentor guidance and academy visibility.**
+
+Date: 2026-11-14
+Task: Auth email fixes (password reset, invites, login)
+Status: Code VERIFIED (unit + callback tests, tsc, eslint); hosted SMTP/URL/templates PENDING owner setup in the Supabase dashboard
+
+What changed:
+- Decision (owner): no password rules beyond Supabase's 6-character minimum; re-using the current password on reset counts as success (`same_password` no longer an error)
+- Reset page asks for the new password twice (must match)
+- Login, sign-up and reset normalise the email (trim + lower-case)
+- Invite and recovery templates link to `/auth/callback?token_hash=…` so links work on any device/browser (no PKCE same-browser requirement)
+
+What remains:
+- Hosted project: custom SMTP, Site URL = Vercel URL, Redirect URLs, paste templates (docs/email.md)
+- Live meetings: a camera/mic failure right after connecting (device in use by another app/tab, not found, publish refused) no longer replaces the room with "couldn't connect to the video service"; the user stays in and sees a device warning. Only a real `ConnectionError` is fatal. LiveKit Cloud credentials verified valid (server-side `listRooms`). Tests: unit 537 passing

@@ -56,11 +56,50 @@ Automated: `E2E_BASE_URL=http://localhost:3000 E2E_MAILPIT_URL=http://127.0.0.1:
 (add the local `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the environment for
 the independent-mentor test, e.g. `set -a; . ./.env.local; set +a` first).
 
-### Real emails while developing locally (optional)
+### Send real emails with Gmail (no domain needed)
 
-Add a real SMTP provider to `supabase/config.toml` (`[auth.email.smtp]`, see the commented
-example in that file). Use an `env(...)` reference for the password, never the literal value.
-Then restart with `npx supabase stop && npx supabase start`.
+The local stack can deliver invites and reset emails to real inboxes through Gmail's SMTP server.
+You don't need your own domain. Good for testing with a few real people; for production use a
+provider with a verified domain (below).
+
+1. On the Gmail account that will send: turn on **2-Step Verification**, then go to
+   Google Account → Security → **App passwords** and create one. Copy the 16-letter password.
+   (Your normal Gmail password won't work.)
+2. `cp supabase/.env.example supabase/.env` and fill it in:
+   ```text
+   SMTP_ENABLED=true
+   SMTP_HOST=smtp.gmail.com
+   SMTP_USER=your.address@gmail.com
+   SMTP_PASS=the16letterapppassword   (no spaces)
+   ```
+   `supabase/.env` is gitignored. Never put the password in `config.toml` or commit it.
+3. In `.env.local` set `NEXT_PUBLIC_LOCAL_EMAIL_DELIVERY=true` (hides the "sent to Mailpit" note).
+4. Restart: `npx supabase stop && npx supabase start` (your data is kept), then restart
+   `npm run dev`.
+5. Check: `docker inspect supabase_auth_elitecadet-ssb --format '{{range .Config.Env}}{{println .}}{{end}}' | grep GOTRUE_SMTP_HOST`
+   should print `smtp.gmail.com`. Send a password reset to a real address.
+
+Limits and gotchas:
+- Gmail allows about 500 emails a day. Emails come from your Gmail address and can land in spam.
+- Supabase's own limit is `email_sent` per hour in `[auth.rate_limit]` of `config.toml`.
+- **Opening links on a phone (same Wi-Fi):** by default links point at `localhost`, which on a
+  phone means the phone itself ("site can't be reached"). Use this computer's Wi-Fi address
+  (`hostname -I`, first value, e.g. `192.168.1.20`):
+  - `supabase/.env`: `AUTH_SITE_URL=http://192.168.1.20:3000`,
+    `AUTH_EXTERNAL_URL=http://192.168.1.20:54321/auth/v1`,
+    `AUTH_REDIRECT_PATTERN=http://192.168.1.20:3000/**`
+  - `.env.local`: `NEXT_PUBLIC_SUPABASE_URL=http://192.168.1.20:54321`
+  - restart Supabase and `npm run dev`, and open the app at `http://192.168.1.20:3000` on this
+    computer too (not `localhost`), so its session and the phone's use the same address.
+  - The address can change when you reconnect to Wi-Fi; update the four values if it does.
+    Some networks (college/office) block devices from reaching each other; then only the
+    hosted project works for other devices.
+- To go back to Mailpit: `SMTP_ENABLED=false`, `NEXT_PUBLIC_LOCAL_EMAIL_DELIVERY=false`, restart.
+- `npx supabase start` fails with *"env(SMTP_ENABLED)" is not true or false* if `supabase/.env`
+  is missing: copy `supabase/.env.example` (it defaults to Mailpit).
+
+The same Gmail settings (host `smtp.gmail.com`, port `587`, your address, the app password) also
+work in the hosted project's **SMTP Settings** below.
 
 ## Hosted Supabase (staging / production): custom SMTP is required
 
@@ -287,3 +326,19 @@ The server logs only the error code and HTTP status, never the address or a toke
     accounts.
 - **Links:** single use; expire after 1 hour (`otp_expiry` / Supabase default). A used, expired
   or tampered link fails safely.
+
+## Email templates (branded, fewer spam flags)
+
+`supabase/templates/{invite,recovery,confirmation}.html` are used by the local stack
+(`config.toml` → `[auth.email.template.*]`). For the hosted project, paste each into
+**Authentication → Emails → Templates** with the same subject:
+
+| Template | Subject | File |
+|---|---|---|
+| Invite user | You're invited to EliteCadet | `supabase/templates/invite.html` |
+| Reset password | Reset your EliteCadet password | `supabase/templates/recovery.html` |
+| Confirm signup | Confirm your EliteCadet email | `supabase/templates/confirmation.html` |
+
+Inbox placement with Gmail SMTP is never guaranteed. What helps most: https links on a real
+host (the Vercel deployment, never a bare IP), these templates, and marking the first email
+"Not spam". The reliable fix is a domain with SPF/DKIM/DMARC and a provider (Brevo, Resend).

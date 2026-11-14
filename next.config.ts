@@ -1,4 +1,3 @@
-
 import type { NextConfig } from "next";
 
 // Static brand/landing images. Not `immutable`: the academy can replace a file
@@ -8,6 +7,10 @@ const STATIC_ASSET_CACHE = "public, max-age=86400, stale-while-revalidate=604800
 
 const nextConfig: NextConfig = {
   agentRules: false,
+  // `next dev` only: lets a phone on the same Wi-Fi open the app at this
+  // computer's address (the host in NEXT_PUBLIC_SUPABASE_URL when that isn't
+  // localhost), e.g. from a local invite or password-reset email.
+  allowedDevOrigins: lanDevHosts(),
   poweredByHeader: false,
   images: {
     // Remote images used by PIB news articles and curated YouTube thumbnails.
@@ -43,5 +46,14 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
+function lanDevHosts(): string[] {
+  try {
+    const host = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname;
+    return host && host !== "localhost" && host !== "127.0.0.1" && !host.endsWith(".supabase.co") ? [host] : [];
+  } catch {
+    return [];
+  }
+}
 
 export default nextConfig;

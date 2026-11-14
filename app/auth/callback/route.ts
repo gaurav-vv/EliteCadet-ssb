@@ -4,7 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import { isPasswordSetupSession, safeNextPath } from "@/lib/auth/redirect";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  // The address the browser used (Host header), not request.url's: `next dev`
+  // reports its own bind address (localhost) there, which sent a phone opening
+  // an email link at this computer's Wi-Fi address to its own "localhost",
+  // away from the session cookie just set. A browser always sends the real
+  // Host of the link it opened, so a link can't point this elsewhere; `next`
+  // stays a safe relative path (below).
+  const url = new URL(request.url);
+  const { searchParams } = url;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? url.host;
+  const proto = request.headers.get("x-forwarded-proto") ?? url.protocol.replace(/:$/, "");
+  const origin = `${proto}://${host}`;
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;

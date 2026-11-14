@@ -1120,8 +1120,11 @@ WebRTC, LiveKit Cloud, India region), instead of a pasted meeting link.
   - Chat and reactions are authorized and broadcast by the server; clients can't publish data.
   - The mentor is the host and can mute or remove a participant. A removed student can't rejoin.
   - Students join muted.
-  - In batch meetings, students join listen-only. The mentor lets an individual student speak or
-    share video, and can take it back.
+  - Every student can use their own microphone and camera, in batch and one-to-one meetings
+    (decided 2026-11-14, replaces "batch students join listen-only"). In a batch, students join
+    muted. The host can mute a student, turn off their mic/camera, give it back, or remove them.
+  - **End meeting** ends it for everyone: once the database marks it completed, each client also
+    checks the server every ~10 s and leaves, even if the video service didn't close the room.
 - **Attendance (decided 2026-10-20, replaces "joining counts as present"):**
   - Present means eligible connected time is at least **75% of the scheduled duration**.
     - Eligible time is the union of the student's visits inside the scheduled window, taken from

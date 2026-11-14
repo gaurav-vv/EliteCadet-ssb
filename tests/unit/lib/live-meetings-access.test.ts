@@ -157,7 +157,7 @@ describe("hosts", () => {
     vi.mocked(getActor).mockResolvedValue(actor("academy_admin"));
     db.queue.push({ data: live, error: null }, { data: { student_id: STUDENT }, error: null });
     expect((await meetings.moderateParticipant(MEETING, STUDENT, "allow_audio")).ok).toBe(true);
-    expect(livekit.setPublishLevel).toHaveBeenCalledWith(expect.anything(), MEETING, STUDENT, "batch", "audio");
+    expect(livekit.setPublishLevel).toHaveBeenCalledWith(expect.anything(), MEETING, STUDENT, "audio");
 
     db.queue.push({ data: live, error: null }, { data: null, error: null });
     expect((await meetings.moderateParticipant(MEETING, OTHER_MENTOR, "remove")).error?.code).toBe("not_found");
@@ -259,14 +259,14 @@ describe("ending a meeting", () => {
     expect((await meetings.endMeeting(MEETING)).error?.message).toMatch(/hasn't started/);
   });
 
-  it("reports failure — never success — when the video room can't be closed, and a retry succeeds", async () => {
+  it("ends the meeting even when the video room can't be closed (clients leave on their state check), and retrying is safe", async () => {
     vi.mocked(getActor).mockResolvedValue(actor("mentor", MENTOR));
     db.rpc.mockResolvedValue({ data: true, error: null });
     vi.mocked(livekit.closeRoom).mockRejectedValue(new Error("connect ECONNREFUSED"));
     db.queue.push({ data: live(), error: null });
-    const failed = await meetings.endMeeting(MEETING);
-    expect(failed.ok).toBe(false);
-    expect(failed.error?.message).toBe(meetings.ROOM_CLOSE_FAILED);
+    const result = await meetings.endMeeting(MEETING);
+    expect(result.ok).toBe(true);
+    expect(db.rpc).toHaveBeenCalledWith("end_live_meeting", { p_session: MEETING });
     expect(livekit.closeRoom).toHaveBeenCalledTimes(3);
 
     // Retrying is safe: the database step is idempotent (already completed).

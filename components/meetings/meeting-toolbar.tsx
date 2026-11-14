@@ -103,7 +103,7 @@ export function MeetingToolbar(props: MeetingToolbarProps) {
           pressed={!micOn}
           onClick={props.onMic}
           disabled={!canMic}
-          disabledReason="You're listening. The host can let you speak — raise your hand to ask."
+          disabledReason="The host turned off your microphone. Raise your hand to ask to speak."
         />
         <ToolButton
           label={camOn ? "Stop video" : "Start video"}
@@ -111,7 +111,7 @@ export function MeetingToolbar(props: MeetingToolbarProps) {
           pressed={camOn}
           onClick={props.onCamera}
           disabled={!canCamera}
-          disabledReason="The host hasn't allowed your camera in this batch meeting."
+          disabledReason="The host turned off your camera for this meeting."
         />
         <ToolButton
           label={sharing ? "Stop sharing" : "Share screen"}

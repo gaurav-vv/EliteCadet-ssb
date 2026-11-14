@@ -2,6 +2,7 @@
 // Mirrors the CHECK constraints in supabase/migrations/0016_demo_requests.sql.
 
 import type { DemoInterest, DemoRequestInput } from "@/types/demo-requests";
+import { isValidEmail } from "@/lib/utils/email";
 
 export type DemoFieldErrors = Partial<Record<keyof DemoRequestInput, string>>;
 
@@ -15,7 +16,6 @@ export interface CleanDemoRequest {
 }
 
 const INTERESTS: DemoInterest[] = ["student", "mentor", "academy"];
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -35,7 +35,7 @@ export function validateDemoRequest(
   const errors: DemoFieldErrors = {};
 
   if (fullName.length < 2 || fullName.length > 80) errors.fullName = "Enter your name (2–80 characters).";
-  if (!EMAIL_RE.test(email) || email.length > 254) errors.email = "Enter a valid email address.";
+  if (!isValidEmail(email) || email.length > 254) errors.email = "Enter a valid email address.";
   if (phone && !PHONE_RE.test(phone)) errors.phone = "Enter a valid phone number, or leave it empty.";
   if (!isDemoInterest(input.interest)) errors.interest = "Choose what you're interested in.";
   if (organisation.length > 120) errors.organisation = "Keep this under 120 characters.";

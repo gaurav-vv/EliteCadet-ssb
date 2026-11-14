@@ -45,7 +45,7 @@ describe("SignupForm: required fields and field-specific errors", () => {
     render(<SignupForm />);
     expect(screen.getByText(/fields marked \* are required/i)).toBeInTheDocument();
     for (const field of [/full name/i, /^email/i, /^password/i]) expect(screen.getByLabelText(field)).toBeRequired();
-    expect(screen.getByText("At least 8 characters.")).toBeInTheDocument();
+    expect(screen.getByText("At least 6 characters.")).toBeInTheDocument();
   });
 
   it("rejects an invalid email and a short password, and keeps everything typed", async () => {
@@ -54,7 +54,7 @@ describe("SignupForm: required fields and field-specific errors", () => {
     await fillSignup(user, { email: "not-an-email", password: "short" });
     await create(user);
     expect(await screen.findByText("Enter a valid email address.")).toBeInTheDocument();
-    expect(screen.getByText("Password must be at least 8 characters.")).toBeInTheDocument();
+    expect(screen.getByText("Password must be at least 6 characters.")).toBeInTheDocument();
     expect(screen.getByLabelText(/full name/i)).toHaveValue("New Cadet");
     expect(screen.getByLabelText(/^email/i)).toHaveValue("not-an-email");
     expect(signUp).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe("SignupForm: failures", () => {
     render(<SignupForm />);
     await fillSignup(user);
     await create(user);
-    expect(await screen.findByText(/Choose a stronger password\. Use at least 8 characters/)).toBeInTheDocument();
+    expect(await screen.findByText(/Choose a stronger password\. Use at least 6 characters/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^password/i)).toHaveAttribute("aria-invalid", "true");
   });
 

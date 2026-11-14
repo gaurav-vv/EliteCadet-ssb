@@ -17,7 +17,7 @@ type SignupRole = Extract<Role, "student" | "academy_admin">;
 type FieldName = "fullName" | "academyName" | "email" | "password";
 
 export const SIGNUP_SUCCESS_MESSAGE = "Your account has been created successfully!";
-export const PASSWORD_HINT = "At least 8 characters.";
+export const PASSWORD_HINT = "At least 6 characters.";
 
 // Order the fields appear in, so the first invalid one gets the focus.
 const FIELD_ORDER: FieldName[] = ["fullName", "academyName", "email", "password"];
@@ -81,7 +81,7 @@ export function SignupForm({ initialRole = "student" }: { initialRole?: SignupRo
           setFieldErrors({ email: message });
           focusFirst({ email: message });
         } else if (code === "weak_password") {
-          const weak = `${message} Use at least 8 characters, and avoid common passwords.`;
+          const weak = `${message} Use at least 6 characters, and avoid common passwords.`;
           setFieldErrors({ password: weak });
           focusFirst({ password: weak });
         } else {

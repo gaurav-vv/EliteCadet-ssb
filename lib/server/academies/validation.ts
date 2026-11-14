@@ -1,6 +1,7 @@
 // Academy input parsing — pure (tests/unit/lib/academies-validation.test.ts).
 
 import type { AcademyInput, AcademyListParams, AcademySort, AcademyStatus, AcademyStatusFilter, MemberRole } from "@/types/academies";
+import { isValidEmail } from "@/lib/utils/email";
 
 export const ACADEMY_PAGE_SIZE = 20;
 
@@ -57,7 +58,6 @@ export interface CleanAcademyInput {
   contact_phone: string | null;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;
 
 function str(value: unknown): string {
@@ -86,7 +86,7 @@ export function validateAcademyInput(input: Partial<Record<keyof AcademyInput, u
     }
     if (!valid || logoUrl.length > 500) errors.logoUrl = "Use an https:// image link.";
   }
-  if (contactEmail && (!EMAIL_RE.test(contactEmail) || contactEmail.length > 254)) errors.contactEmail = "Enter a valid email.";
+  if (contactEmail && (!isValidEmail(contactEmail) || contactEmail.length > 254)) errors.contactEmail = "Enter a valid email.";
   if (contactPhone && !PHONE_RE.test(contactPhone)) errors.contactPhone = "Enter a valid phone number.";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };

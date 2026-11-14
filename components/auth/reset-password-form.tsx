@@ -72,7 +72,7 @@ export function ResetPasswordForm() {
         }
         setStatus("error");
         if (code === "weak_password" || code === "same_password" || code === "validation_error") {
-          setFieldErrors({ password: code === "weak_password" ? `${message} Use at least 8 characters, and avoid common passwords.` : message });
+          setFieldErrors({ password: code === "weak_password" ? `${message} Use at least 6 characters, and avoid common passwords.` : message });
           document.getElementById("password")?.focus();
         } else {
           setErrorMessage(message);
@@ -156,7 +156,7 @@ export function ResetPasswordForm() {
             disabled={loading}
           />
           <p id="password-hint" className="text-[12px] text-ink-secondary">
-            At least 8 characters.
+            At least 6 characters.
           </p>
           {fieldErrors.password && (
             <p id="password-error" role="alert" className="text-[12px] text-danger">

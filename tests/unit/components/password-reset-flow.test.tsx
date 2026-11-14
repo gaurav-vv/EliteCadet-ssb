@@ -168,7 +168,7 @@ describe("Reset password: the form", () => {
     await ready();
     expect(screen.getByLabelText(/new password/i)).toBeRequired();
     expect(screen.getByLabelText(/confirm password/i)).toBeRequired();
-    expect(screen.getByText("At least 8 characters.")).toBeInTheDocument();
+    expect(screen.getByText("At least 6 characters.")).toBeInTheDocument();
   });
 
   it("flags empty fields next to each field, focuses the first, and sends nothing", async () => {
@@ -184,7 +184,7 @@ describe("Reset password: the form", () => {
     const user = await ready();
     await fill(user, "short", "short");
     await save(user);
-    expect(await screen.findByText("Password must be at least 8 characters.")).toBeInTheDocument();
+    expect(await screen.findByText("Password must be at least 6 characters.")).toBeInTheDocument();
     expect(screen.getByLabelText(/new password/i)).toHaveValue("short");
     expect(update).not.toHaveBeenCalled();
   });
@@ -204,7 +204,7 @@ describe("Reset password: the form", () => {
     const user = await ready();
     await fill(user, "password1234", "password1234");
     await save(user);
-    expect(await screen.findByText(/choose a stronger password\. use at least 8 characters/i)).toBeInTheDocument();
+    expect(await screen.findByText(/choose a stronger password\. use at least 6 characters/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/new password/i)).toHaveAttribute("aria-invalid", "true");
     expect(push).not.toHaveBeenCalled();
   });

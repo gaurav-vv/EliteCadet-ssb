@@ -60,10 +60,12 @@ describe("createJoinToken scope", () => {
   const cfg = { url: GOOD.LIVEKIT_URL, apiKey: GOOD.LIVEKIT_API_KEY, apiSecret: GOOD.LIVEKIT_API_SECRET };
   const verify = (jwt: string) => new TokenVerifier(cfg.apiKey, cfg.apiSecret).verify(jwt);
 
-  it("binds a batch student to one room, their own identity, listen-only, no data", async () => {
+  // Decision 2026-11-14 (owner): students may use mic and camera in batch meetings too; the host can revoke.
+  it("binds a batch student to one room and their own identity, with camera and mic but no data", async () => {
     const claims = await verify(await createJoinToken(cfg, { sessionId: SESSION, userId: "student-1", name: "Asha", role: "student", kind: "batch" }));
     expect(claims.sub).toBe("student-1");
-    expect(claims.video).toMatchObject({ room: `session-${SESSION}`, roomJoin: true, canSubscribe: true, canPublish: false, canPublishData: false, canUpdateOwnMetadata: false });
+    expect(claims.video).toMatchObject({ room: `session-${SESSION}`, roomJoin: true, canSubscribe: true, canPublish: true, canPublishData: false, canUpdateOwnMetadata: false });
+    expect(claims.video?.canPublishSources).toEqual(["camera", "microphone"]);
     expect(claims.video?.roomAdmin).toBeFalsy();
     expect(JSON.parse(claims.metadata ?? "{}")).toEqual({ role: "student" });
   });

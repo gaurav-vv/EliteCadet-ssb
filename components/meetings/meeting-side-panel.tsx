@@ -27,7 +27,7 @@ function PersonRow({ p, kind, canModerate, onAction }: { p: Participant; kind: "
   const canSpeak = allows(perm, SOURCE.microphone);
   const canVideo = allows(perm, SOURCE.camera);
   const weak = quality === ConnectionQuality.Poor || quality === ConnectionQuality.Lost;
-  const roleLabel = host ? (roleOf(p) === "admin" ? "Co-host (academy)" : "Host") : kind === "batch" ? (canVideo ? "Can speak and share video" : canSpeak ? "Can speak" : "Listening") : "Student";
+  const roleLabel = host ? (roleOf(p) === "admin" ? "Co-host (academy)" : "Host") : canVideo ? "Student" : canSpeak ? "Student · camera off by host" : "Student · listening only";
   return (
     <li className="flex min-h-12 items-center gap-3 px-4 py-2">
       <span aria-hidden="true" className={cn("flex size-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold", host ? "bg-brand-accent text-white" : "bg-surface-base text-ink")}>
@@ -71,8 +71,8 @@ function PersonRow({ p, kind, canModerate, onAction }: { p: Participant; kind: "
             <DropdownMenuContent align="end">
               {hand && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "lower_hand")}>Lower hand</DropdownMenuItem>}
               {kind === "batch" && !canSpeak && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "allow_audio")}>Allow to speak</DropdownMenuItem>}
-              {kind === "batch" && !canVideo && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "allow_video")}>Allow to speak and share video</DropdownMenuItem>}
-              {kind === "batch" && (canSpeak || canVideo) && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "revoke")}>Stop speaking and video</DropdownMenuItem>}
+              {kind === "batch" && !canVideo && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "allow_video")}>Allow mic and camera</DropdownMenuItem>}
+              {kind === "batch" && (canSpeak || canVideo) && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "revoke")}>Turn off their mic and camera</DropdownMenuItem>}
               {p.isMicrophoneEnabled && <DropdownMenuItem onSelect={() => onAction(p.identity, name, "mute")}>Mute microphone</DropdownMenuItem>}
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onSelect={() => onAction(p.identity, name, "remove")}>

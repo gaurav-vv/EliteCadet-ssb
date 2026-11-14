@@ -147,7 +147,7 @@ test.describe("auth flows on a local Supabase stack", () => {
     await page.getByLabel("New password").fill("short1");
     await page.getByLabel("Confirm password").fill("short1");
     await save.click();
-    await expect(page.getByText("Password must be at least 8 characters.")).toBeVisible();
+    await expect(page.getByText("Password must be at least 6 characters.")).toBeVisible();
     await page.getByLabel("New password").fill(NEW_PASSWORD);
     await page.getByLabel("Confirm password").fill(`${NEW_PASSWORD}-different`);
     await save.click();

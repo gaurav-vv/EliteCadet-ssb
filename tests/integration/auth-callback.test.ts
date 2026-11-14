@@ -32,6 +32,12 @@ beforeEach(() => {
 });
 
 describe("/auth/callback", () => {
+  it("returns to the address the browser used (Host), e.g. a phone on this computer's Wi-Fi address", async () => {
+    fake();
+    const res = await GET(new Request("http://localhost:3000/auth/callback?code=abc&next=%2Freset-password", { headers: { host: "192.168.1.20:3000" } }));
+    expect(res.headers.get("location")).toBe("http://192.168.1.20:3000/reset-password");
+  });
+
   it("exchanges a PKCE code and continues to the reset page", async () => {
     const auth = fake();
     const target = await call("?code=abc&next=%2Freset-password");

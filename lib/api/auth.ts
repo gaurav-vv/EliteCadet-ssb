@@ -21,6 +21,10 @@ export const PROFILE_MISSING_MESSAGE =
 // existing imports keep working.
 export { validateEmail, validatePassword, validateSignupInput, validateLoginInput };
 
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 // Every email link comes back through /auth/callback on the SAME origin the
 // request was made from: the PKCE code verifier is a cookie on that origin,
 // so a different host (www vs apex, a fixed env URL) would break the exchange.
@@ -48,7 +52,8 @@ function isRateLimited(error: { status?: number; code?: string }): boolean {
   return error.status === 429 || error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit";
 }
 
-export async function signUp(input: SignupInput): Promise<AuthResult<{ role: string; needsConfirmation: boolean }>> {
+export async function signUp(rawInput: SignupInput): Promise<AuthResult<{ role: string; needsConfirmation: boolean }>> {
+  const input = { ...rawInput, email: normalizeEmail(rawInput.email) };
   const fieldErrors = validateSignupInput(input);
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: { code: "validation_error", message: Object.values(fieldErrors)[0] } };
@@ -101,7 +106,10 @@ export async function signUp(input: SignupInput): Promise<AuthResult<{ role: str
   }
 }
 
-export async function logIn(input: LoginInput): Promise<AuthResult<{ role: string }>> {
+export async function logIn(rawInput: LoginInput): Promise<AuthResult<{ role: string }>> {
+  // Autofill and phone keyboards add spaces or a capital first letter; Supabase
+  // stores emails lower-case, so an untouched " Name@gmail.com" never matches.
+  const input = { ...rawInput, email: normalizeEmail(rawInput.email) };
   const fieldErrors = validateLoginInput(input);
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: { code: "validation_error", message: Object.values(fieldErrors)[0] } };
@@ -155,7 +163,8 @@ export async function logIn(input: LoginInput): Promise<AuthResult<{ role: strin
   }
 }
 
-export async function requestPasswordReset(email: string): Promise<AuthResult<null>> {
+export async function requestPasswordReset(rawEmail: string): Promise<AuthResult<null>> {
+  const email = normalizeEmail(rawEmail);
   const emailError = validateEmail(email);
   if (emailError) {
     return { ok: false, error: { code: "validation_error", message: emailError } };
@@ -198,10 +207,9 @@ export async function updatePassword(password: string): Promise<AuthResult<null>
     // password_set marks the invite as accepted, so only the first password
     // choice after an invite signs the person straight in (see pendingInviteEmail).
     const { error } = await supabase.auth.updateUser({ password, data: { password_set: true } });
-    if (error) {
-      if (error.code === "same_password") {
-        return { ok: false, error: { code: "same_password", message: "Choose a password different from your current one." } };
-      }
+    // Re-using the current password is allowed (owner decision 2026-11-14): the
+    // account already has exactly the password the user asked for.
+    if (error && error.code !== "same_password") {
       if (error.code === "weak_password") {
         return { ok: false, error: { code: "weak_password", message: "Choose a stronger password." } };
       }

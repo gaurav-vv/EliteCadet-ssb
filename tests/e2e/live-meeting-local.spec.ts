@@ -112,8 +112,8 @@ test("mentor and students meet: media, chat, reactions, raised hands, leave vs e
   await hasLiveVideo(student);
   await expect.poll(() => remoteAudioTracks(student), { timeout: 20_000 }).toBeGreaterThan(0);
 
-  // Batch student: listen-only (mic disabled with the reason), no host controls.
-  await expect(student.getByRole("button", { name: /^unmute$/i })).toHaveAttribute("aria-disabled", "true");
+  // Batch student: may use their own mic (joins muted), no host controls.
+  await expect(student.getByRole("button", { name: /^unmute$/i })).not.toHaveAttribute("aria-disabled", "true");
   await expect(student.getByRole("button", { name: /^end meeting$/i })).toHaveCount(0);
   await expect(student.getByRole("button", { name: /actions for/i })).toHaveCount(0);
 
