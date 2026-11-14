@@ -20,6 +20,7 @@ import { getMyPreferences } from "@/lib/server/student/preferences";
 import { getAcademyPerformance, getMyProgress, PROGRESS_SUMMARY_COLUMNS, toScorePoint } from "@/lib/server/progress/service";
 import { getAcademySessions, getMySessions, getMyStudentSessions } from "@/lib/server/sessions/service";
 import { createClient } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
 import type { ActivityEntry, AcademyDashboard, MenteeRow, MentorDashboard, StudentDashboard } from "@/types/dashboards";
 import type { AttentionStudent, ScorePoint } from "@/types/progress";
@@ -97,7 +98,9 @@ export async function getMentorDashboard(nowIso: string): Promise<ServiceResult<
     const [rows, scores] = ids.length
       ? await Promise.all([
           supabase.from("student_progress").select(`student_id, ${PROGRESS_SUMMARY_COLUMNS}`).in("student_id", ids),
-          supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at").in("student_id", ids),
+          readAll((from, to) =>
+            supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at").in("student_id", ids).order("student_id").order("assessment_id").range(from, to),
+          ),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];
     const failed = rows.error ?? scores.error;

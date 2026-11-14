@@ -9,6 +9,7 @@ import { isCategory } from "@/lib/server/content/validation";
 import { attendancePct, attentionReason, averagePct, categoryAverages, sortAttention, strengthAndWeakArea, summarize, trendOf } from "@/lib/server/progress/compute";
 import { getMyStudentSessions } from "@/lib/server/sessions/service";
 import { createClient } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 import { mapDbError, type ServiceResult } from "@/lib/server/users/service";
 import { isUuid } from "@/lib/server/users/validation";
 import { CONTENT_CATEGORIES } from "@/types/content";
@@ -236,12 +237,19 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
   if (!me || me.profile.role !== "academy_admin" || !me.profile.academyId) return fail("unauthorized", "Only an academy admin can view performance.");
   const academyId = me.profile.academyId;
   const supabase = await createClient();
+  // Scores, progress rows and students can each pass the API's 1,000-row response limit in a large academy, and
+  // an unpaged read would silently average only the first 1,000 (lib/supabase/read-all.ts). Each is read in
+  // pages with a stable order.
   const [batches, rows, scores, students, open] = await Promise.all([
     supabase.from("batches").select("id, name").eq("academy_id", academyId).eq("status", "active").order("name"),
-    supabase.from("student_progress").select(`student_id, batch_id, practice_done, ${PROGRESS_SUMMARY_COLUMNS}`).eq("academy_id", academyId),
-    supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at, batch_id"),
-    supabase.from("academy_students").select("id, full_name, email, batch_id, batch_name").eq("academy_id", academyId),
-    supabase.from("assessments").select("batch_id").eq("academy_id", academyId).eq("status", "published"),
+    readAll((from, to) =>
+      supabase.from("student_progress").select(`student_id, batch_id, practice_done, ${PROGRESS_SUMMARY_COLUMNS}`).eq("academy_id", academyId).order("student_id").range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at, batch_id").order("student_id").order("assessment_id").range(from, to),
+    ),
+    readAll((from, to) => supabase.from("academy_students").select("id, full_name, email, batch_id, batch_name").eq("academy_id", academyId).order("id").range(from, to)),
+    readAll((from, to) => supabase.from("assessments").select("id, batch_id").eq("academy_id", academyId).eq("status", "published").order("id").range(from, to)),
   ]);
   const failed = batches.error ?? rows.error ?? scores.error ?? students.error ?? open.error;
   if (failed) return mapDbError(failed, "We couldn't load performance. Please try again.");

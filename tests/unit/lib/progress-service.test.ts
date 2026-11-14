@@ -25,7 +25,7 @@ const actor = (role: "mentor" | "student" | "academy_admin") => ({ id: ME, email
 function builder(table: string) {
   const result = db.queue.shift() ?? { data: [], error: null };
   const q: Record<string, ReturnType<typeof vi.fn>> = {};
-  for (const m of ["select", "insert", "upsert", "update", "delete", "eq", "in", "order", "limit"]) q[m] = vi.fn(() => q);
+  for (const m of ["select", "insert", "upsert", "update", "delete", "eq", "in", "order", "limit", "range"]) q[m] = vi.fn(() => q);
   q.maybeSingle = vi.fn(async () => result);
   (q as unknown as { then: unknown }).then = (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve);
   db.calls.push({ table, q });
@@ -228,5 +228,30 @@ describe("getAcademyPerformance", () => {
     expect(res.data?.batches).toEqual([{ batchId: "b1", batchName: "Alpha", students: 1, avgScorePct: 30, attendancePct: 100, reviewedCount: 1, practiceDone: 4 }]);
     expect(res.data?.attention).toEqual([{ studentId: STUDENT, name: "Asha", batchName: "Alpha", reason: expect.stringMatching(/Average score 30%/) }]);
     expect(db.calls[0].q.eq).toHaveBeenCalledWith("academy_id", "acad");
+  });
+  // Regression: PostgREST answers at most 1,000 rows per request and does not fail past that, so an unpaged read
+  // silently averaged only the first 1,000 reviewed scores of a large academy (1,000 of 1,435 on the local stack).
+  it("reads every page of scores, so an academy over 1,000 reviewed scores is not averaged on a partial set", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("academy_admin"));
+    const firstPage = Array.from({ length: 1000 }, (_, i) => scoreRow({ assessment_id: `a${i}`, score_pct: 100 }));
+    const secondPage = Array.from({ length: 435 }, (_, i) => scoreRow({ assessment_id: `b${i}`, score_pct: 0 }));
+    db.queue.push(
+      { data: [{ id: "b1", name: "Alpha" }], error: null },
+      { data: [{ student_id: STUDENT, batch_id: "b1", reviewed_count: 1435, sessions_present: 0, sessions_absent: 0, content_completed: 0, last_submission_at: null, practice_done: 0 }], error: null },
+      { data: firstPage, error: null },
+      { data: [{ id: STUDENT, full_name: "Asha", batch_id: "b1", batch_name: "Alpha" }], error: null },
+      { data: [], error: null },
+      // The fake hands results out in call order: the second page of scores is only requested after the other
+      // four reads have started, so it is queued last.
+      { data: secondPage, error: null },
+    );
+    const res = await service.getAcademyPerformance(NOW);
+    expect(res.ok).toBe(true);
+    // 1,000 scores of 100% and 435 of 0% average 69.7%; the first page alone would have said 100%.
+    expect(res.data?.batches[0].avgScorePct).toBeCloseTo(69.7, 1);
+    const scoreCalls = db.calls.filter((c) => c.table === "student_scores");
+    expect(scoreCalls).toHaveLength(2);
+    expect(scoreCalls[0].q.range).toHaveBeenCalledWith(0, 999);
+    expect(scoreCalls[1].q.range).toHaveBeenCalledWith(1000, 1999);
   });
 });

@@ -36,7 +36,7 @@ const session = (id: string, startsAt: string, mentorId = ME) => ({ id, batchId:
 function builder(table: string) {
   const result = db.queue.shift() ?? { data: [], error: null };
   const q: Record<string, ReturnType<typeof vi.fn>> = {};
-  for (const m of ["select", "eq", "in", "order", "limit"]) q[m] = vi.fn(() => q);
+  for (const m of ["select", "eq", "in", "order", "limit", "range"]) q[m] = vi.fn(() => q);
   (q as unknown as { then: unknown }).then = (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve);
   db.calls.push({ table, q });
   return q;
