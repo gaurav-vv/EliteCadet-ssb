@@ -1,4 +1,4 @@
-// Per-browser only, same pattern as profile-storage.ts, until a practice
+// Per-browser only (specs.md 8a.4g: the PIQ stays on the device), until a practice
 // backend exists (specs.md §6.4b).
 import { normalisePiq, type PiqInput } from "@/lib/practice/piq-questions";
 

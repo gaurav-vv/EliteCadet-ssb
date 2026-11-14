@@ -26,6 +26,12 @@ describe("localMailboxUrl", () => {
     expect(localMailboxUrl()).toBe("http://localhost:54324");
   });
 
+  it("is null for a local stack that sends real email (SMTP enabled)", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
+    vi.stubEnv("NEXT_PUBLIC_LOCAL_EMAIL_DELIVERY", "true");
+    expect(localMailboxUrl()).toBeNull();
+  });
+
   it("is null for a hosted project, or no/invalid URL — never claims capture there", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abcd.supabase.co");
     expect(localMailboxUrl()).toBeNull();

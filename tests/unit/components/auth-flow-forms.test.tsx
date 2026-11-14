@@ -49,6 +49,17 @@ describe("SignupForm", () => {
 });
 
 describe("ResetPasswordForm", () => {
+  it("refuses when the two passwords don't match", async () => {
+    vi.mocked(establishRecoverySession).mockResolvedValue("ready");
+    const user = userEvent.setup();
+    render(<ResetPasswordForm />);
+    await user.type(await screen.findByLabelText(/^new password/i), "brandnewpass");
+    await user.type(screen.getByLabelText(/confirm new password/i), "different1");
+    await user.click(screen.getByRole("button", { name: /save new password/i }));
+    expect(await screen.findByText(/don't match/i)).toBeInTheDocument();
+    expect(updatePassword).not.toHaveBeenCalled();
+  });
+
   it("offers a new link when the recovery session can't be established", async () => {
     vi.mocked(establishRecoverySession).mockResolvedValue("invalid");
     render(<ResetPasswordForm />);
@@ -61,7 +72,8 @@ describe("ResetPasswordForm", () => {
     vi.mocked(updatePassword).mockResolvedValue({ ok: true, data: null });
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
-    await user.type(await screen.findByLabelText(/new password/i), "brandnewpass");
+    await user.type(await screen.findByLabelText(/^new password/i), "brandnewpass");
+    await user.type(screen.getByLabelText(/confirm new password/i), "brandnewpass");
     await user.click(screen.getByRole("button", { name: /save new password/i }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/login?reason=password_updated"));
   });
@@ -71,7 +83,8 @@ describe("ResetPasswordForm", () => {
     vi.mocked(updatePassword).mockResolvedValue({ ok: false, error: { code: "link_expired", message: "expired" } });
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
-    await user.type(await screen.findByLabelText(/new password/i), "brandnewpass");
+    await user.type(await screen.findByLabelText(/^new password/i), "brandnewpass");
+    await user.type(screen.getByLabelText(/confirm new password/i), "brandnewpass");
     await user.click(screen.getByRole("button", { name: /save new password/i }));
     expect(await screen.findByRole("link", { name: /request a new link/i })).toBeInTheDocument();
   });

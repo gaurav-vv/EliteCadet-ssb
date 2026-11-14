@@ -46,18 +46,26 @@ const OUTCOME: Record<RoomOutcome, { title: string; description: string; rejoin:
 
 // Lobby → (token from the server) → LiveKit room → outcome. The media token
 // comes only from joinMeetingAction, which re-checks everything server-side.
+// Errors from turning on the camera/mic (browser or LiveKit publish), never a lost connection.
+const DEVICE_ERRORS = new Set(["NotReadableError", "NotFoundError", "OverconstrainedError", "AbortError", "TrackInvalidError", "DeviceUnsupportedError", "PublishTrackError"]);
+
 export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoin, opensAtLabel, backHref, hostName }: MeetingRoomProps) {
   const [join, setJoin] = useState<JoinState>(initialJoin);
   const [phase, setPhase] = useState<Phase>({ name: "lobby" });
   const [pending, setPending] = useState(false);
   const [deviceWarning, setDeviceWarning] = useState<string | null>(null);
   const isHost = role !== "student";
-  const publishesOnJoin = isHost || kind === "one_to_one";
-  const [camera, setCamera] = useState(publishesOnJoin);
-  const [mic, setMic] = useState(publishesOnJoin);
+  // Everyone may use their camera and mic. In a batch, students start muted so
+  // a full room isn't noisy; they unmute themselves when they want to speak.
+  const [camera, setCamera] = useState(true);
+  const [mic, setMic] = useState(isHost || kind === "one_to_one");
   // Set BEFORE this client disconnects whenever the meeting is over for
   // everyone, so the outcome can't depend on which disconnect reason wins.
   const endedHere = useRef(false);
+  // True once LiveKit's signal connection is up. After that, any onError comes
+  // from turning on the camera/mic (in use by another app or tab, not found,
+  // not allowed to publish), which must never throw the user out of the room.
+  const signalUp = useRef(false);
 
   // Waiting rooms poll the server (never the browser clock) for a change.
   useEffect(() => {
@@ -113,9 +121,17 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
   }, []);
 
   const onError = useCallback((error: Error) => {
-    // Media device errors arrive through onDeviceFailure; anything else here is
-    // a connection problem (e.g. the video service is unreachable).
     if (error?.name === "NotAllowedError") return;
+    if (error?.name !== "ConnectionError" && (signalUp.current || DEVICE_ERRORS.has(error?.name))) {
+      setDeviceWarning(
+        error?.name === "NotReadableError"
+          ? "Your camera or microphone is being used by another app or browser tab. Close it, then turn it on again. You're still in the meeting."
+          : error?.name === "NotFoundError"
+            ? "We couldn't find a camera or microphone on this device. You're still in the meeting and can listen and chat."
+            : "We couldn't start your camera or microphone. You're still in the meeting; try turning it on again.",
+      );
+      return;
+    }
     setPhase({ name: "error", message: "We couldn't connect to the video service. Check your network and try again." });
   }, []);
 
@@ -130,6 +146,9 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
         video={camera}
         options={{ adaptiveStream: true, dynacast: true }}
         onDisconnected={onDisconnected}
+        onConnected={() => {
+          signalUp.current = true;
+        }}
         onMediaDeviceFailure={onDeviceFailure}
         onError={onError}
         className="flex min-w-0 flex-col gap-3"
@@ -198,24 +217,22 @@ export function MeetingRoom({ sessionId, title, role, viewerId, kind, initialJoi
             ? "Starting opens the room for your students. Meetings aren't recorded."
             : role === "admin"
               ? "You join as a co-host with the same controls as the mentor. If the meeting hasn't started, joining starts it. Meetings aren't recorded."
-              : publishesOnJoin
+              : kind === "one_to_one"
                 ? "Your mentor will see and hear you. Meetings aren't recorded."
-                : "You'll join listening. Your mentor can let you speak or turn on your camera. Chat, reactions and raise hand work for everyone. Meetings aren't recorded."}
+                : "Everyone in the batch can see and hear you when your camera and microphone are on. You can unmute any time to speak. Meetings aren't recorded."}
         </p>
       </div>
-      {publishesOnJoin && (
-        <fieldset className="flex flex-wrap gap-3">
-          <legend className="sr-only">Devices on joining</legend>
-          <Button type="button" variant="outline" className="min-h-11" aria-pressed={camera} onClick={() => setCamera((v) => !v)}>
-            {camera ? <Video aria-hidden="true" size={16} /> : <VideoOff aria-hidden="true" size={16} />}
-            {camera ? "Camera on" : "Camera off"}
-          </Button>
-          <Button type="button" variant="outline" className="min-h-11" aria-pressed={mic} onClick={() => setMic((v) => !v)}>
-            {mic ? <Mic aria-hidden="true" size={16} /> : <MicOff aria-hidden="true" size={16} />}
-            {mic ? "Microphone on" : "Microphone off"}
-          </Button>
-        </fieldset>
-      )}
+      <fieldset className="flex flex-wrap gap-3">
+        <legend className="sr-only">Devices on joining</legend>
+        <Button type="button" variant="outline" className="min-h-11" aria-pressed={camera} onClick={() => setCamera((v) => !v)}>
+          {camera ? <Video aria-hidden="true" size={16} /> : <VideoOff aria-hidden="true" size={16} />}
+          {camera ? "Camera on" : "Camera off"}
+        </Button>
+        <Button type="button" variant="outline" className="min-h-11" aria-pressed={mic} onClick={() => setMic((v) => !v)}>
+          {mic ? <Mic aria-hidden="true" size={16} /> : <MicOff aria-hidden="true" size={16} />}
+          {mic ? "Microphone on" : "Microphone off"}
+        </Button>
+      </fieldset>
       <p className="text-[13px] text-ink-secondary">Your browser will ask to use your camera and microphone. You can still join if you say no.</p>
       <div className="flex justify-end">
         <Button type="button" className="min-h-11" onClick={enter} disabled={pending}>

@@ -5,6 +5,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { describeLookupFailure, loadAccountAccess } from "@/lib/auth/account";
 import type { AuthResult, LoginInput, SignupInput } from "@/types/auth";
+import { isValidEmail } from "@/lib/utils/email";
 
 export const SUSPENDED_MESSAGE = "This account has been suspended. Contact your academy or the platform team for help.";
 
@@ -15,17 +16,21 @@ export const ACCOUNT_UNAVAILABLE_MESSAGE = "We couldn't load your account right 
 export const PROFILE_MISSING_MESSAGE =
   "Your sign-in worked, but your account isn't fully set up. Contact your academy or the platform team for help.";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 export function validateEmail(email: string): string | null {
   if (!email.trim()) return "Email is required.";
-  if (!EMAIL_RE.test(email)) return "Enter a valid email address.";
+  if (!isValidEmail(email)) return "Enter a valid email address.";
   return null;
 }
 
 export function validatePassword(password: string): string | null {
   if (!password) return "Password is required.";
-  if (password.length < 8) return "Password must be at least 8 characters.";
+  // Supabase Auth's own minimum; no other rules (AGENTS.md: owner decision 2026-11-14).
+  if (password.length < 6) return "Password must be at least 6 characters.";
   return null;
 }
 
@@ -62,7 +67,8 @@ function isRateLimited(error: { status?: number; code?: string }): boolean {
   return error.status === 429 || error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit";
 }
 
-export async function signUp(input: SignupInput): Promise<AuthResult<{ role: string; needsConfirmation: boolean }>> {
+export async function signUp(rawInput: SignupInput): Promise<AuthResult<{ role: string; needsConfirmation: boolean }>> {
+  const input = { ...rawInput, email: normalizeEmail(rawInput.email) };
   const fieldErrors = validateSignupInput(input);
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: { code: "validation_error", message: Object.values(fieldErrors)[0] } };
@@ -115,7 +121,10 @@ export async function signUp(input: SignupInput): Promise<AuthResult<{ role: str
   }
 }
 
-export async function logIn(input: LoginInput): Promise<AuthResult<{ role: string }>> {
+export async function logIn(rawInput: LoginInput): Promise<AuthResult<{ role: string }>> {
+  // Autofill and phone keyboards add spaces or a capital first letter; Supabase
+  // stores emails lower-case, so an untouched " Name@gmail.com" never matches.
+  const input = { ...rawInput, email: normalizeEmail(rawInput.email) };
   const fieldErrors = validateLoginInput(input);
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: { code: "validation_error", message: Object.values(fieldErrors)[0] } };
@@ -169,7 +178,8 @@ export async function logIn(input: LoginInput): Promise<AuthResult<{ role: strin
   }
 }
 
-export async function requestPasswordReset(email: string): Promise<AuthResult<null>> {
+export async function requestPasswordReset(rawEmail: string): Promise<AuthResult<null>> {
+  const email = normalizeEmail(rawEmail);
   const emailError = validateEmail(email);
   if (emailError) {
     return { ok: false, error: { code: "validation_error", message: emailError } };
@@ -210,10 +220,9 @@ export async function updatePassword(password: string): Promise<AuthResult<null>
 
   try {
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      if (error.code === "same_password") {
-        return { ok: false, error: { code: "same_password", message: "Choose a password different from your current one." } };
-      }
+    // Re-using the current password is allowed: the account already has
+    // exactly the password the user asked for, so that counts as success.
+    if (error && error.code !== "same_password") {
       if (error.code === "weak_password") {
         return { ok: false, error: { code: "weak_password", message: "Choose a stronger password." } };
       }

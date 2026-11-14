@@ -14,8 +14,11 @@ export interface LiveKitConfig {
 }
 
 // Names of the server-side variables that are unset — names only, never values.
+// A value pasted from a dashboard while it was hidden ("••••") or with stray
+// spaces/quotes can never authenticate, so it counts as unset (names only).
+const usable = (v: string | undefined) => Boolean(v) && /^[\x21-\x7e]+$/.test(v!) && !/^["']|["']$/.test(v!);
 export function missingLiveKitConfig(): string[] {
-  return ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"].filter((name) => !process.env[name]);
+  return ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"].filter((name) => !usable(process.env[name]));
 }
 
 export function liveKitConfig(): LiveKitConfig | null {
@@ -38,12 +41,14 @@ export function sessionIdFromRoom(room: string | undefined): string | null {
 
 // "admin" = an academy admin of the meeting's academy, joining as co-host.
 export type ParticipantRole = "mentor" | "admin" | "student";
-// What a batch-meeting student may publish; the mentor changes it live.
+// What a student may publish; the host changes it live.
 export type PublishLevel = "none" | "audio" | "audio_video";
 
-function sourcesFor(role: ParticipantRole, kind: MeetingKind, level?: PublishLevel): TrackSource[] {
+function sourcesFor(role: ParticipantRole, level?: PublishLevel): TrackSource[] {
   if (role !== "student") return [TrackSource.CAMERA, TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO];
-  const effective = level ?? (kind === "one_to_one" ? "audio_video" : "none");
+  // Decision 2026-11-14 (owner): students may use their mic and camera in every
+  // meeting so sessions are interactive. The host can still mute, revoke or remove.
+  const effective = level ?? "audio_video";
   if (effective === "audio_video") return [TrackSource.CAMERA, TrackSource.MICROPHONE];
   if (effective === "audio") return [TrackSource.MICROPHONE];
   return [];
@@ -51,9 +56,9 @@ function sourcesFor(role: ParticipantRole, kind: MeetingKind, level?: PublishLev
 
 // A short-lived token for exactly one room. Identity is the authenticated
 // user id (never client input). No chat/data channel, no room admin, no
-// recording. A batch student joins listen-only until the mentor allows them.
+// recording. Students can publish mic + camera; the host can revoke it live.
 export async function createJoinToken(cfg: LiveKitConfig, input: { sessionId: string; userId: string; name: string; role: ParticipantRole; kind: MeetingKind }): Promise<string> {
-  const sources = sourcesFor(input.role, input.kind);
+  const sources = sourcesFor(input.role);
   const token = new AccessToken(cfg.apiKey, cfg.apiSecret, {
     identity: input.userId,
     name: input.name,
@@ -96,8 +101,8 @@ export async function closeRoom(cfg: LiveKitConfig, sessionId: string): Promise<
   }
 }
 
-export async function setPublishLevel(cfg: LiveKitConfig, sessionId: string, identity: string, kind: MeetingKind, level: PublishLevel): Promise<void> {
-  const sources = sourcesFor("student", kind, level);
+export async function setPublishLevel(cfg: LiveKitConfig, sessionId: string, identity: string, level: PublishLevel): Promise<void> {
+  const sources = sourcesFor("student", level);
   await rooms(cfg).updateParticipant(roomNameFor(sessionId), identity, {
     permission: { canSubscribe: true, canPublish: sources.length > 0, canPublishSources: sources, canPublishData: false },
   });

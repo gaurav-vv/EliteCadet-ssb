@@ -166,9 +166,9 @@ describe("updatePassword", () => {
     expect((await updatePassword("brandnewpass")).error?.code).toBe("link_expired");
   });
 
-  it("asks for a different password when it is unchanged", async () => {
+  it("accepts re-using the current password", async () => {
     fake({ update: { error: { code: "same_password", status: 422, message: "same" } } });
-    expect((await updatePassword("brandnewpass")).error?.code).toBe("same_password");
+    expect((await updatePassword("brandnewpass")).ok).toBe(true);
   });
 });
 

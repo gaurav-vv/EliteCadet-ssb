@@ -15,6 +15,7 @@ import {
   endMeetingAction,
   listMeetingMessagesAction,
   lowerAllHandsAction,
+  meetingJoinStateAction,
   moderateParticipantAction,
   muteAllStudentsAction,
   sendMeetingMessageAction,
@@ -49,8 +50,8 @@ interface RoomStageProps {
 }
 
 // The live room (session_ref.png): video stage + toolbar, Participants/Chat
-// panel. Media is host-led: in a batch meeting only the host (and students the
-// host allows) publish. Chat, reactions and raised hands go through the server
+// panel. Everyone can use their camera and microphone; the host can mute,
+// revoke or remove a student. Chat, reactions and raised hands go through the server
 // (authorized per call) and arrive here as server-sent data.
 export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, hostName, onMeetingOver }: RoomStageProps) {
   const room = useRoomContext();
@@ -149,14 +150,39 @@ export function RoomStage({ sessionId, title, role, viewerId, kind, endsAt, host
     };
   }, [room, viewerId]);
 
-  // Tell a batch student when the host gives or takes the floor.
-  const prevCanMic = useRef(canMic);
+  // Tell a student when the host takes or gives back their microphone. The
+  // first permissions to arrive (on connect) are the starting point, not a change.
+  const prevCanMic = useRef<boolean | null>(null);
+  const permKnown = perm !== undefined;
   useEffect(() => {
-    if (role === "student" && kind === "batch" && prevCanMic.current !== canMic) {
-      setNotice({ tone: "status", text: canMic ? "The host let you speak. Turn on your microphone when you're ready." : "The host has closed your microphone." });
+    if (!permKnown) return;
+    if (role === "student" && prevCanMic.current !== null && prevCanMic.current !== canMic) {
+      setNotice({ tone: "status", text: canMic ? "The host let you speak again. Turn on your microphone when you're ready." : "The host turned off your microphone." });
     }
     prevCanMic.current = canMic;
-  }, [canMic, kind, role]);
+  }, [canMic, permKnown, role]);
+
+  // ---- Ended by a host elsewhere ----
+  // Deleting the video room normally disconnects everyone at once. As a
+  // backstop (e.g. the video service didn't confirm the delete), every client
+  // asks the server whether the meeting is still on and leaves if it isn't.
+  useEffect(() => {
+    if (connection !== ConnectionState.Connected) return;
+    const timer = setInterval(async () => {
+      if (over.current) return;
+      try {
+        const result = await meetingJoinStateAction(sessionId);
+        if (result.ok && (result.join === "ended" || result.join === "cancelled") && !over.current) {
+          over.current = true;
+          onMeetingOver();
+          void room.disconnect();
+        }
+      } catch {
+        // Offline for a moment: the next tick retries.
+      }
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [connection, onMeetingOver, room, sessionId]);
 
   // ---- Hard stop at the scheduled end ----
   // Everyone's client leaves; a host's client also ends it on the server. The

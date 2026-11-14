@@ -12,6 +12,7 @@ import { establishRecoverySession, updatePassword } from "@/lib/api/auth";
 export function ResetPasswordForm() {
   const router = useRouter();
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [link, setLink] = useState<"checking" | "ready" | "invalid">("checking");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -32,6 +33,11 @@ export function ResetPasswordForm() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (password !== confirm) {
+      setStatus("error");
+      setErrorMessage("The two passwords don't match.");
+      return;
+    }
     setStatus("loading");
     setErrorMessage(null);
 
@@ -76,6 +82,7 @@ export function ResetPasswordForm() {
     <div className="glass-regular flex flex-col gap-6 px-8 py-10">
       <div className="flex flex-col gap-1 text-center">
         <h1 className="text-xl font-semibold text-ink">Set a new password</h1>
+        <p className="text-sm text-ink-secondary">At least 6 characters. You&apos;ll log in with it from now on.</p>
       </div>
 
       {status === "error" && errorMessage && (
@@ -94,6 +101,18 @@ export function ResetPasswordForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={status === "loading"}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="confirm-password">Confirm new password</Label>
+          <Input
+            id="confirm-password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
             disabled={status === "loading"}
           />
         </div>

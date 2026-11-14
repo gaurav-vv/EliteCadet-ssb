@@ -29,12 +29,12 @@ describe("validatePassword", () => {
     expect(validatePassword("")).toBe("Password is required.");
   });
 
-  it("rejects a password under 8 characters", () => {
-    expect(validatePassword("short1")).toBe("Password must be at least 8 characters.");
+  it("rejects a password under 6 characters", () => {
+    expect(validatePassword("abc12")).toBe("Password must be at least 6 characters.");
   });
 
-  it("accepts an 8+ character password", () => {
-    expect(validatePassword("longenough")).toBeNull();
+  it("accepts a 6+ character password", () => {
+    expect(validatePassword("abc123")).toBeNull();
   });
 });
 

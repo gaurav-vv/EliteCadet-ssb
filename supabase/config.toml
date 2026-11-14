@@ -157,11 +157,13 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://localhost:3000"
-# The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
-# external_url = ""
+# From supabase/.env (see supabase/.env.example): localhost by default, or this
+# computer's Wi-Fi address so email links open on a phone on the same network.
+site_url = "env(AUTH_SITE_URL)"
+# The public URL that Auth serves on — the host in every email link.
+external_url = "env(AUTH_EXTERNAL_URL)"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:*/**", "http://127.0.0.1:*/**"]
+additional_redirect_urls = ["http://localhost:*/**", "http://127.0.0.1:*/**", "env(AUTH_REDIRECT_PATTERN)"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -234,15 +236,32 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Real email delivery from the local stack (docs/email.md → "Send real emails
+# with Gmail"). Values come from supabase/.env, which is gitignored — copy
+# supabase/.env.example. SMTP_ENABLED=false (the default there) keeps every
+# email in Mailpit. Never write a password in this file.
+[auth.email.smtp]
+enabled = "env(SMTP_ENABLED)"
+host = "env(SMTP_HOST)"
+port = 587
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
+admin_email = "env(SMTP_USER)"
+sender_name = "EliteCadet"
+
+# Branded templates (supabase/templates). The hosted project needs the same
+# subject + HTML pasted into Authentication → Emails → Templates (docs/email.md).
+[auth.email.template.invite]
+subject = "You're invited to EliteCadet"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Reset your EliteCadet password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your EliteCadet email"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

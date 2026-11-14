@@ -182,14 +182,14 @@ async function myLiveMeeting(id: string): Promise<ServiceResult<{ session: Sessi
   return { ok: true, data: { session: found.data, cfg } };
 }
 
-export const ROOM_CLOSE_FAILED = "The meeting is ended in EliteCadet, but the video service didn't confirm that everyone was disconnected. Press End again to retry.";
-
 // Ends the meeting for everyone. Two steps, both safe to repeat:
 //  1. the database (end_live_meeting): completed, server end time, open
-//     attendance closed, 75% attendance finalized — idempotent;
-//  2. the video room is deleted, which disconnects every participant.
-// Success is reported only when BOTH succeeded; if the room couldn't be
-// deleted the caller gets an error and can simply retry.
+//     attendance closed, 75% attendance finalized — idempotent. This is the
+//     source of truth: from here on no one can get a token to (re)join.
+//  2. the video room is deleted, which disconnects every participant at once.
+// If step 2 fails the meeting is still over: every client in the room checks
+// the server every few seconds (room-stage.tsx) and leaves when it has ended,
+// so the host is never stuck in a "Try again" loop. The failure is logged.
 export async function endMeeting(id: string): Promise<ServiceResult<null>> {
   const actor = await hostActor();
   if (!actor) return fail("unauthorized", "Only the meeting's mentor or academy admin can end it.");
@@ -211,7 +211,8 @@ export async function endMeeting(id: string): Promise<ServiceResult<null>> {
       if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
     }
   }
-  return fail("server_error", ROOM_CLOSE_FAILED);
+  console.error("[meetings] meeting ended in the database; video room not closed — clients will leave on their next state check");
+  return { ok: true, data: null };
 }
 
 export type ModerationAction = "allow_audio" | "allow_video" | "revoke" | "mute" | "remove" | "lower_hand";
@@ -233,18 +234,16 @@ export async function moderateParticipant(id: string, studentId: string, action:
   const { session: s, cfg } = live.data;
   if (s.status !== "scheduled" || !s.actualStartedAt || s.actualEndedAt) return fail("validation_error", "This meeting isn't live.");
   if (!(await isAudienceMember(s, studentId))) return fail("not_found", "That person isn't in this meeting.");
-  const kind = s.meetingKind!;
-
   try {
     switch (action as ModerationAction) {
       case "allow_audio":
-        await livekit.setPublishLevel(cfg, s.id, studentId, kind, "audio");
+        await livekit.setPublishLevel(cfg, s.id, studentId, "audio");
         break;
       case "allow_video":
-        await livekit.setPublishLevel(cfg, s.id, studentId, kind, "audio_video");
+        await livekit.setPublishLevel(cfg, s.id, studentId, "audio_video");
         break;
       case "revoke":
-        await livekit.setPublishLevel(cfg, s.id, studentId, kind, "none");
+        await livekit.setPublishLevel(cfg, s.id, studentId, "none");
         break;
       case "mute":
         await livekit.muteAudio(cfg, s.id, studentId);
