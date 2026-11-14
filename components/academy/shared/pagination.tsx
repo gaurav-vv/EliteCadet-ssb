@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {

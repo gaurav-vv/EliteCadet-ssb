@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { ArrowRight, CalendarClock, History, ListChecks } from "lucide-react";
 import { TodayMission } from "@/components/roadmap/today-mission";
 import { ProgressStats } from "@/components/progress/progress-views";

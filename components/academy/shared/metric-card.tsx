@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { IconTile } from "@/components/academy/shared/icon-tile";
 import type { DashboardMetric } from "@/types/academy";
 

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { IntentPrefetchLink } from "@/components/ui/intent-prefetch-link";
 import { navIcons } from "@/components/ui/nav-icons";
 import { isWorkspaceNavActive, type WorkspaceNavItem } from "@/lib/navigation/workspace";
 import { cn } from "cn";
@@ -64,8 +64,9 @@ export function WorkspaceNavigation({ items, label, variant = "full", onNavigate
           );
         }
 
+        // Prefetch on intent, not on sight: the sidebar shows every workspace page at once.
         return (
-          <Link
+          <IntentPrefetchLink
             key={item.href}
             href={item.href}
             title={isRail ? item.label : undefined}
@@ -76,7 +77,7 @@ export function WorkspaceNavigation({ items, label, variant = "full", onNavigate
             className={itemClass}
           >
             {content}
-          </Link>
+          </IntentPrefetchLink>
         );
       })}
     </nav>

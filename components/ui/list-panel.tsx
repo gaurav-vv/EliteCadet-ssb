@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { cn } from "cn";
 
 export function ListPanel({ children, className }: { children: React.ReactNode; className?: string }) {

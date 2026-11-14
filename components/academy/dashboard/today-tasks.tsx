@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 import { IconTile } from "@/components/academy/shared/icon-tile";
 import { ChartCard } from "@/components/academy/shared/chart-card";
