@@ -10,6 +10,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { logIn } from "@/lib/api/auth";
 import { validateLoginInput } from "@/lib/auth/validation";
 import { postLoginPath } from "@/lib/auth/redirect";
+import { setFlash } from "@/lib/flash";
+
+export const LOGIN_SUCCESS_MESSAGE = "Logged in successfully!";
 
 const REASON_MESSAGES: Record<string, string> = {
   login_required: "Please log in to continue.",
@@ -68,6 +71,8 @@ export function LoginForm({ redirectTo, reason }: LoginFormProps) {
       // No router.refresh() after the push: it re-rendered the dashboard a second time (every query twice)
       // right after the push had fetched it fresh. Workspace pages are dynamic, so the push never reuses a
       // page cached before sign-in, and nothing rendered before sign-in depends on the session.
+      // One-shot toast, shown by the workspace layout on the next screen.
+      setFlash(LOGIN_SUCCESS_MESSAGE);
       router.push(postLoginPath(result.data!.role, redirectTo));
     } finally {
       submitting.current = false;

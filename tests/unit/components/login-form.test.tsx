@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LoginForm } from "@/components/auth/login-form";
+import { takeFlash } from "@/lib/flash";
 import { logIn } from "@/lib/api/auth";
 
 vi.mock("@/lib/api/auth", () => ({
@@ -20,6 +21,7 @@ beforeEach(() => {
   mockedLogIn.mockReset();
   push.mockReset();
   refresh.mockReset();
+  takeFlash();
 });
 
 describe("LoginForm", () => {
@@ -42,6 +44,19 @@ describe("LoginForm", () => {
     // One navigation only: a refresh after the push rendered the dashboard (and ran its queries) twice.
     expect(push).toHaveBeenCalledTimes(1);
     expect(refresh).not.toHaveBeenCalled();
+    // The success toast is left for the dashboard to show once.
+    expect(takeFlash()).toBe("Logged in successfully!");
+  });
+
+  it("leaves no success toast behind when login fails", async () => {
+    mockedLogIn.mockResolvedValue({ ok: false, error: { code: "invalid_credentials", message: "Incorrect email or password." } });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+    await user.type(screen.getByLabelText(/email/i), "cadet@example.com");
+    await user.type(screen.getByLabelText(/password/i), "wrongpass");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+    await screen.findByText(/incorrect email or password/i);
+    expect(takeFlash()).toBeNull();
   });
 
   it("honors an explicit redirectTo instead of the role default", async () => {
