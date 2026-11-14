@@ -104,3 +104,20 @@ machine is not a Core Web Vitals pass. `perf:security` tries, against the local 
 
 Logout from the UI, mutations (use local/staging only), field (real-user) data, any hosted or
 production authenticated run, and capacity on production-like hardware.
+
+## Realistic dashboard volume (local only)
+
+The small seed above is enough for request counts, not for query behaviour. To profile the dashboards with real
+volume, seed one large academy into the **local** database:
+
+```bash
+npm run perf:seed-dashboards                       # 300 students, 12 batches, 8 mentors, 6 assessments per batch
+npm run perf:seed-dashboards -- --students 600     # a bigger academy
+```
+
+It refuses any Supabase URL that is not localhost, talks to Postgres through `docker exec` into the local stack's own
+database container, and prints a login for the academy admin, one student and one mentor (test data). The defaults
+produce 1,800 attempts, about 1,435 reviewed scores, 120 sessions and 2,400 attendance rows, which crosses
+PostgREST's 1,000-row response limit on purpose. Profile with `EXPLAIN (ANALYZE, BUFFERS)` as the academy admin
+(`set local role authenticated` plus `request.jwt.claims`), so row-level security applies exactly as in the app.
+Do not run it against staging or production: it writes tens of thousands of rows and uses superuser-only settings.

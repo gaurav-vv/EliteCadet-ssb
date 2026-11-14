@@ -38,7 +38,7 @@ tells people to paste SQL into the SQL Editor, which records nothing) is **unkno
 | `0028` | inserts a `profiles` row (and an academy for an academy admin) for any account without one | adds rows only; 0 accounts qualify today | yes |
 | `0029`-`0033` | `create index if not exists` on 10 foreign-key columns | none. A plain `create index` blocks writes to that table while it builds; the tables hold a handful to a few hundred rows, so the lock is milliseconds. Do not use `concurrently` in the SQL Editor transaction | yes |
 
-`supabase/catchup/production_catchup_0005_0035.sql` is **only** for a database that is still at `0004`.
+`supabase/catchup/production_catchup_0005_0036.sql` is **only** for a database that is still at `0004`.
 It refuses to run when `0005` is present. **Do not run it on this project.**
 
 ## Verify first (read-only, paste into the SQL Editor; nothing is changed)
@@ -103,7 +103,7 @@ stay batch-only.
 6. **Rollback** is the commented block at the top of the migration file. Dropping the table and view does not
    touch any other data, but restore `is_my_mentee` to its `0014` body first.
 
-If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0035.sql`
+If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0036.sql`
 (regenerated with `bash supabase/catchup/build.sh`) includes `0034`.
 
 ## Migration 0035: academy admin notifications (new, NOT applied to the hosted project)
@@ -125,6 +125,26 @@ column, policy or function is changed. Existing notifications and the students' 
    triggers do not exist yet); after it, an old app build would drop the unknown kind safely at its boundary.
 5. **Rollback:** the commented block at the top of the migration file (drop the two triggers and functions).
    A Postgres enum value cannot be dropped; the unused value is harmless.
+
+## Migration 0036: student_progress in one pass (new, NOT applied to the hosted project)
+
+`supabase/migrations/0036_student_progress_single_pass.sql` replaces **one view definition**
+(`public.student_progress`): same columns, names, types, order, `security_invoker` setting and rows for every
+caller; it only changes how the numbers are computed (one grouped pass per table instead of eight correlated
+subqueries per student). No table, policy, function or data changes. Applied and tested **only locally**.
+
+Measured on the local stack with a seeded 300-student academy (`npm run perf:seed-dashboards`), as the academy admin:
+the dashboard's `student_progress` request about 2.7 s before, about 0.8 s after; academy dashboard page content
+3.5-3.9 s before, 1.5-2.0 s after; performance page 3.9-5.0 s before, 1.3-1.65 s after. An md5 of every row for an
+academy admin, a mentor and a student was identical before and after.
+
+1. **Before:** nothing to check; the statement is `create or replace view` and safe to run once or twice.
+2. Back up or confirm point-in-time recovery, then run the file in the SQL Editor in one transaction.
+3. **After (read-only):** `select count(*) from public.student_progress;` still works as a super admin, and the academy
+   dashboard loads. The view definition now contains `group by`.
+4. **Deploy order:** either order works; the application code does not depend on this migration (it only makes the
+   same query faster). The application change that pages through results (`lib/supabase/read-all.ts`) is independent.
+5. **Rollback:** the commented block at the top of the migration file restores the previous definition.
 
 ## Rollback
 
