@@ -36,11 +36,11 @@ describe("stage", () => {
 });
 
 describe("focus and time", () => {
-  it("focuses on the weakest areas first, unpractised core areas next, never GTO without evidence", () => {
+  it("focuses on the weakest areas first, unpracticed core areas next, never GTO without evidence", () => {
     const f = focusAreas(dims({ psychology: "developing", interview: "needs_attention", consistency: "strong", revision: "improving" }));
     expect(f.map((x) => x.dimension)).toEqual(["interview", "communication", "self_awareness"]);
     expect(f[0].why).toBe("evidence for interview");
-    expect(f[1].why).toMatch(/Not practised enough/);
+    expect(f[1].why).toMatch(/Not practiced enough/);
     expect(focusAreas(dims({})).some((x) => x.dimension === "gto")).toBe(false);
   });
   it("splits daily time across the focus areas", () => {

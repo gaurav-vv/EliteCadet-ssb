@@ -461,7 +461,7 @@ export const INTERVIEW_GTO_RESOURCES: ResourceArticle[] = [
       },
       {
         title: "Propose-and-invite practice",
-        instructions: "In your next group activity of any kind, practise proposing at least two ideas using the pattern: idea, reason, invitation for feedback. Afterwards, write down how others responded and whether you adjusted.",
+        instructions: "In your next group activity of any kind, practice proposing at least two ideas using the pattern: idea, reason, invitation for feedback. Afterwards, write down how others responded and whether you adjusted.",
       },
       {
         title: "Weekly self-review",
@@ -707,7 +707,7 @@ export const INTERVIEW_GTO_RESOURCES: ResourceArticle[] = [
       "Understand the lecturette format: topic selection, short preparation and a timed talk.",
       "Use a simple three-part structure to organise any topic quickly.",
       "Improve delivery: voice, pace, eye contact and time management.",
-      "Practise with a varied list of topics across common categories.",
+      "Practice with a varied list of topics across common categories.",
     ],
     sections: [
       {
@@ -814,7 +814,7 @@ export const INTERVIEW_GTO_RESOURCES: ResourceArticle[] = [
       "Use introduction, two or three body points with examples, and a conclusion.",
       "Write key words, not sentences, during preparation.",
       "Speak clearly, steadily and to the whole group.",
-      "Practise with a timer until three minutes feels natural.",
+      "Practice with a timer until three minutes feels natural.",
     ],
   },
 
@@ -864,9 +864,9 @@ export const INTERVIEW_GTO_RESOURCES: ResourceArticle[] = [
         bullets: [
           "Run 3 to 5 km three or four times a week.",
           "Build upper body strength with push-ups and hanging or pull-ups.",
-          "Practise rope climbing where a safe rope and supervision are available.",
+          "Practice rope climbing where a safe rope and supervision are available.",
           "Do skipping, squats and lunges for leg strength.",
-          "Practise balance on a low beam or kerb.",
+          "Practice balance on a low beam or kerb.",
         ],
       },
       {

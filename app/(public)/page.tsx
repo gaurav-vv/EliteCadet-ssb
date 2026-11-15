@@ -30,7 +30,7 @@ import academicsPhoto from "@/public/images/landing/academics.jpg";
 export const metadata: Metadata = {
   title: { absolute: "EliteCadet — SSB Mentorship, Practice & Progress" },
   description:
-    "Connect with experienced defence mentors, practise through live sessions, and build the confidence to join the armed forces.",
+    "Connect with experienced defence mentors, practice through live sessions, and build the confidence to join the armed forces.",
 };
 
 type Benefit = { icon: LucideIcon; label: string };
@@ -65,11 +65,11 @@ const roleSections: {
   {
     id: "students",
     eyebrow: "For Students",
-    title: "Learn. Practise.",
+    title: "Learn. Practice.",
     accentText: "Grow.",
     accent: "blue",
     description:
-      "Get mentored by experienced defence officers, attend live sessions, practise SSB modules, and receive personalised feedback.",
+      "Get mentored by experienced defence officers, attend live sessions, practice SSB modules, and receive personalised feedback.",
     cta: { label: "Explore as a Student", href: "/signup" },
     photo: studentsPhoto,
     photoAlt: "A student taking notes beside a laptop",
@@ -133,12 +133,12 @@ const steps = [
     description: "Sign up as a student, or set up your academy. Mentors join through their academy.",
   },
   {
-    title: "Practise with guidance",
+    title: "Practice with guidance",
     description: "Work through the SSB practice journey and attend live sessions with your mentors.",
   },
   {
     title: "Track and improve",
-    description: "See your progress, act on mentor feedback, and practise again with clear direction.",
+    description: "See your progress, act on mentor feedback, and practice again with clear direction.",
   },
 ];
 
@@ -168,7 +168,7 @@ export default function LandingPage() {
               Your SSB Journey with the Right Guidance
             </h1>
             <p className="max-w-[34rem] text-base leading-relaxed text-[var(--site-text)] sm:text-lg">
-              Connect with experienced defence mentors, practise through live sessions, and build the confidence to
+              Connect with experienced defence mentors, practice through live sessions, and build the confidence to
               achieve your dream of joining the armed forces.
             </p>
             <div className="flex flex-wrap gap-4">
