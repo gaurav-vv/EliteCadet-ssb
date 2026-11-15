@@ -521,7 +521,10 @@
 }
 
 /* Ambient background wash (§2 / §7.1) — one persistent instance in the root
-   layout, never regenerated per route. */
+   layout, never regenerated per route. A static gradient on purpose: it used to be
+   blurred by 120px and animated forever, which made the browser re-render a
+   full-screen layer continuously on every page for a change nobody can see at
+   5–8% opacity (a radial gradient is already smooth). */
 .ambient-wash {
   position: fixed;
   inset: 0;
@@ -533,18 +536,6 @@
     rgba(45, 212, 191, 0.05) 40%,
     transparent 70%
   );
-  filter: blur(120px);
-  animation: ambient-drift 18s ease-in-out infinite;
-}
-
-@keyframes ambient-drift {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(-40px, 30px);
-  }
 }
 
 .glass-thin:focus-visible,
