@@ -99,14 +99,14 @@ const roleSections: {
     ],
   },
   {
-    id: "academics",
-    eyebrow: "For Academics",
+    id: "academies",
+    eyebrow: "For Academies",
     title: "Empower",
     accentText: "Your Institution",
     accent: "gold",
     description:
       "Provide your students with expert mentorship, structured SSB preparation, and measurable progress — all in one platform.",
-    cta: { label: "Explore for Academics", href: "/signup?as=academy" },
+    cta: { label: "Explore for Academies", href: "/signup?as=academy" },
     photo: academicsPhoto,
     photoAlt: "A defence academy building with the national flag",
     benefits: [
@@ -222,7 +222,7 @@ export default function LandingPage() {
         </ActionPanel>
       </section>
 
-      {/* Students / Mentors / Academics */}
+      {/* Students / Mentors / Academies */}
       <div className="flex flex-col gap-4 pb-4">
         {roleSections.map((section) => (
           <RoleSection key={section.id} {...section} />
