@@ -28,7 +28,7 @@ academies can't see who is falling behind until it's too late.
 SSB Academy puts the whole preparation loop in one place:
 
 ```text
-Student   Practise  →  get mentor feedback  →  improve  →  practise again
+Student   Practice  →  get mentor feedback  →  improve  →  practice again
 Mentor    See mentees  →  review their work  →  evaluate  →  follow up
 Academy   Organise batches  →  monitor progress  →  act on who needs attention
 ```

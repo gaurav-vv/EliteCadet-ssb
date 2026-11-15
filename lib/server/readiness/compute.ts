@@ -132,7 +132,7 @@ const NEXT: Record<ReadinessDimensionId, string> = {
   psychology: "Take a timed TAT, WAT or SRT practice and read the pattern feedback afterwards.",
   gto: "Read the GTO tasks in the Day 3 and Day 4 journey and ask your mentor for a GTO assessment.",
   revision: "Retake a test you've had feedback on, and read one Library item on that area.",
-  consistency: "Practise a little every day — even one question keeps the habit going.",
+  consistency: "Practice a little every day — even one question keeps the habit going.",
 };
 
 function nextFor(id: ReadinessDimensionId, state: ReadinessState): string | null {

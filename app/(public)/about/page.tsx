@@ -36,7 +36,7 @@ const audiences: { icon: LucideIcon; title: string; text: string; href: string; 
   {
     icon: Sparkles,
     title: "Students",
-    text: "Practise through the SSB journey, get feedback, join live sessions and track your own readiness.",
+    text: "Practice through the SSB journey, get feedback, join live sessions and track your own readiness.",
     href: "/signup",
     cta: "Sign up as a student",
   },
@@ -67,7 +67,7 @@ export default function AboutPage() {
           </h1>
           <p className="max-w-[680px] text-base leading-relaxed text-[var(--site-muted)]">
             EliteCadet brings students, mentors and academies together on one platform for Services Selection Board
-            preparation. Students practise and learn, mentors guide and evaluate, and academies see how their cadets are
+            preparation. Students practice and learn, mentors guide and evaluate, and academies see how their cadets are
             progressing.
           </p>
         </div>

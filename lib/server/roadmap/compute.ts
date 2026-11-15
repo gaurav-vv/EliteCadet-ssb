@@ -11,9 +11,9 @@ import { PREPARATION_STAGES, type StudentPreferences } from "@/types/student";
 
 const STAGES: Record<RoadmapStageId, { label: string; explanation: string }> = {
   exploration: { label: "Exploration", explanation: "Take the starting-point diagnostic so your plan can fit you." },
-  foundation: { label: "Foundation", explanation: "Build evidence across the main areas: practise each at least once." },
+  foundation: { label: "Foundation", explanation: "Build evidence across the main areas: practice each at least once." },
   core_preparation: { label: "Core preparation", explanation: "Work steadily on your weaker areas while keeping the others going." },
-  advanced_practice: { label: "Advanced practice", explanation: "Several areas are strong; push the rest and practise under time." },
+  advanced_practice: { label: "Advanced practice", explanation: "Several areas are strong; push the rest and practice under time." },
   mock_readiness: { label: "Mock readiness", explanation: "Your interview and psychology practice are strong: run full mock interviews and timed tests." },
   final_revision: { label: "Final revision", explanation: "Your SSB date is close: revise, rest well and run short timed practice." },
 };
@@ -48,7 +48,7 @@ export function stageFor(hasBaseline: boolean, daysToTarget: number | null, dims
   return "core_preparation";
 }
 
-// Weakest first; unpractised core areas count as weak. GTO without evidence is
+// Weakest first; unpracticed core areas count as weak. GTO without evidence is
 // left out until GTO practice exists.
 export function focusAreas(dims: ReadinessDimension[]): RoadmapFocus[] {
   const rank = (d: ReadinessDimension) =>
@@ -61,7 +61,7 @@ export function focusAreas(dims: ReadinessDimension[]): RoadmapFocus[] {
       dimension: d.id,
       name: d.name,
       state: d.state,
-      why: d.state === "not_enough_evidence" ? "Not practised enough yet to know where you stand." : (d.evidence[0] ?? `Currently ${d.state.replace("_", " ")}.`),
+      why: d.state === "not_enough_evidence" ? "Not practiced enough yet to know where you stand." : (d.evidence[0] ?? `Currently ${d.state.replace("_", " ")}.`),
       action: { ...ACTIONS[d.id], reason: d.state === "not_enough_evidence" ? `${d.name} has no evidence yet.` : `${d.name} is ${d.state === "needs_attention" ? "your weakest area" : d.state.replace("_", " ")}.` },
     }));
 }
@@ -99,7 +99,7 @@ export function buildRoadmap({ preferences, diagnostic, readiness, recommendatio
   if (stageId === "final_revision") candidates.push({ title: "Run a mock interview", reason: `Your SSB date is ${daysToTarget === 0 ? "today" : `in ${daysToTarget} days`}; timed practice matters most now.`, href: "/student/practice/interview/ai" });
   if (focus[0]) candidates.push({ title: focus[0].action.title, reason: focus[0].action.reason, href: focus[0].action.href });
   const consistency = dims.find((d) => d.id === "consistency");
-  if (consistency && (consistency.state === "needs_attention" || consistency.state === "developing")) candidates.push({ title: "Practise for a few minutes today", reason: consistency.evidence[0] ?? "Regular practice builds the habit.", href: "/student/practice" });
+  if (consistency && (consistency.state === "needs_attention" || consistency.state === "developing")) candidates.push({ title: "Practice for a few minutes today", reason: consistency.evidence[0] ?? "Regular practice builds the habit.", href: "/student/practice" });
   if (mission && mission !== "all-done") candidates.push({ title: `Continue Day ${mission.dayNumber}: ${mission.title}`, reason: `${mission.done} of ${mission.total} done in this practice set.`, href: mission.href });
   const baselineAge = diagnostic.baseline ? Date.parse(nowIso) - Date.parse(diagnostic.baseline.submittedAt) : 0;
   if (hasBaseline && !diagnostic.latest && baselineAge > 28 * DAY_MS && diagnostic.nextAllowedAt === null) candidates.push({ title: "Retake the diagnostic", reason: "It's been over four weeks: see how far you've come since your starting point.", href: "/student/diagnostic" });
