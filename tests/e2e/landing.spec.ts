@@ -5,12 +5,12 @@ test.describe("Landing page", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Your SSB Journey with the Right Guidance" })).toBeVisible();
-    for (const id of ["students", "mentors", "academics", "how-it-works", "about"]) {
+    for (const id of ["students", "mentors", "academies", "how-it-works"]) {
       await expect(page.locator(`#${id}`)).toHaveCount(1);
     }
 
     const nav = page.getByRole("navigation", { name: "Primary" });
-    for (const [name, href] of [["Home", "/"], ["Students", "/#students"], ["Mentors", "/#mentors"], ["Academics", "/#academics"], ["How It Works", "/#how-it-works"], ["About", "/#about"]]) {
+    for (const [name, href] of [["Home", "/"], ["Students", "/#students"], ["Mentors", "/#mentors"], ["Academies", "/#academies"], ["How It Works", "/#how-it-works"], ["About", "/about"]]) {
       await expect(nav.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
     }
 
@@ -19,7 +19,7 @@ test.describe("Landing page", () => {
       ["Sign Up / Login", "/signup"],
       ["Explore as a Student", "/signup"],
       ["Join as a Mentor", "/request-demo?interest=mentor"],
-      ["Explore for Academics", "/signup?as=academy"],
+      ["Explore for Academies", "/signup?as=academy"],
     ];
     for (const [name, href] of ctas) {
       await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
@@ -28,7 +28,7 @@ test.describe("Landing page", () => {
     await expect(page.getByText(/\d+K\+|\d+%|\d\.\d\/5/)).toHaveCount(0);
   });
 
-  test("Explore for Academics preselects the academy signup", async ({ page }) => {
+  test("Explore for Academies preselects the academy signup", async ({ page }) => {
     await page.goto("/signup?as=academy");
     await expect(page.getByLabel("Academy name")).toBeVisible();
   });

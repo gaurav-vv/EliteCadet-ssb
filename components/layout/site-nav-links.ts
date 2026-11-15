@@ -4,7 +4,7 @@ export const SITE_NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/#students", label: "Students" },
   { href: "/#mentors", label: "Mentors" },
-  { href: "/#academics", label: "Academics" },
+  { href: "/#academies", label: "Academies" },
   { href: "/#how-it-works", label: "How It Works" },
-  { href: "/#about", label: "About" },
+  { href: "/about", label: "About" },
 ] as const;

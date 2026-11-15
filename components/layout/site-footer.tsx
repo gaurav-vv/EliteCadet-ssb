@@ -18,7 +18,7 @@ const headingClass = "text-[0.8125rem] font-medium tracking-[0.14em] text-white/
 // use WorkspaceFooter; standalone pages use MinimalFooter. See DESIGN.md.
 export function SiteFooter() {
   return (
-    <footer id="about" className="scroll-mt-20 bg-[var(--site-navy)] text-white">
+    <footer className="bg-[var(--site-navy)] text-white">
       <div className="mx-auto grid max-w-[1440px] gap-8 px-4 py-10 sm:px-6 md:grid-cols-[2fr_1fr_1fr] lg:px-12">
         <div className="flex max-w-sm flex-col gap-3">
           <Link href="/" className={`${linkClass} flex items-center gap-2 text-white`} aria-label="EliteCadet home">
@@ -32,7 +32,7 @@ export function SiteFooter() {
 
         <nav aria-label="Explore" className="flex flex-col gap-2">
           <p className={headingClass}>Explore</p>
-          {SITE_NAV_LINKS.filter(({ label }) => label !== "Home" && label !== "About").map(({ href, label }) => (
+          {SITE_NAV_LINKS.filter(({ label }) => label !== "Home").map(({ href, label }) => (
             <Link key={href} href={href} className={linkClass}>
               {label}
             </Link>
