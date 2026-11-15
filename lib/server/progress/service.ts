@@ -232,6 +232,20 @@ export interface AcademyPerformance {
   points: ScorePoint[];
 }
 
+// The academy's progress and score rows come from two database functions (migration 0037) that check the
+// caller once instead of re-checking row-level security on every row: about 15 ms instead of 1 to 3 s. If the
+// function is not there yet (code deployed before the migration), fall back to the views, which return the
+// same rows, so deploying in either order never breaks the page.
+const FUNCTION_MISSING = new Set(["42883", "PGRST202"]);
+async function readWithFallback<T>(
+  viaFunction: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { code?: string; message?: string } | null }>,
+  viaView: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { code?: string; message?: string } | null }>,
+) {
+  const res = await readAll(viaFunction);
+  if (res.error?.code && FUNCTION_MISSING.has(res.error.code)) return readAll(viaView);
+  return res;
+}
+
 export async function getAcademyPerformance(nowIso: string): Promise<ServiceResult<AcademyPerformance>> {
   const me = await getActor();
   if (!me || me.profile.role !== "academy_admin" || !me.profile.academyId) return fail("unauthorized", "Only an academy admin can view performance.");
@@ -242,11 +256,15 @@ export async function getAcademyPerformance(nowIso: string): Promise<ServiceResu
   // pages with a stable order.
   const [batches, rows, scores, students, open] = await Promise.all([
     supabase.from("batches").select("id, name").eq("academy_id", academyId).eq("status", "active").order("name"),
-    readAll((from, to) =>
-      supabase.from("student_progress").select(`student_id, batch_id, practice_done, ${PROGRESS_SUMMARY_COLUMNS}`).eq("academy_id", academyId).order("student_id").range(from, to),
+    readWithFallback(
+      (from, to) => supabase.rpc("academy_progress_rows").order("student_id").range(from, to),
+      (from, to) =>
+        supabase.from("student_progress").select(`student_id, batch_id, practice_done, ${PROGRESS_SUMMARY_COLUMNS}`).eq("academy_id", academyId).order("student_id").range(from, to),
     ),
-    readAll((from, to) =>
-      supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at, batch_id").order("student_id").order("assessment_id").range(from, to),
+    readWithFallback(
+      (from, to) => supabase.rpc("academy_score_points").order("student_id").order("assessment_id").range(from, to),
+      (from, to) =>
+        supabase.from("student_scores").select("student_id, assessment_id, title, category, score, max_score, score_pct, reviewed_at, batch_id").order("student_id").order("assessment_id").range(from, to),
     ),
     readAll((from, to) => supabase.from("academy_students").select("id, full_name, email, batch_id, batch_name").eq("academy_id", academyId).order("id").range(from, to)),
     readAll((from, to) => supabase.from("assessments").select("id, batch_id").eq("academy_id", academyId).eq("status", "published").order("id").range(from, to)),

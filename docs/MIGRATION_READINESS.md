@@ -38,7 +38,7 @@ tells people to paste SQL into the SQL Editor, which records nothing) is **unkno
 | `0028` | inserts a `profiles` row (and an academy for an academy admin) for any account without one | adds rows only; 0 accounts qualify today | yes |
 | `0029`-`0033` | `create index if not exists` on 10 foreign-key columns | none. A plain `create index` blocks writes to that table while it builds; the tables hold a handful to a few hundred rows, so the lock is milliseconds. Do not use `concurrently` in the SQL Editor transaction | yes |
 
-`supabase/catchup/production_catchup_0005_0036.sql` is **only** for a database that is still at `0004`.
+`supabase/catchup/production_catchup_0005_0037.sql` is **only** for a database that is still at `0004`.
 It refuses to run when `0005` is present. **Do not run it on this project.**
 
 ## Verify first (read-only, paste into the SQL Editor; nothing is changed)
@@ -103,7 +103,7 @@ stay batch-only.
 6. **Rollback** is the commented block at the top of the migration file. Dropping the table and view does not
    touch any other data, but restore `is_my_mentee` to its `0014` body first.
 
-If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0036.sql`
+If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0037.sql`
 (regenerated with `bash supabase/catchup/build.sh`) includes `0034`.
 
 ## Migration 0035: academy admin notifications (new, NOT applied to the hosted project)
@@ -145,6 +145,27 @@ academy admin, a mentor and a student was identical before and after.
 4. **Deploy order:** either order works; the application code does not depend on this migration (it only makes the
    same query faster). The application change that pages through results (`lib/supabase/read-all.ts`) is independent.
 5. **Rollback:** the commented block at the top of the migration file restores the previous definition.
+
+## Migration 0037: academy performance functions (new, NOT applied to the hosted project)
+
+`supabase/migrations/0037_academy_performance_functions.sql` **adds two read-only functions**,
+`academy_progress_rows()` and `academy_score_points()`. No table, view, policy or data changes; the views and every
+policy stay as they are. The academy dashboard and performance pages call them so the caller's access is checked
+once instead of on every row.
+
+- **Security:** the academy is taken from the caller's own profile (`current_admin_academy_id()`), never a parameter.
+  Students, mentors, super admins and anyone not an academy admin get zero rows; anonymous callers are refused;
+  `EXECUTE` is granted to `authenticated` only. Verified locally with `tests/performance/scripts/verify-academy-functions.sql`
+  (identical md5 to the views for the academy admin; 0 rows for the other roles; another academy's admin sees only their academy).
+- **Measured locally** (300-student academy, 1,435 scores): 1 to 3 s per request through the views, about 15 ms and 7 ms
+  through the functions. The hosted `authenticated` role times out at 8 s, so a large academy could fail to load
+  through the views.
+1. **Before:** nothing to check; the statements are `create or replace function`. Back up or confirm point-in-time recovery.
+2. Run the file in the SQL Editor in one transaction.
+3. **After (read-only):** as an academy admin, `select count(*) from public.academy_progress_rows();` returns the academy's student count.
+4. **Deploy order:** either order works. If the code is deployed first, it falls back to the views automatically
+   (same rows, slower) until the migration is applied.
+5. **Rollback:** the commented `drop function` lines at the top of the migration file.
 
 ## Rollback
 
