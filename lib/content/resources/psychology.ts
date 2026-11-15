@@ -137,7 +137,7 @@ export const PSYCHOLOGY_RESOURCES: ResourceArticle[] = [
     objectives: [
       "Use the 30-second viewing window to collect the details a story needs.",
       "Plan a complete story in your head before you start writing.",
-      "Practise on four described picture prompts and compare your stories with model versions.",
+      "Practice on four described picture prompts and compare your stories with model versions.",
       "Build a weekly practice routine that improves both speed and quality.",
     ],
     sections: [
@@ -311,7 +311,7 @@ export const PSYCHOLOGY_RESOURCES: ResourceArticle[] = [
         ],
         example: {
           label: "Word: weak response / better response",
-          text: "FAILURE: 'Failure makes me sad and depressed.' / 'Failure showed me where to practise more.'\n\nFEAR: 'Fear is very dangerous for a person.' / 'Facing small fears regularly builds confidence.'\n\nMOTHER: 'One should always respect his mother.' / 'My mother manages the house with great patience.'\n\nCROWD: 'Crowds are irritating and noisy.' / 'Volunteers guided the crowd safely at the mela.'\n\nDEFEAT: 'Defeat is the end of all hopes.' / 'Our team analysed the defeat and trained harder.'\n\nNIGHT: 'Night is dark and scary.' / 'Watchmen keep the colony safe at night.'",
+          text: "FAILURE: 'Failure makes me sad and depressed.' / 'Failure showed me where to practice more.'\n\nFEAR: 'Fear is very dangerous for a person.' / 'Facing small fears regularly builds confidence.'\n\nMOTHER: 'One should always respect his mother.' / 'My mother manages the house with great patience.'\n\nCROWD: 'Crowds are irritating and noisy.' / 'Volunteers guided the crowd safely at the mela.'\n\nDEFEAT: 'Defeat is the end of all hopes.' / 'Our team analysed the defeat and trained harder.'\n\nNIGHT: 'Night is dark and scary.' / 'Watchmen keep the colony safe at night.'",
         },
       },
       {
@@ -534,7 +534,7 @@ export const PSYCHOLOGY_RESOURCES: ResourceArticle[] = [
       },
     ],
     takeaways: [
-      "Practise under real conditions: 60 words, 15 seconds each, no going back.",
+      "Practice under real conditions: 60 words, 15 seconds each, no going back.",
       "Model responses show qualities to aim for; they are not sentences to memorise.",
       "Tagging your responses reveals patterns that a quick read-through misses.",
       "Read your full sheet as a stranger would and ask whether it reflects the real you.",
@@ -543,11 +543,11 @@ export const PSYCHOLOGY_RESOURCES: ResourceArticle[] = [
   },
 
   // ---------------------------------------------------------------------------
-  // 5. Practising decisiveness for the SRT
+  // 5. Practicing decisiveness for the SRT
   // ---------------------------------------------------------------------------
   {
     slug: "srt-decisiveness",
-    title: "Practising decisiveness for the SRT",
+    title: "Practicing decisiveness for the SRT",
     category: "Psychology Tests",
     description: "How to react to a situation instead of describing it.",
     updatedOn: "2026-10-25",
@@ -668,7 +668,7 @@ export const PSYCHOLOGY_RESOURCES: ResourceArticle[] = [
     description: "Sixteen everyday situations with model responses and a one-line explanation for each.",
     updatedOn: "2026-10-25",
     objectives: [
-      "Practise responding to a varied set of realistic situations under time pressure.",
+      "Practice responding to a varied set of realistic situations under time pressure.",
       "Compare your responses with model responses and understand the reasoning behind each.",
       "Notice which kinds of situations you handle well and which slow you down.",
       "Prepare to attempt a full 60-situation set in 30 minutes.",
@@ -731,7 +731,7 @@ export const PSYCHOLOGY_RESOURCES: ResourceArticle[] = [
         heading: "Reviewing your responses",
         paragraphs: [
           "After comparing all 16 responses, sort your own answers into three groups: those that covered the same essential point as the model, those that were reasonable but missed something important, and those that were vague, feeling-based or unrealistic.",
-          "Look at the settings where you did best and worst. Many candidates find emergencies easy but struggle with situations involving people, such as a non-cooperating teammate or a classmate who is cheating. Those are the situations to practise more.",
+          "Look at the settings where you did best and worst. Many candidates find emergencies easy but struggle with situations involving people, such as a non-cooperating teammate or a classmate who is cheating. Those are the situations to practice more.",
           "When you are comfortable with these 16, move to a full set of 60 situations in 30 minutes, made from situations you write yourself or collect from practice books. Keep the same review method each time.",
         ],
       },

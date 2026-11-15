@@ -32,7 +32,7 @@ function Evaluation({ e, audience }: { e: AiEvaluation; audience: "student" | "m
     ["Where it shows", e.feedback.evidence],
     ["Why it matters", e.feedback.impact],
     [audience === "student" ? "One thing to change" : "Suggested change", e.feedback.improvementAction],
-    ["Practise next", e.feedback.recommendedPractice],
+    ["Practice next", e.feedback.recommendedPractice],
   ];
   return (
     <div className="flex flex-col gap-6">

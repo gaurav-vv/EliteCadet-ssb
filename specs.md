@@ -132,7 +132,7 @@ SUPER_ADMIN   (added 2026-10-07 — see §8a)
 
 | Role | Uses the platform to |
 |---|---|
-| Student | Practise, receive AI-assisted feedback, learn, attend sessions, track readiness, see weak areas, follow recommendations |
+| Student | Practice, receive AI-assisted feedback, learn, attend sessions, track readiness, see weak areas, follow recommendations |
 | Mentor | View assigned mentees, monitor performance, evaluate, give feedback, run basic sessions, spot students needing attention |
 | Academy Admin | Manage students, batches and mentors; monitor readiness and performance; spot students needing attention; view basic reports |
 
@@ -418,7 +418,7 @@ Conference (Day 5)  Conference Questions (practice) · Mock Conference
 - **PIQ-based questions (interview only).** The student fills a short PIQ-style form (hometown,
   education, favourite subject, sports, hobbies, activities, achievements, previous SSB attempts; all
   optional, at least one required). Questions are generated from fixed templates, with no AI and no
-  network call, and practised like any other bank. The conference is about the week's performance, so
+  network call, and practiced like any other bank. The conference is about the week's performance, so
   it has no PIQ questions.
 - **Mock mode.** A timed run, one question at a time with a per-question countdown and a manual
   "Next question" button, followed by a review screen (question, answer, guidance, self-review).
@@ -1186,7 +1186,7 @@ dashboard figure, user, academy, batch, session, content item or progress value 
 
 Every phase ships with a working frontend and backend against the real database, never as static
 mockups. The finished workflow is: Super Admin publishes content → Academy Admin creates a batch,
-adds students and assigns mentors → Mentor schedules a session → students attend and practise → the
+adds students and assigns mentors → Mentor schedules a session → students attend and practice → the
 mentor evaluates and the feedback is stored → progress updates → each role sees the same progress
 data at its own scope (Student: "My Progress"; Mentor: "My Assigned Students"; Academy: "Academy /
 Batch Performance"; Super Admin: "Platform Analytics").

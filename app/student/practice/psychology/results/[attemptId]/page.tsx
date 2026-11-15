@@ -31,7 +31,7 @@ export default async function PsychologyResultPage({ params }: { params: Promise
               <p className="text-[14px] text-ink-secondary">Submitted {formatIstDay(result.data.submittedAt)}</p>
             </div>
             <Button asChild className="min-h-11">
-              <Link href={`/student/practice/psychology/${result.data.test}`}>Practise again</Link>
+              <Link href={`/student/practice/psychology/${result.data.test}`}>Practice again</Link>
             </Button>
           </div>
           <PendingRefresh active={result.data.feedback.status === "pending"} />

@@ -69,7 +69,7 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
         heading: "Subject-wise approach",
         paragraphs: [
           "Mathematics rewards accuracy more than speed in the early stages. Learn the standard topics thoroughly — algebra, trigonometry, matrices and determinants, analytical geometry, calculus, vectors, statistics and probability, as listed in the official syllabus — and only then work on speed. Read the negative marking rule in the notification and decide in advance how you will handle questions you are unsure about.",
-          "English in the GAT tests reading comprehension, vocabulary, grammar and usage. Reading a quality newspaper editorial daily and noting unfamiliar words in context is more useful than memorising long word lists. Practise spotting errors and completing sentences regularly.",
+          "English in the GAT tests reading comprehension, vocabulary, grammar and usage. Reading a quality newspaper editorial daily and noting unfamiliar words in context is more useful than memorising long word lists. Practice spotting errors and completing sentences regularly.",
           "General Knowledge is the largest section by marks. Cover the static subjects through NCERT books, and follow current affairs through official and reliable sources. Keep your notes short so that you can revise them many times.",
         ],
       },
@@ -81,7 +81,7 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
           "Small daily habits help: speak in English for a few minutes on a topic, take part in sports or team activities, read about the armed forces, and reflect honestly on your strengths and weaknesses. Fill in a practice PIQ form so that you know your own background facts precisely.",
         ],
         bullets: [
-          "Practise a few WAT words or SRT situations each week on the app.",
+          "Practice a few WAT words or SRT situations each week on the app.",
           "Join a team sport or activity and take responsibility in it.",
           "Read about the three services and their training academies.",
         ],
@@ -161,9 +161,9 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
         id: "paper-strategy",
         heading: "Paper-wise strategy",
         paragraphs: [
-          "English is common to every route and is often underestimated. Practise reading comprehension, synonyms and antonyms in context, sentence improvement and spotting errors. Read one editorial a day and summarise it in three sentences.",
+          "English is common to every route and is often underestimated. Practice reading comprehension, synonyms and antonyms in context, sentence improvement and spotting errors. Read one editorial a day and summarise it in three sentences.",
           "General Knowledge covers History, Geography, Polity, Economy, General Science and current affairs. School-level NCERT books are a strong base. Keep current affairs notes in a fixed format and revise them weekly.",
-          "Elementary Mathematics covers arithmetic, algebra, trigonometry, geometry, mensuration and statistics at roughly school level. Graduates who have been away from Mathematics for some years should start with basics and rebuild speed gradually. Read the negative marking rule in the notification and practise deciding when to skip.",
+          "Elementary Mathematics covers arithmetic, algebra, trigonometry, geometry, mensuration and statistics at roughly school level. Graduates who have been away from Mathematics for some years should start with basics and rebuild speed gradually. Read the negative marking rule in the notification and practice deciding when to skip.",
         ],
       },
       {
@@ -199,7 +199,7 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
         id: "common-pitfalls",
         heading: "Common pitfalls for CDS aspirants",
         paragraphs: [
-          "Graduates sometimes assume that school-level Mathematics will be easy and leave it until late. In practice, speed and accuracy fade after a few years away from the subject, so begin early with basic arithmetic and algebra and practise steadily.",
+          "Graduates sometimes assume that school-level Mathematics will be easy and leave it until late. In practice, speed and accuracy fade after a few years away from the subject, so begin early with basic arithmetic and algebra and practice steadily.",
           "Another frequent mistake is collecting too many books and online courses. One good source per subject, the official syllabus, previous papers and your own notes are usually enough. Switching resources every few weeks wastes time and creates the feeling of never finishing.",
           "Finally, some candidates neglect fitness and expression while preparing for the written exam. A daily run and a few minutes of spoken English cost little time and pay off at the SSB.",
         ],
@@ -628,14 +628,14 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
         ],
         example: {
           label: "Sample consistency check",
-          text: "SDT claim: my friends think I take responsibility. Evidence: I coordinated our class trip and handled the budget. PIQ: listed as class representative. Interview readiness: can describe what went wrong on the trip and how I fixed it. Group task behaviour to practise: volunteer for a role, and listen before proposing a plan.",
+          text: "SDT claim: my friends think I take responsibility. Evidence: I coordinated our class trip and handled the budget. PIQ: listed as class representative. Interview readiness: can describe what went wrong on the trip and how I fixed it. Group task behaviour to practice: volunteer for a role, and listen before proposing a plan.",
         },
       },
       {
-        id: "practise-consistently",
-        heading: "Practise the same way you will be assessed",
+        id: "practice-consistently",
+        heading: "Practice the same way you will be assessed",
         paragraphs: [
-          "When you practise TAT, WAT and SRT on the app, review your responses together, not separately. Ask whether they show the same kind of person. Compare them with your SDT draft and your practice PIQ.",
+          "When you practice TAT, WAT and SRT on the app, review your responses together, not separately. Ask whether they show the same kind of person. Compare them with your SDT draft and your practice PIQ.",
           "Ask a friend or mentor who knows you to read a set of your responses and tell you whether they sound like you. Their reaction is often more useful than any score.",
           "When you use the app's AI-assisted feedback, treat it as a prompt for reflection rather than a verdict. Look for repeated observations across different tests — if several responses are flagged for the same pattern, that pattern is worth working on in real life.",
         ],
@@ -645,11 +645,11 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
         heading: "Staying yourself under pressure",
         paragraphs: [
           "Consistency is hardest when you are tired, nervous or surprised. During the SSB you will write many responses at speed, take part in group tasks with strangers and face questions you did not expect. Under that pressure, people tend to fall back on habits — which is exactly why genuine habits matter more than prepared lines.",
-          "Practise under mild pressure before the SSB. Attempt WAT and SRT at realistic timings, take part in timed group discussions, and ask a mock interviewer to follow up on your answers with 'why' and 'give me an example'. Notice where your answers change from what you wrote earlier.",
+          "Practice under mild pressure before the SSB. Attempt WAT and SRT at realistic timings, take part in timed group discussions, and ask a mock interviewer to follow up on your answers with 'why' and 'give me an example'. Notice where your answers change from what you wrote earlier.",
           "If you realise during the SSB that you made a mistake or overstated something, it is acceptable to correct it honestly. A calm correction reads as maturity; defending an inaccurate claim usually makes the inconsistency worse.",
         ],
         bullets: [
-          "Practise at realistic timings so habits, not scripts, carry you.",
+          "Practice at realistic timings so habits, not scripts, carry you.",
           "Invite follow-up questions in mock interviews.",
           "Correct honest mistakes calmly instead of defending them.",
         ],
@@ -727,7 +727,7 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
           "Expression: read aloud for ten minutes daily; speak for two minutes on a topic without notes.",
           "Organising: plan a small event or a weekly family task end to end, including a budget.",
           "Cooperation and responsibility: take a defined role in a team sport, NCC, NSS or a volunteer group.",
-          "Initiative and decision-making: practise SRT situations and compare your response with what you actually did in similar real situations.",
+          "Initiative and decision-making: practice SRT situations and compare your response with what you actually did in similar real situations.",
           "Stamina and determination: follow a fitness plan with a measurable target, such as improving a timed run.",
         ],
       },
@@ -826,14 +826,14 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
         heading: "Week 2: psychology tests and expression",
         paragraphs: [
           "Increase psychology test practice and work towards the timings used at the SSB. Review your responses as a set to check consistency.",
-          "Start speaking practice: narrate a story from a picture within the time given in PPDT practice, and practise a short group discussion with friends or on a recorded topic.",
+          "Start speaking practice: narrate a story from a picture within the time given in PPDT practice, and practice a short group discussion with friends or on a recorded topic.",
         ],
       },
       {
         id: "week-three",
         heading: "Week 3: group tasks and interview",
         paragraphs: [
-          "Learn the format of group tasks such as group discussion, group planning exercise, progressive and half group tasks, lecturette and command task. Practise lecturettes on familiar topics and group planning exercises with friends if possible.",
+          "Learn the format of group tasks such as group discussion, group planning exercise, progressive and half group tasks, lecturette and command task. Practice lecturettes on familiar topics and group planning exercises with friends if possible.",
           "Conduct mock interviews based on your PIQ. Ask someone to question you on your family, education, hobbies, achievements, reasons for joining and current affairs, and to follow up on your answers.",
         ],
       },
@@ -893,7 +893,7 @@ export const EXAM_STRATEGY_RESOURCES: ResourceArticle[] = [
     takeaways: [
       "Read your call-up letter and official procedure first.",
       "Move from self-understanding to practice to integration across four weeks.",
-      "Practise all three techniques: psychology, group tasks and interview.",
+      "Practice all three techniques: psychology, group tasks and interview.",
       "Keep fitness, sleep and rest in the plan; arrive fresh.",
     ],
   },

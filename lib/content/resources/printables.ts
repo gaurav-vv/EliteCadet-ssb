@@ -216,7 +216,7 @@ export const PRINTABLE_DOCS: PrintableDoc[] = [
     title: "SRT practice sheet",
     kind: "Worksheet",
     category: "Psychology Tests",
-    description: "Twenty everyday situations to practise quick, practical reaction responses.",
+    description: "Twenty everyday situations to practice quick, practical reaction responses.",
     blocks: [
       {
         heading: "How to use this sheet",
@@ -304,7 +304,7 @@ export const PRINTABLE_DOCS: PrintableDoc[] = [
           "Read about the SSB procedure: screening, psychology tests, GTO, interview, conference.",
           "Prepare your PIQ fact sheet from your certificates.",
           "Start a current affairs notebook with one page per area.",
-          "Practise 2 TAT stories and 30 WAT words daily.",
+          "Practice 2 TAT stories and 30 WAT words daily.",
           "Begin running 3 km and basic strength work.",
         ],
       },
@@ -312,9 +312,9 @@ export const PRINTABLE_DOCS: PrintableDoc[] = [
         heading: "Week 2 – Psychology tests",
         style: "check",
         lines: [
-          "Practise 4 TAT stories daily within time.",
-          "Practise 60 WAT words in one sitting, three times this week.",
-          "Practise 30 SRT situations daily.",
+          "Practice 4 TAT stories daily within time.",
+          "Practice 60 WAT words in one sitting, three times this week.",
+          "Practice 30 SRT situations daily.",
           "Write a draft self-description and review it honestly.",
           "Do two group discussions with friends or online peers.",
         ],
@@ -325,8 +325,8 @@ export const PRINTABLE_DOCS: PrintableDoc[] = [
         lines: [
           "Solve 3 GPE practice scenarios with written plans and timings.",
           "Give 5 lecturettes on different topics with a timer.",
-          "Practise 2 group discussions and review your contributions.",
-          "Practise a mock obstacle circuit twice this week.",
+          "Practice 2 group discussions and review your contributions.",
+          "Practice a mock obstacle circuit twice this week.",
           "Increase running to 4 to 5 km.",
         ],
       },
@@ -335,7 +335,7 @@ export const PRINTABLE_DOCS: PrintableDoc[] = [
         style: "check",
         lines: [
           "Hold 3 mock interviews based on your PIQ fact sheet.",
-          "Practise rapid-fire questions daily.",
+          "Practice rapid-fire questions daily.",
           "Revise your current affairs notebook and explain 10 topics aloud.",
           "Complete one full timed set of TAT, WAT and SRT.",
           "Prepare documents and packing using the checklist.",

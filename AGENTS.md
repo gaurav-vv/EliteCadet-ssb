@@ -40,7 +40,7 @@ and record the resolution in `status.md` → *Decisions*.
 
 SSB Academy is a web platform for **Services Selection Board (SSB) preparation**, serving three academy roles plus a platform Super Admin:
 
-- **Student** — practises, receives AI-assisted feedback, learns, tracks readiness.
+- **Student** — practices, receives AI-assisted feedback, learns, tracks readiness.
 - **Mentor** — reviews mentees, evaluates performance, runs sessions, gives feedback.
 - **Academy Admin** — manages students, batches and mentors; monitors academy-level performance.
 - **Super Admin** — manages the whole platform: users, academies, global content, permissions,

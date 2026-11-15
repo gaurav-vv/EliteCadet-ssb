@@ -76,7 +76,7 @@ export interface JourneyDayProgress {
   total: number;
 }
 
-/** The next self-paced bank to work on; "all-done" when finished; null when there's nothing to practise. */
+/** The next self-paced bank to work on; "all-done" when finished; null when there's nothing to practice. */
 export type JourneyMission = { dayNumber: number; title: string; href: string; done: number; total: number } | "all-done" | null;
 
 // Mentor view of a mentee's practice (answers readable by their mentors).
