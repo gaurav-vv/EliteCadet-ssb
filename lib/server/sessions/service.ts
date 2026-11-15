@@ -318,6 +318,18 @@ export async function removeAvailability(id: string): Promise<ServiceResult<null
 export async function getMyStudentSessions(filter: unknown, nowIso: string): Promise<ServiceResult<SessionRecord[]>> {
   const actor = await getActor();
   if (!actor || actor.profile.role !== "student") return fail("unauthorized", "Only a student can view their sessions.");
+  // One database function (0038) returns the student's sessions with the host's name in a single read: the same
+  // sessions row-level security allows (their batch's, or ones they were selected for), without re-checking the
+  // policy per row or a second request for host names. Falls back to the table read if the migration isn't applied.
+  const supabase = await createClient();
+  const fast = await supabase.rpc("my_sessions", { p_filter: parseSessionFilter(filter), p_now: nowIso });
+  if (!fast.error) {
+    const rows = ((fast.data ?? []) as Record<string, unknown>[]).map((r) =>
+      toSession({ ...r, batch: { name: r.batch_name }, mentor: { full_name: r.host_name }, session_participants: ((r.participant_ids as string[] | null) ?? []).map((student_id) => ({ student_id })) }),
+    );
+    return { ok: true, data: rows.filter((s): s is SessionRecord => s !== null) };
+  }
+  if (!(fast.error.code && ["42883", "PGRST202"].includes(fast.error.code))) return mapDbError(fast.error, "We couldn't load sessions. Please try again.");
   // No extra scope on purpose: RLS (can_see_session) returns exactly the
   // sessions for this student's batch or the ones they were selected for.
   return listSessions({}, parseSessionFilter(filter), nowIso);

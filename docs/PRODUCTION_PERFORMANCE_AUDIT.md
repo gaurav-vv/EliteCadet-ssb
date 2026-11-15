@@ -129,7 +129,7 @@ It can be revisited with real region data.
 
 ## Before production launch
 
-1. Apply migrations to the hosted database in order (`0034` to `0037` may be local only; check first), following `docs/MIGRATION_READINESS.md`.
+1. Apply migrations to the hosted database in order (`0034` to `0038` may be local only; check first), following `docs/MIGRATION_READINESS.md`.
 2. Align the Vercel function region with the Supabase region (a project setting you approve).
 3. Check the hosted email setup (custom SMTP, Site URL, Redirect URLs); see `docs/email.md`.
 4. Run the staged load test in `docs/PRODUCTION_SCALING_PLAN.md` and read the real numbers before claiming 100 users.

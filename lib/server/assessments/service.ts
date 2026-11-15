@@ -236,10 +236,40 @@ export async function getReviewQueue(): Promise<ServiceResult<(AttemptRecord & {
 
 // ---- Student --------------------------------------------------------------------
 
+// One database function (0038) returns the student's assessments with their own attempt and reviewed feedback in a
+// single read, instead of two reads that each re-check access policies row by row. Rebuilt into the same nested
+// shape the records are parsed from below. Falls back to the two table reads if the migration isn't applied yet.
+function fromAssessmentRow(r: Record<string, unknown>): (AssessmentRecord & { attempt: AttemptRecord | null }) | null {
+  const assessment = toAssessment({ ...r, batch: { name: r.batch_name }, mentor: { full_name: r.mentor_name } });
+  if (!assessment) return null;
+  const attempt =
+    typeof r.attempt_id === "string"
+      ? toAttempt({
+          id: r.attempt_id,
+          assessment_id: r.id,
+          student_id: r.student_id ?? "",
+          answers: r.attempt_answers,
+          status: r.attempt_status,
+          submitted_at: r.attempt_submitted_at,
+          student: { full_name: r.student_name, email: r.student_email },
+          feedback:
+            typeof r.feedback_id === "string"
+              ? { id: r.feedback_id, score: r.feedback_score, strengths: r.feedback_strengths, improvement_areas: r.feedback_improvement_areas, comments: r.feedback_comments, status: r.feedback_status, reviewed_at: r.feedback_reviewed_at, mentor: { full_name: r.feedback_mentor_name } }
+              : null,
+        })
+      : null;
+  return { ...assessment, attempt };
+}
+
 export async function getStudentAssessments(): Promise<ServiceResult<(AssessmentRecord & { attempt: AttemptRecord | null })[]>> {
   const me = await role("student");
   if (!me) return fail("unauthorized", "Only a student can view assessments.");
   const supabase = await createClient();
+  const fast = await supabase.rpc("my_assessments");
+  if (!fast.error) {
+    return { ok: true, data: ((fast.data ?? []) as Record<string, unknown>[]).map((r) => fromAssessmentRow({ ...r, student_id: me.id })).filter((a): a is AssessmentRecord & { attempt: AttemptRecord | null } => a !== null) };
+  }
+  if (!(fast.error.code && ["42883", "PGRST202"].includes(fast.error.code))) return mapDbError(fast.error, "We couldn't load your assessments. Please try again.");
   const [assessments, attempts] = await Promise.all([
     supabase.from("assessments").select(A_COLS).neq("status", "draft").order("created_at", { ascending: false }).limit(200),
     supabase.from("assessment_attempts").select(T_COLS).eq("student_id", me.id),

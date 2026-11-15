@@ -47,11 +47,12 @@ describe("student dashboard request budget", () => {
 
     const count = (target: string) => calls.list.filter((c) => c === target).length;
     // The dashboard and getMyProgress share one assessments read and one sessions read.
-    expect(count("from:assessments")).toBe(1);
-    expect(count("from:assessment_attempts")).toBe(1);
-    expect(count("from:sessions")).toBe(1);
-    expect(count("from:student_progress")).toBe(1);
-    expect(count("from:student_scores")).toBe(1);
+    // Each is one database-function read (0038): assessments + attempt + feedback together, sessions + host name together.
+    expect(count("rpc:my_assessments")).toBe(1);
+    expect(count("rpc:my_sessions")).toBe(1);
+    expect(count("rpc:my_progress_summary")).toBe(1);
+    expect(count("rpc:my_score_points")).toBe(1);
+    expect(count("from:assessments") + count("from:assessment_attempts") + count("from:sessions") + count("from:student_progress") + count("from:student_scores")).toBe(0);
     // Before: 15 calls. After: 12.
     expect(calls.list.length).toBeLessThanOrEqual(12);
 

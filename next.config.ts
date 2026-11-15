@@ -12,6 +12,15 @@ const nextConfig: NextConfig = {
   // localhost), e.g. from a local invite or password-reset email.
   allowedDevOrigins: lanDevHosts(),
   poweredByHeader: false,
+  experimental: {
+    // Browser-side page cache. Moving between sections used to re-render the page on the server every time
+    // (each click waited on Vercel plus several Supabase reads). Pages the user has just visited now come
+    // straight from memory for 30 s, so going back and forth between Dashboard, Practice, Sessions and
+    // Assessments is instant. It is per browser tab and per signed-in user, never shared. Anything the
+    // user saves goes through a Server Action that calls revalidatePath, which clears this cache for that
+    // page, and a full reload always fetches fresh data. Prefetched (static-shell) pages keep 3 minutes.
+    staleTimes: { dynamic: 30, static: 180 },
+  },
   images: {
     // Remote images used by PIB news articles and curated YouTube thumbnails.
     remotePatterns: [

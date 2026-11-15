@@ -15,6 +15,10 @@ import { isUuid } from "@/lib/server/users/validation";
 import { CONTENT_CATEGORIES } from "@/types/content";
 import type { AttendanceStatus, AttentionStudent, BatchPerformance, ProgressSummary, Recommendation, ScorePoint, StudentProgress } from "@/types/progress";
 
+// Postgres "undefined function" / PostgREST "function not found in the schema cache": the migration that adds
+// a database function has not been applied yet, so callers fall back to the views.
+const FUNCTION_MISSING = new Set(["42883", "PGRST202"]);
+
 const fail = <T>(code: "validation_error" | "not_found" | "unauthorized", message: string): ServiceResult<T> => ({ ok: false, error: { code, message } });
 
 export function toScorePoint(row: unknown): ScorePoint | null {
@@ -60,12 +64,30 @@ async function loadStudent(studentId: string): Promise<ServiceResult<StudentProg
   if (row.error) return mapDbError(row.error, "We couldn't load progress. Please try again.");
   if (scores.error) return mapDbError(scores.error, "We couldn't load progress. Please try again.");
   const points = (scores.data ?? []).map(toScorePoint).filter((p): p is ScorePoint => p !== null);
+  return buildStudentProgress(row.data as Record<string, unknown> | null, points);
+}
+
+// The signed-in student's own progress, through two database functions (0038) that check the caller once
+// instead of re-checking the views' access policies on every row. Falls back to the views if the migration
+// hasn't been applied yet (function missing), so the page works either way.
+async function loadMyProgress(studentId: string): Promise<ServiceResult<StudentProgress>> {
+  const supabase = await createClient();
+  const [row, scores] = await Promise.all([supabase.rpc("my_progress_summary"), supabase.rpc("my_score_points")]);
+  if ((row.error?.code && FUNCTION_MISSING.has(row.error.code)) || (scores.error?.code && FUNCTION_MISSING.has(scores.error.code))) return loadStudent(studentId);
+  if (row.error) return mapDbError(row.error, "We couldn't load progress. Please try again.");
+  if (scores.error) return mapDbError(scores.error, "We couldn't load progress. Please try again.");
+  const points = ((scores.data ?? []) as unknown[]).map(toScorePoint).filter((p): p is ScorePoint => p !== null);
+  const first = Array.isArray(row.data) ? row.data[0] : row.data;
+  return buildStudentProgress((first ?? null) as Record<string, unknown> | null, points);
+}
+
+function buildStudentProgress(row: Record<string, unknown> | null, points: ScorePoint[]): ServiceResult<StudentProgress> {
   const categories = categoryAverages(points);
   const { strength, weakArea } = strengthAndWeakArea(categories);
   return {
     ok: true,
     data: {
-      summary: summarize(progressRow(row.data as Record<string, unknown> | null), points),
+      summary: summarize(progressRow(row), points),
       trend: trendOf(points),
       categories,
       strength,
@@ -95,7 +117,7 @@ export async function getMyProgress(nowIso: string, inputs: ProgressInputs = {})
   // The three reads don't depend on each other, so they run together. (They used
   // to run one after another: progress, then assessments, then sessions.)
   const [progress, assessments, sessions] = await Promise.all([
-    loadStudent(me.id),
+    loadMyProgress(me.id),
     inputs.assessments ?? getStudentAssessments(),
     inputs.sessions ?? getMyStudentSessions("upcoming", nowIso),
   ]);
@@ -236,7 +258,6 @@ export interface AcademyPerformance {
 // caller once instead of re-checking row-level security on every row: about 15 ms instead of 1 to 3 s. If the
 // function is not there yet (code deployed before the migration), fall back to the views, which return the
 // same rows, so deploying in either order never breaks the page.
-const FUNCTION_MISSING = new Set(["42883", "PGRST202"]);
 async function readWithFallback<T>(
   viaFunction: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { code?: string; message?: string } | null }>,
   viaView: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { code?: string; message?: string } | null }>,
