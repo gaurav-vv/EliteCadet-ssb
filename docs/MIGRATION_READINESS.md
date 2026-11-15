@@ -38,7 +38,7 @@ tells people to paste SQL into the SQL Editor, which records nothing) is **unkno
 | `0028` | inserts a `profiles` row (and an academy for an academy admin) for any account without one | adds rows only; 0 accounts qualify today | yes |
 | `0029`-`0033` | `create index if not exists` on 10 foreign-key columns | none. A plain `create index` blocks writes to that table while it builds; the tables hold a handful to a few hundred rows, so the lock is milliseconds. Do not use `concurrently` in the SQL Editor transaction | yes |
 
-`supabase/catchup/production_catchup_0005_0037.sql` is **only** for a database that is still at `0004`.
+`supabase/catchup/production_catchup_0005_0038.sql` is **only** for a database that is still at `0004`.
 It refuses to run when `0005` is present. **Do not run it on this project.**
 
 ## Verify first (read-only, paste into the SQL Editor; nothing is changed)
@@ -103,7 +103,7 @@ stay batch-only.
 6. **Rollback** is the commented block at the top of the migration file. Dropping the table and view does not
    touch any other data, but restore `is_my_mentee` to its `0014` body first.
 
-If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0037.sql`
+If the hosted project were ever rebuilt from scratch at `0004`, `supabase/catchup/production_catchup_0005_0038.sql`
 (regenerated with `bash supabase/catchup/build.sh`) includes `0034`.
 
 ## Migration 0035: academy admin notifications (new, NOT applied to the hosted project)
@@ -165,6 +165,28 @@ once instead of on every row.
 3. **After (read-only):** as an academy admin, `select count(*) from public.academy_progress_rows();` returns the academy's student count.
 4. **Deploy order:** either order works. If the code is deployed first, it falls back to the views automatically
    (same rows, slower) until the migration is applied.
+5. **Rollback:** the commented `drop function` lines at the top of the migration file.
+
+## Migration 0038: student performance functions (new, NOT applied to the hosted project)
+
+`supabase/migrations/0038_student_performance_functions.sql` **adds four read-only functions**: `my_progress_summary()`,
+`my_score_points()`, `my_assessments()` and `my_sessions(filter, now)`. No table, view, policy or data changes. The
+student Dashboard, Progress, Roadmap, Assessments and Sessions pages call them, so a student's access is checked once
+instead of once per row, and assessments + attempt + feedback (and sessions + host name) come back in one request instead of two.
+
+- **Security:** the student is always `auth.uid()`; no function takes a student id. Each returns only what the existing
+  policies already let that student see (non-draft assessments of their own batch, their own attempt, their own
+  *reviewed* feedback, sessions of their batch or ones they were selected for). A user in no batch gets zero rows;
+  anonymous callers are refused; `EXECUTE` is granted to `authenticated` only. Verified locally with
+  `tests/performance/scripts/verify-student-functions.sql` (identical md5 to the old path for five students and all three session views).
+- **Measured locally** (student with 6 attempts, noisy PC): assessments 230 ms to 103 ms (up to 850 ms before on a cold run),
+  progress summary 42 ms to 23 ms, sessions 34 ms to 10 ms, and two requests became one for assessments and for sessions.
+- **Also in this change (no database step):** `experimental.staleTimes` in `next.config.ts` keeps visited pages in the
+  browser for 30 s, so moving between sections is instant. Saves clear it through `revalidatePath`.
+1. **Before:** nothing to check; the statements are `create or replace function`. Back up or confirm point-in-time recovery.
+2. Run the file in the SQL Editor in one transaction.
+3. **After (read-only):** as a student, `select count(*) from public.my_assessments();` returns the assessments of their batch.
+4. **Deploy order:** either order works. If the code is deployed first, it falls back to the old reads automatically.
 5. **Rollback:** the commented `drop function` lines at the top of the migration file.
 
 ## Rollback

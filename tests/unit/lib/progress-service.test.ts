@@ -67,7 +67,20 @@ describe("getMyProgress", () => {
     expect(res.ok).toBe(true);
     expect(res.data?.summary).toMatchObject({ avgScorePct: 60, attendancePct: 75, contentCompleted: 2 });
     expect(res.data?.recentFeedback).toHaveLength(1);
-    for (const c of db.calls.slice(0, 2)) expect(c.q.eq).toHaveBeenCalledWith("student_id", ME);
+    // Read through the two database functions, which take no student id: the caller is always auth.uid().
+    expect(db.calls.map((c) => c.table)).toEqual(["my_progress_summary", "my_score_points"]);
+  });
+
+  it("falls back to the views (own rows only) when the 0038 functions aren't there yet", async () => {
+    vi.mocked(getActor).mockResolvedValue(actor("student"));
+    const missing = { data: null, error: { code: "PGRST202", message: "function not found" } };
+    db.queue.push(missing, missing, { data: { reviewed_count: 1, sessions_present: 3, sessions_absent: 1, content_completed: 2, last_submission_at: null }, error: null }, { data: [scoreRow({ student_id: ME })], error: null });
+    const res = await service.getMyProgress(NOW);
+    expect(res.ok).toBe(true);
+    expect(res.data?.summary).toMatchObject({ avgScorePct: 60, attendancePct: 75, contentCompleted: 2 });
+    const views = db.calls.filter((c) => c.table === "student_progress" || c.table === "student_scores");
+    expect(views).toHaveLength(2);
+    for (const c of views) expect(c.q.eq).toHaveBeenCalledWith("student_id", ME);
   });
 
   it("shows nothing invented when there is no data", async () => {
@@ -83,16 +96,17 @@ describe("progress reads name the columns they need (no select *)", () => {
   const selected = () => db.calls.map((c) => ({ table: c.table, cols: c.q.select.mock.calls[0]?.[0] as string }));
   const needed = ["reviewed_count", "sessions_present", "sessions_absent", "content_completed", "last_submission_at"];
 
-  it("a student's own progress selects only what the summary and score points read", async () => {
+  it("a student's own progress (view fallback) selects only what the summary and score points read", async () => {
     vi.mocked(getActor).mockResolvedValue(actor("student"));
-    db.queue.push({ data: null, error: null }, { data: [], error: null });
+    const missing = { data: null, error: { code: "42883", message: "function does not exist" } };
+    db.queue.push(missing, missing, { data: null, error: null }, { data: [], error: null });
     await service.getMyProgress(NOW);
-    const [progress, scores] = selected();
+    const [progress, scores] = selected().filter((c) => c.table === "student_progress" || c.table === "student_scores");
     expect(progress).toEqual({ table: "student_progress", cols: service.PROGRESS_SUMMARY_COLUMNS });
     expect(scores).toEqual({ table: "student_scores", cols: service.SCORE_POINT_COLUMNS });
     for (const col of needed) expect(progress.cols).toContain(col);
     for (const col of ["assessment_id", "category", "score_pct", "reviewed_at", "improvement_areas", "strengths"]) expect(scores.cols).toContain(col);
-    for (const { cols } of selected()) expect(cols).not.toContain("*");
+    for (const { cols } of selected().filter((c) => c.cols)) expect(cols).not.toContain("*");
   });
 
   it("the academy reads use the two database functions (checked once per call, not per row)", async () => {
@@ -170,7 +184,7 @@ describe("getMyProgress: assessments and sessions are read once, and together", 
     await vi.waitFor(() => expect(getStudentAssessments).toHaveBeenCalled());
     // Both reads and the progress queries are already in flight while the first is unresolved.
     expect(getMyStudentSessions).toHaveBeenCalled();
-    expect(db.from).toHaveBeenCalledWith("student_progress");
+    expect(db.from).toHaveBeenCalledWith("my_progress_summary");
     releaseAssessments({ ok: true, data: [] });
     releaseSessions({ ok: true, data: [] });
     expect((await pending).ok).toBe(true);
