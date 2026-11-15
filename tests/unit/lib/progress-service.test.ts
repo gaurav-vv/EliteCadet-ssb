@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({ from: vi.fn(), queue: [] as unknown[], calls: [] as { table: string; q: Record<string, ReturnType<typeof vi.fn>> }[] }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: db.from }) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: db.from, rpc: (fn: string) => db.from(fn) }) }));
 vi.mock("@/lib/server/auth/guard", () => ({ getActor: vi.fn() }));
 vi.mock("@/lib/server/academy-people/service", () => ({ getMyMentee: vi.fn() }));
 vi.mock("@/lib/server/assessments/service", () => ({ getStudentAssessments: vi.fn(async () => ({ ok: true, data: [] })) }));
@@ -95,15 +95,29 @@ describe("progress reads name the columns they need (no select *)", () => {
     for (const { cols } of selected()) expect(cols).not.toContain("*");
   });
 
-  it("the academy view also selects student_id, batch_id and practice_done, still no select *", async () => {
+  it("the academy reads use the two database functions (checked once per call, not per row)", async () => {
     vi.mocked(getActor).mockResolvedValue({ ...actor("academy_admin"), profile: { ...actor("academy_admin").profile, academyId: "acad" } });
+    await service.getAcademyPerformance(NOW);
+    const tables = db.calls.map((c) => c.table);
+    expect(tables).toContain("academy_progress_rows");
+    expect(tables).toContain("academy_score_points");
+    expect(tables).not.toContain("student_progress");
+    expect(tables).not.toContain("student_scores");
+  });
+
+  it("falls back to the views, with named columns and no select *, when the functions are not installed yet", async () => {
+    vi.mocked(getActor).mockResolvedValue({ ...actor("academy_admin"), profile: { ...actor("academy_admin").profile, academyId: "acad" } });
+    const missing = { data: null, error: { code: "PGRST202", message: "Could not find the function" } };
+    // batches, progress fn (missing), scores fn (missing), students, open assessments, then the two view reads
+    db.queue.push({ data: [], error: null }, missing, missing, { data: [], error: null }, { data: [], error: null });
     await service.getAcademyPerformance(NOW);
     const progress = selected().find((c) => c.table === "student_progress");
     expect(progress?.cols).toContain("student_id");
     expect(progress?.cols).toContain("batch_id");
     expect(progress?.cols).toContain("practice_done");
     for (const col of needed) expect(progress?.cols).toContain(col);
-    expect(progress?.cols).not.toContain("*");
+    for (const { cols } of selected().filter((c) => typeof c.cols === "string")) expect(cols).not.toContain("*");
+    expect(selected().some((c) => c.table === "student_scores")).toBe(true);
   });
 
   it("mentee summaries need student_id to group rows by student", async () => {
@@ -249,7 +263,7 @@ describe("getAcademyPerformance", () => {
     expect(res.ok).toBe(true);
     // 1,000 scores of 100% and 435 of 0% average 69.7%; the first page alone would have said 100%.
     expect(res.data?.batches[0].avgScorePct).toBeCloseTo(69.7, 1);
-    const scoreCalls = db.calls.filter((c) => c.table === "student_scores");
+    const scoreCalls = db.calls.filter((c) => c.table === "academy_score_points");
     expect(scoreCalls).toHaveLength(2);
     expect(scoreCalls[0].q.range).toHaveBeenCalledWith(0, 999);
     expect(scoreCalls[1].q.range).toHaveBeenCalledWith(1000, 1999);

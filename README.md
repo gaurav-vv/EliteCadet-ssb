@@ -122,7 +122,7 @@ lib/server/          domain services: users, academies, academy-people, content,
 lib/actions/         Server Actions
 lib/practice/        5-day journey structure and timing
 types/               shared domain types
-supabase/migrations/ 0001–0036, applied in order, one file per number
+supabase/migrations/ 0001–0037, applied in order, one file per number
 supabase/tests/      end-to-end database workflow check
 tests/               Vitest unit + integration, Playwright e2e
 ```
