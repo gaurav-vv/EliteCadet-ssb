@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { RetryErrorState } from "@/components/academy/shared/retry-error-state";
 import { RoleTag } from "@/components/admin/users/user-tags";
 import { Button } from "@/components/ui/button";

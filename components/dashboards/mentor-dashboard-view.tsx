@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { CalendarClock, CircleCheck, ClipboardCheck, Users } from "lucide-react";
 import { StatusBadge } from "@/components/academy/shared/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { ArrowRight, Newspaper } from "lucide-react";
 import { NewsThumbnail } from "@/components/student/news-thumbnail";
 import { formatNewsDate } from "@/lib/api/news";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { ArrowRight, ListChecks } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { RoadmapAction } from "@/types/roadmap";

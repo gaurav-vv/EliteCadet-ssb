@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { ChevronRight } from "lucide-react";
 import { IconTile } from "@/components/academy/shared/icon-tile";
 import type { NavIconName } from "@/components/ui/nav-icons";

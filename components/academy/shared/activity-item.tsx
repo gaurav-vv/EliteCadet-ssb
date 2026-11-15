@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { StatusBadge } from "@/components/academy/shared/status-badge";
 import type { DashboardTone } from "@/types/academy";
 

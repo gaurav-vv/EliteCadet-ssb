@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentPrefetchLink as Link } from "@/components/ui/intent-prefetch-link";
 import { CalendarClock } from "lucide-react";
 import { ChartCard } from "@/components/academy/shared/chart-card";
 import { EmptyState } from "@/components/ui/empty-state";

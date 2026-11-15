@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LoginForm } from "@/components/auth/login-form";
+import { takeFlash } from "@/lib/flash";
 import { logIn } from "@/lib/api/auth";
 
 vi.mock("@/lib/api/auth", () => ({
@@ -20,6 +21,7 @@ beforeEach(() => {
   mockedLogIn.mockReset();
   push.mockReset();
   refresh.mockReset();
+  takeFlash();
 });
 
 describe("LoginForm", () => {
@@ -39,7 +41,22 @@ describe("LoginForm", () => {
 
     await waitFor(() => expect(mockedLogIn).toHaveBeenCalledWith({ email: "cadet@example.com", password: "correcthorse" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/mentor"));
-    expect(refresh).toHaveBeenCalled();
+    // One navigation only: a refresh after the push rendered the dashboard (and ran its queries) twice.
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+    // The success toast is left for the dashboard to show once.
+    expect(takeFlash()).toBe("Logged in successfully!");
+  });
+
+  it("leaves no success toast behind when login fails", async () => {
+    mockedLogIn.mockResolvedValue({ ok: false, error: { code: "invalid_credentials", message: "Incorrect email or password." } });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+    await user.type(screen.getByLabelText(/email/i), "cadet@example.com");
+    await user.type(screen.getByLabelText(/password/i), "wrongpass");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+    await screen.findByText(/incorrect email or password/i);
+    expect(takeFlash()).toBeNull();
   });
 
   it("honors an explicit redirectTo instead of the role default", async () => {
@@ -68,6 +85,43 @@ describe("LoginForm", () => {
     await user.click(screen.getByRole("button", { name: /log in/i }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith(expected));
+  });
+
+  it.each([
+    ["student", "/student"],
+    ["mentor", "/mentor"],
+    ["academy_admin", "/academy"],
+    ["super_admin", "/admin"],
+  ])("sends a %s to %s with exactly one navigation (no refresh)", async (role, expected) => {
+    mockedLogIn.mockResolvedValue({ ok: true, data: { role } });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/email/i), "cadet@example.com");
+    await user.type(screen.getByLabelText(/password/i), "correcthorse");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith(expected));
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["account_suspended", "This account has been suspended."],
+    ["account_unavailable", "We couldn't load your account."],
+    ["profile_missing", "Your account isn't fully set up."],
+  ] as const)("a %s sign-in shows its message and goes nowhere", async (code, message) => {
+    mockedLogIn.mockResolvedValue({ ok: false, error: { code, message } });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/email/i), "cadet@example.com");
+    await user.type(screen.getByLabelText(/password/i), "correcthorse");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("explains why the proxy sent the user back here when their account couldn't load", () => {
